@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/ui_background"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="App Name"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:paddingBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/btn_freeze"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="16dp"
+        android:text="冻结 (Freeze)"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/btn_unfreeze"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="16dp"
+        android:text="解冻 (Unfreeze)"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/btn_run"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="16dp"
+        android:text="运行 (Run)"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/btn_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="16dp"
+        android:text="应用信息 (App Info)"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="16sp"/>
+
+</LinearLayout>

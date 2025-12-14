@@ -28,5 +28,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.item_gestures).setOnClickListener {
             startActivity(android.content.Intent(this, GesturesActivity::class.java))
         }
+
+        findViewById<View>(R.id.item_freezer).setOnClickListener {
+            startActivity(android.content.Intent(this, FreezerActivity::class.java))
+        }
     }
 }

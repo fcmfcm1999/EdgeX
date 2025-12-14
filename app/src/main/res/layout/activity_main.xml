@@ -79,6 +79,7 @@
 
             <!-- Item 2: Freezer -->
             <LinearLayout
+                android:id="@+id/item_freezer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="?android:attr/selectableItemBackground"
@@ -109,10 +110,7 @@
                     android:textColor="@color/ui_text_primary"
                     android:textSize="16sp" />
                 
-                <CheckBox
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:buttonTint="@color/ui_checkbox_tint" />
+
             </LinearLayout>
 
             <!-- Item 3: About -->
