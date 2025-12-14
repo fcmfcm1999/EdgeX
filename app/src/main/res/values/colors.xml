@@ -1,10 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- Brand Colors -->
+    <color name="purple_200">#FF80CBC4</color>
+    <color name="purple_500">#FF009688</color>
+    <color name="purple_700">#FF00796B</color>
+    <color name="teal_200">#FF80CBC4</color>
+    <color name="teal_700">#FF00796B</color>
+    
+    <!-- Core Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Semantic Colors (Light Mode Default) -->
+    <color name="ui_background">#FFFFFFFF</color>
+    <color name="ui_text_primary">#DE000000</color>
+    <color name="ui_text_secondary">#8A000000</color>
+    
+    <color name="ui_header_background">@color/purple_500</color>
+    <color name="ui_header_text">@color/white</color>
+    
+    <color name="ui_item_background">@color/white</color>
+    <color name="ui_icon_bg">@color/purple_500</color>
+    <color name="ui_icon_tint">@color/white</color>
+    <color name="ui_checkbox_tint">@color/purple_500</color>
 </resources>

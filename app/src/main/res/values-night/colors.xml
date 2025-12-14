@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic Colors (Dark Mode Override) -->
+    <color name="ui_background">#FF212121</color>
+    <color name="ui_text_primary">#DEFFFFFF</color>
+    <color name="ui_text_secondary">#8AFFFFFF</color>
+    
+    <!-- Keep header same or darken? Standard material dark uses Surface color, but user screenshot shows Teal header. We keep Teal. -->
+    <color name="ui_header_background">@color/purple_500</color> 
+    <color name="ui_header_text">@color/white</color>
+    
+    <color name="ui_item_background">#FF212121</color>
+    <color name="ui_icon_bg">@color/purple_500</color>
+    <color name="ui_icon_tint">@color/white</color>
+    <color name="ui_checkbox_tint">@color/white</color>
+</resources>

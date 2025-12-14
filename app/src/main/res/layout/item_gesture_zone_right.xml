@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Header -->
+    <LinearLayout
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="16dp">
+
+        <FrameLayout
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/circle_background_teal">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_edge_panel"
+                android:tint="@color/ui_icon_tint" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:text="Right Zone"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="16sp" />
+
+        <CheckBox
+            android:id="@+id/checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:buttonTint="@color/ui_checkbox_tint" />
+        
+            <ImageView
+            android:id="@+id/arrow"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_arrow_drop_down"
+            android:tint="@color/ui_checkbox_tint" />
+    </LinearLayout>
+
+    <!-- Body (Collapsed by default) -->
+    <LinearLayout
+        android:id="@+id/body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingStart="72dp"
+        android:paddingEnd="16dp">
+
+        <!-- Action Items Include -->
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_click" />
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_double_click" />
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_long_press" />
+        
+        <!-- Right Side specfic: Swipe Left -->
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_swipe_left" />
+        
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_swipe_up" />
+        <include layout="@layout/item_gesture_action" android:id="@+id/action_swipe_down" />
+
+    </LinearLayout>
+</LinearLayout>
