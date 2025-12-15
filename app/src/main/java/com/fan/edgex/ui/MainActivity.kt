@@ -25,7 +25,19 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         
+        val prefs = getSharedPreferences("config", MODE_PRIVATE)
+        val cbGestures = findViewById<android.widget.CheckBox>(R.id.checkbox_gestures)
+        cbGestures.isChecked = prefs.getBoolean("gestures_enabled", true)
+        cbGestures.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("gestures_enabled", isChecked).apply()
+            // Notify Hook to refresh
+            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+        }
+
         findViewById<View>(R.id.item_gestures).setOnClickListener {
+            // Only allow entering if allowed? Or always allow? 
+            // User: "Only when enabled ... gestures take effect". This usually means background logic.
+            // But just in case, I'll allow configuration access always (standard UX).
             startActivity(android.content.Intent(this, GesturesActivity::class.java))
         }
 

@@ -22,18 +22,25 @@ class ConfigProvider : ContentProvider() {
     override fun query(
         uri: Uri,
         projection: Array<out String>?,
-        selection: String?,
-        selectionArgs: Array<out String>?,
-        sortOrder: String?
+        selection: String?, // KEY
+        selectionArgs: Array<out String>?, // Default Value
+        sortOrder: String? // TYPE (string, boolean, int)
     ): Cursor? {
-        // Read from internal standardized SharedPreferences
         val context = context ?: return null
         val prefs = context.getSharedPreferences("config", Context.MODE_PRIVATE)
-        val selectedApps = prefs.getStringSet("selected_apps", emptySet()) ?: emptySet()
+        val key = selection ?: return null
+        val defValue = selectionArgs?.firstOrNull() ?: ""
+        val type = sortOrder ?: "string"
         
-        // Return data as a Cursor
-        val cursor = MatrixCursor(arrayOf("package_names"))
-        cursor.addRow(arrayOf(selectedApps.joinToString(",")))
+        val cursor = MatrixCursor(arrayOf("value"))
+        
+        val value = when(type) {
+            "boolean" -> prefs.getBoolean(key, defValue.toBoolean()).toString()
+            "int" -> prefs.getInt(key, defValue.toIntOrNull() ?: 0).toString()
+            else -> prefs.getString(key, defValue)
+        }
+        
+        cursor.addRow(arrayOf(value))
         return cursor
     }
 
