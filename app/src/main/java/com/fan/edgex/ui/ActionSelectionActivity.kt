@@ -50,12 +50,12 @@ class ActionSelectionActivity : AppCompatActivity() {
         recyclerView.adapter = ActionAdapter(actions) { item ->
             // Save Selection
             val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-            prefs.edit().putString(prefKey, item.label).apply() 
-            // Saving "Label" for simple display updating in previous screen. 
-            // Ideally should save 'code' and map back, but for this prototype UI I'll save current display text too or just finish.
-            // Let's save the CODE for logic, but we need to update the UI on the other side. 
-            // I'll save the visual label too for easy UI binding on return? No, let's just save code.
+            prefs.edit().putString(prefKey, item.code).apply() // Valid Code: "freezer_drawer" etc
+            // Saving "Label" for simple display updating in previous screen.
             prefs.edit().putString(prefKey + "_label", item.label).apply()
+            
+            // Notify Hook to refresh (CRITICAL for instant update)
+            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
             
             finish()
         }

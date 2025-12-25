@@ -13,6 +13,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import com.fan.edgex.overlay.DrawerManager
 import kotlin.math.abs
 
 @SuppressLint("StaticFieldLeak")
@@ -42,13 +43,13 @@ object GestureManager {
     private fun addGestureView(gravity: Int) {
         val wm = context?.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = context?.resources?.displayMetrics
-        val widthPx = if (metrics != null) (30 * metrics.density).toInt() else 100
+        val widthPx = if (metrics != null) (40 * metrics.density).toInt() else 120
         
         val view = GestureView(context!!, gravity)
         val params = WindowManager.LayoutParams(
             widthPx, // Usage of calculated DP width (approx 80-100px) instead of 30px
             WindowManager.LayoutParams.MATCH_PARENT, // Revert to full height for reliability
-            2024, 
+            2027, // TYPE_MAGNIFICATION_OVERLAY: Often allows full gesture exclusion and is visible.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
@@ -73,14 +74,16 @@ object GestureManager {
         val thread = Thread {
             try {
                 // Pre-fetch keys
-                val keys = listOf("gestures_enabled", 
-                                "left_mid_swipe_left", "left_mid_swipe_right",
-                                "left_bottom_swipe_left", "left_bottom_swipe_right", 
-                                "right_top_swipe_left", "right_top_swipe_right",
-                                "right_mid_swipe_left", "right_mid_swipe_right",
-                                "right_bottom_swipe_left", "right_bottom_swipe_right",
-                                "zone_enabled_left_mid", "zone_enabled_left_bottom",
-                                "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom")
+                val keys = listOf(
+                    "gestures_enabled",
+                    "zone_enabled_left_mid", "zone_enabled_left_bottom",
+                    "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
+                    "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
+                    "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
+                    "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
+                    "right_mid_swipe_left", "right_mid_swipe_right", "right_mid_swipe_up", "right_mid_swipe_down",
+                    "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down"
+                )
                 
                 for (key in keys) {
                      val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled") "boolean" else "string"
@@ -90,7 +93,10 @@ object GestureManager {
                 
                 // Refresh Views on Main Thread after Cache Update
                 Handler(Looper.getMainLooper()).post {
-                    views.forEach { it.invalidate() }
+                    views.forEach { 
+                        it.updateWindowRegion()
+                        it.invalidate() 
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -103,15 +109,7 @@ object GestureManager {
         private var startY = 0f
         private var startTime = 0L
         private val handler = Handler(Looper.getMainLooper())
-        private var clickCount = 0
-        
-        // Double click timeout
-        private val resetClick = Runnable {
-            if (clickCount == 1) {
-                triggerAction("click")
-            }
-            clickCount = 0
-        }
+
 
         private val paint = android.graphics.Paint()
 
@@ -174,8 +172,71 @@ object GestureManager {
 
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
-            val exclusionRects = listOf(Rect(0, 0, width, height))
-            systemGestureExclusionRects = exclusionRects
+            // No-op here, layout update handled via ContentObserver -> reloadConfig -> main thread handler
+        }
+
+        fun updateWindowRegion() {
+            val h = context.resources.displayMetrics.heightPixels
+            var minTop = h // Start from bottom
+            var maxBottom = 0 // Start from top
+            
+            var hasEnabledZone = false
+
+            if (edgeGravity == Gravity.LEFT) {
+                if (isZoneEnabled("left_mid")) {
+                    minTop = kotlin.math.min(minTop, 0)
+                    maxBottom = kotlin.math.max(maxBottom, (h * 0.6f).toInt())
+                    hasEnabledZone = true
+                }
+                if (isZoneEnabled("left_bottom")) {
+                    minTop = kotlin.math.min(minTop, (h * 0.6f).toInt())
+                    maxBottom = kotlin.math.max(maxBottom, h)
+                    hasEnabledZone = true
+                }
+            } else {
+                 if (isZoneEnabled("right_top")) {
+                    minTop = kotlin.math.min(minTop, 0)
+                    maxBottom = kotlin.math.max(maxBottom, (h * 0.33f).toInt())
+                    hasEnabledZone = true
+                }
+                if (isZoneEnabled("right_mid")) {
+                    minTop = kotlin.math.min(minTop, (h * 0.33f).toInt())
+                    maxBottom = kotlin.math.max(maxBottom, (h * 0.66f).toInt())
+                    hasEnabledZone = true
+                }
+                if (isZoneEnabled("right_bottom")) {
+                    minTop = kotlin.math.min(minTop, (h * 0.66f).toInt())
+                    maxBottom = kotlin.math.max(maxBottom, h)
+                    hasEnabledZone = true
+                }
+            }
+            
+            // Update Window Layout Params
+            try {
+                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val params = layoutParams as WindowManager.LayoutParams
+                
+                if (!hasEnabledZone) {
+                    // Hide completely
+                    params.height = 0
+                } else {
+                    // Set precise coverage
+                    params.gravity = Gravity.TOP or edgeGravity
+                    params.y = minTop
+                    params.height = maxBottom - minTop
+                }
+                
+                wm.updateViewLayout(this, params)
+                
+                // Also update exclusion rects based on the NEW local coordinates
+                // Note: exclusion rects are usually relative to the window content
+                val exclusionRects = mutableListOf<Rect>()
+                exclusionRects.add(Rect(0, 0, width, params.height)) 
+                systemGestureExclusionRects = exclusionRects
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
         
         private fun isZoneEnabled(zone: String): Boolean {
@@ -216,7 +277,9 @@ object GestureManager {
                             }
                         } else {
                             // Tap / Click handling (if movement is small)
-                            handleClick(duration)
+                            // User requested to remove Click features to fix obstruction.
+                            // So we trigger Pass-Through immediately.
+                            injectInputEvent(endX, endY)
                         }
                     } else {
                         // Vertical Swipe
@@ -229,7 +292,7 @@ object GestureManager {
                                  triggerAction("swipe_down")
                              }
                         } else {
-                            handleClick(duration)
+                            injectInputEvent(endX, endY)
                         }
                     }
                     return true
@@ -238,18 +301,75 @@ object GestureManager {
             return false
         }
         
-        private fun handleClick(duration: Long) {
-            if (duration > 400) {
-                 triggerAction("long_press")
-            } else {
-                clickCount++
-                if (clickCount == 1) {
-                    handler.postDelayed(resetClick, 300)
-                } else if (clickCount == 2) {
-                    handler.removeCallbacks(resetClick)
-                    triggerAction("double_click")
-                    clickCount = 0
+        private fun injectInputEvent(x: Float, y: Float) {
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            
+            // 1. Temporarily disable touch to let event pass through THIS window
+            handler.post { setTouchable(false) }
+            
+            // 2. Wait for WindowManager to update InputWindows (approx 16-32ms frames, safe 50ms)
+            handler.postDelayed({
+                // 3. Inject Event (Async)
+                Thread {
+                    var success = false
+                    try {
+                        val method = Class.forName("android.hardware.input.InputManager")
+                            .getMethod("getInstance")
+                        val instance = method.invoke(null)
+                        val injectMethod = instance.javaClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
+
+                        val downTime = android.os.SystemClock.uptimeMillis()
+                        
+                        // DOWN
+                        val downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+                        downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+                        injectMethod.invoke(instance, downEvent, 0)
+                        downEvent.recycle()
+                        
+                        // Delay for valid tap duration (10-20ms)
+                        Thread.sleep(15)
+
+                        // UP
+                        val eventTime = android.os.SystemClock.uptimeMillis()
+                        val upEvent = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_UP, x, y, 0)
+                        upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+                        injectMethod.invoke(instance, upEvent, 0)
+                        upEvent.recycle()
+                        
+                        success = true
+                    } catch (e: Exception) {
+                        de.robv.android.xposed.XposedBridge.log("EdgeX: Reflection Injection Failed: ${e.message}")
+                    }
+                    
+                    if (!success) {
+                        // Fallback to Shell
+                        try {
+                            Runtime.getRuntime().exec("input tap ${x.toInt()} ${y.toInt()}")
+                        } catch (e: Exception) {
+                             de.robv.android.xposed.XposedBridge.log("EdgeX: Shell Injection Failed: ${e.message}")
+                        }
+                    }
+
+                    // 4. Restore Touch (Main Thread)
+                    handler.post { setTouchable(true) }
+                }.start()
+            }, 100) // Increased delay to 100ms for WM stability
+        }
+        
+        private fun setTouchable(touchable: Boolean) {
+            try {
+                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val params = layoutParams as WindowManager.LayoutParams
+                if (touchable) {
+                    // remove FLAG_NOT_TOUCHABLE -> Become Touchable
+                    params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                } else {
+                    // add FLAG_NOT_TOUCHABLE -> Become Untouchable (Transparent to events)
+                    params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                 }
+                wm.updateViewLayout(this, params)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
         
@@ -261,26 +381,19 @@ object GestureManager {
             
             // Query Config
             val action = getConfig(configKey)
+            
             if (action.isEmpty() || action == "default" || action == "none") return
             
             performAction(action)
         }
-        
+
         private fun getZone(y: Float): String {
             val h = context.resources.displayMetrics.heightPixels
             return when {
-                y < h * 0.33 -> if (edgeGravity == Gravity.LEFT) "left_mid" else "right_top" // Wait, "left_mid"? User layout says "Left Mid", "Left Bottom". What happened to "Left Top"? Layout only had 2 left zones. 
-                // Correction based on USER UI Layout:
-                // Left: Left Mid, Left Bottom.
-                // Right: Right Top, Right Mid, Right Bottom.
-                // Let's refine based on user labels.
-                // Left: < 50% -> Left Mid? > 50% -> Left Bottom? 
-                // Right: < 33% Top, 33-66 Mid, > 66 Bottom.
-                
-                // REVISED LOGIC:
+                y < h * 0.33 -> if (edgeGravity == Gravity.LEFT) "left_mid" else "right_top" 
                 else -> {
                     if (edgeGravity == Gravity.LEFT) {
-                        if (y < h * 0.6) "left_mid" else "left_bottom" // Assuming top part is just "Mid" or User didn't ask for Left Top.
+                        if (y < h * 0.6) "left_mid" else "left_bottom"
                     } else {
                          if (y < h * 0.33) "right_top"
                          else if (y < h * 0.66) "right_mid"
@@ -292,24 +405,17 @@ object GestureManager {
     }
 
     private fun isGesturesEnabled(): Boolean {
-        // Default to TRUE so it works on first install
-        // Logic: if cache returns "false" explicitly, then false. Else true (default or missing).
-        val value = getConfig("gestures_enabled", "boolean", "true")
-        return value != "false"
+        return getConfig("gestures_enabled", "boolean", "true") != "false"
     }
-
 
     
     private fun getConfig(key: String, type: String = "string", defValue: String = ""): String {
-         // Trigger reload if stale, but return cached immediately
          reloadConfigAsync()
          
          if (configCache.containsKey(key)) {
              return configCache[key] ?: defValue
          }
          
-         // Fallback to sync query if completely missing (first run)
-         // Store result in cache
          val value = queryConfigProvider(key, type)
          if (value.isNotEmpty()) configCache[key] = value
          return if (value.isNotEmpty()) value else defValue
@@ -338,44 +444,23 @@ object GestureManager {
     private fun performAction(action: String) {
         val ctx = context ?: return
         
-        // Show Toast for the action
-        // Toast.makeText(ctx, "Gesture: $action", Toast.LENGTH_SHORT).show() // Generic debug
-        
         when (action) {
             "back" -> {
-                Toast.makeText(ctx, "执行: 返回", Toast.LENGTH_SHORT).show()
+                try { Runtime.getRuntime().exec("input keyevent 4") } catch(e:Exception){}
             }
-            
             "home" -> {
-                Toast.makeText(ctx, "执行: 返回桌面", Toast.LENGTH_SHORT).show()
-                 // Placeholder for Home
+                 try { Runtime.getRuntime().exec("input keyevent 3") } catch(e:Exception){}
             }
-            
             "freezer_drawer" -> {
-                Toast.makeText(ctx, "打开冰箱抽屉", Toast.LENGTH_SHORT).show()
-                // Launch Freezer Activity
-//                val intent = Intent().setClassName("com.fan.edgex", "com.fan.edgex.ui.FreezerActivity")
-//                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-//                ctx.startActivity(intent)
+                DrawerManager.showDrawer(context!!)
             }
-            
             "screenshot" -> {
-                Toast.makeText(ctx, "正在截屏...", Toast.LENGTH_SHORT).show()
-//                try { Runtime.getRuntime().exec("input keyevent 120") } catch(e:Exception){}
+                try { Runtime.getRuntime().exec("input keyevent 120") } catch(e:Exception){}
             }
-            
             "refreeze" -> {
                 Toast.makeText(ctx, "重新冻结应用", Toast.LENGTH_SHORT).show()
-                // Refreeze logic placeholder
             }
-            
             else -> Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
         }
-    }
-    
-    // Placeholder for actual global action
-    object AccessibilityService { const val GLOBAL_ACTION_BACK = 1 } 
-    private fun performGlobalAction(action: Int) {
-         try { Runtime.getRuntime().exec("input keyevent 4") } catch(e:Exception){}
     }
 }
