@@ -35,6 +35,9 @@ object GestureManager {
         // Add Right Edge
         addGestureView(Gravity.RIGHT)
         
+        // Load initial config to set correct size immediately
+        reloadConfigAsync()
+        
         de.robv.android.xposed.XposedBridge.log("EdgeX: GestureManager initialized")
     }
 
@@ -43,13 +46,13 @@ object GestureManager {
     private fun addGestureView(gravity: Int) {
         val wm = context?.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = context?.resources?.displayMetrics
-        val widthPx = if (metrics != null) (40 * metrics.density).toInt() else 120
+        val widthPx = if (metrics != null) (24 * metrics.density).toInt() else 72
         
         val view = GestureView(context!!, gravity)
         val params = WindowManager.LayoutParams(
-            widthPx, // Usage of calculated DP width (approx 80-100px) instead of 30px
-            WindowManager.LayoutParams.MATCH_PARENT, // Revert to full height for reliability
-            2027, // TYPE_MAGNIFICATION_OVERLAY: Often allows full gesture exclusion and is visible.
+            widthPx, 
+            0, // Initial height 0 to prevent "full height flash" before config loads
+            2027, // TYPE_MAGNIFICATION_OVERLAY
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
