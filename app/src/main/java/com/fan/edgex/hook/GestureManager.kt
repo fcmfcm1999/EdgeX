@@ -458,9 +458,84 @@ object GestureManager {
                 try { Runtime.getRuntime().exec("input keyevent 120") } catch(e:Exception){}
             }
             "refreeze" -> {
-                Toast.makeText(ctx, "重新冻结应用", Toast.LENGTH_SHORT).show()
+                performRefreeze(ctx)
             }
             else -> Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun performRefreeze(context: Context) {
+        val handler = Handler(Looper.getMainLooper())
+        Thread {
+            try {
+                // 1. Get List from Config (Persistent)
+                var listStr = queryConfigProvider("freezer_app_list", "string")
+                de.robv.android.xposed.XposedBridge.log("EdgeX: Refreeze - freezer_app_list query returned: '$listStr'")
+                
+                // 2. Fallback to Runtime History if persistent list is empty
+                if (listStr.isEmpty()) {
+                    val historySet = DrawerManager.frozenAppsHistory
+                    if (historySet.isEmpty()) {
+                        handler.post { Toast.makeText(context, "冰箱列表为空", Toast.LENGTH_SHORT).show() }
+                        return@Thread
+                    }
+                    listStr = historySet.joinToString(",")
+                    de.robv.android.xposed.XposedBridge.log("EdgeX: Refreeze - using runtime history: '$listStr'")
+                }
+                
+                val packages = listStr.split(",")
+                val pm = context.packageManager
+                var count = 0
+                
+                for (pkg in packages) {
+                    if (pkg.isBlank()) continue
+                    try {
+                        // Check if installed and enabled
+                        val info = pm.getApplicationInfo(pkg, 0) 
+                        if (info.enabled) {
+                             // Freeze it
+                             var success = false
+                             // 1. Try API first (SystemUI context)
+                             try {
+                                 pm.setApplicationEnabledSetting(pkg, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
+                                 success = true
+                             } catch (e: Exception) {
+                                  // Ignore, try Root
+                             }
+                             
+                             // 2. Fallback to Root
+                             if (!success) {
+                                 try {
+                                    val p = Runtime.getRuntime().exec("su")
+                                    val os = java.io.DataOutputStream(p.outputStream)
+                                    os.writeBytes("pm disable $pkg\n")
+                                    os.writeBytes("exit\n")
+                                    os.flush()
+                                    if (p.waitFor() == 0) success = true
+                                 } catch(e: Exception){
+                                     e.printStackTrace()
+                                 }
+                             }
+                             
+                             if (success) count++
+                        }
+                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
+                        // App not found, maybe uninstalled
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                
+                if (count > 0) {
+                    handler.post { Toast.makeText(context, "已重新冻结 $count 个应用", Toast.LENGTH_SHORT).show() }
+                } else {
+                    handler.post { Toast.makeText(context, "没有需要冻结的应用", Toast.LENGTH_SHORT).show() }
+                }
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                handler.post { Toast.makeText(context, "冻结出错: ${e.message}", Toast.LENGTH_SHORT).show() }
+            }
+        }.start()
     }
 }

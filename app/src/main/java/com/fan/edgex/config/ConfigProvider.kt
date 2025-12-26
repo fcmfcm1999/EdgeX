@@ -40,6 +40,8 @@ class ConfigProvider : ContentProvider() {
             else -> prefs.getString(key, defValue)
         }
         
+        android.util.Log.d("EdgeX", "ConfigProvider.query - key: $key, type: $type, value: $value")
+        
         cursor.addRow(arrayOf(value))
         return cursor
     }
