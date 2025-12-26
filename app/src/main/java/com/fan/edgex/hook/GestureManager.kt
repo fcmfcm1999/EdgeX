@@ -444,6 +444,12 @@ object GestureManager {
     private fun performAction(action: String) {
         val ctx = context ?: return
         
+        // Handle app shortcuts
+        if (action.startsWith("app_shortcut:")) {
+            launchShortcut(ctx, action)
+            return
+        }
+        
         when (action) {
             "back" -> {
                 try { Runtime.getRuntime().exec("input keyevent 4") } catch(e:Exception){}
@@ -461,6 +467,48 @@ object GestureManager {
                 performRefreeze(ctx)
             }
             else -> Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun launchShortcut(context: Context, action: String) {
+        try {
+            // Parse: app_shortcut:{packageName}:{shortcutId}
+            val parts = action.split(":")
+            if (parts.size != 3) {
+                Toast.makeText(context, "快捷方式格式错误", Toast.LENGTH_SHORT).show()
+                return
+            }
+            
+            val packageName = parts[1]
+            val shortcutId = parts[2]
+            
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
+                val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+                
+                // Try to start the shortcut
+                try {
+                    launcherApps.startShortcut(packageName, shortcutId, null, null, android.os.Process.myUserHandle())
+                } catch (e: Exception) {
+                    de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to launch shortcut: ${e.message}")
+                    // Fallback: try to launch the app itself
+                    try {
+                        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                        if (intent != null) {
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } else {
+                            Toast.makeText(context, "无法启动快捷方式", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e2: Exception) {
+                        Toast.makeText(context, "启动失败", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } else {
+                Toast.makeText(context, "需要 Android 7.1 及以上版本", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "快捷方式启动失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

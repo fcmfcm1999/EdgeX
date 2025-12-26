@@ -54,6 +54,11 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
+        <activity
+            android:name=".ui.ShortcutSelectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
         <provider
                 android:name=".config.ConfigProvider"
                 android:authorities="com.fan.edgex.provider"

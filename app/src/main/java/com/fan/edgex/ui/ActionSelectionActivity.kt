@@ -1,6 +1,7 @@
 package com.fan.edgex.ui
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -24,7 +25,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem("最近应用 (Recents)", "recents", R.drawable.ic_edge_panel), // Placeholder icon
         ActionItem("冰箱抽屉 (Freezer Drawer)", "freezer_drawer", R.drawable.ic_freezer),
         ActionItem("重新冻结 (Refreeze)", "refreeze", R.drawable.ic_freezer),
-        ActionItem("截屏 (Screenshot)", "screenshot", R.drawable.ic_camera)
+        ActionItem("截屏 (Screenshot)", "screenshot", R.drawable.ic_camera),
+        ActionItem("应用快捷方式 (App Shortcut)", "app_shortcut", R.drawable.ic_apps)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,16 +50,24 @@ class ActionSelectionActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = ActionAdapter(actions) { item ->
-            // Save Selection
-            val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-            prefs.edit().putString(prefKey, item.code).apply() // Valid Code: "freezer_drawer" etc
-            // Saving "Label" for simple display updating in previous screen.
-            prefs.edit().putString(prefKey + "_label", item.label).apply()
-            
-            // Notify Hook to refresh (CRITICAL for instant update)
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-            
-            finish()
+            if (item.code == "app_shortcut") {
+                // Launch ShortcutSelectionActivity
+                val intent = Intent(this, ShortcutSelectionActivity::class.java)
+                intent.putExtra("pref_key", prefKey)
+                startActivity(intent)
+                finish()
+            } else {
+                // Save Selection
+                val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
+                prefs.edit().putString(prefKey, item.code).apply() // Valid Code: "freezer_drawer" etc
+                // Saving "Label" for simple display updating in previous screen.
+                prefs.edit().putString(prefKey + "_label", item.label).apply()
+                
+                // Notify Hook to refresh (CRITICAL for instant update)
+                contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+                
+                finish()
+            }
         }
     }
     
