@@ -44,5 +44,44 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.item_freezer).setOnClickListener {
             startActivity(android.content.Intent(this, FreezerActivity::class.java))
         }
+
+        // Advanced Options (Collapsible)
+        val advancedContent = findViewById<View>(R.id.advanced_options_content)
+        val advancedArrow = findViewById<android.widget.ImageView>(R.id.arrow_advanced)
+        var isAdvancedExpanded = false
+        
+        findViewById<View>(R.id.item_advanced).setOnClickListener {
+            isAdvancedExpanded = !isAdvancedExpanded
+            advancedContent.visibility = if (isAdvancedExpanded) View.VISIBLE else View.GONE
+            advancedArrow.rotation = if (isAdvancedExpanded) 180f else 0f
+        }
+
+        // Advanced Options
+        
+        // 1. Debug Matrix
+        val cbDebug = findViewById<android.widget.CheckBox>(R.id.checkbox_debug_matrix)
+        cbDebug.isChecked = prefs.getBoolean("debug_matrix_enabled", false)
+        
+        val onDebugToggle = { isChecked: Boolean ->
+            prefs.edit().putBoolean("debug_matrix_enabled", isChecked).apply()
+            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+            cbDebug.isChecked = isChecked
+        }
+        
+        cbDebug.setOnCheckedChangeListener { _, isChecked -> onDebugToggle(isChecked) }
+        
+        findViewById<View>(R.id.item_debug_matrix).setOnClickListener {
+            cbDebug.performClick()
+        }
+
+        // 2. Restart SystemUI
+        findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
+            val result = com.fan.edgex.utils.findProcessAndKill("com.android.systemui")
+            result.onSuccess {
+                android.widget.Toast.makeText(this, "正在重启 SystemUI...", android.widget.Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                android.widget.Toast.makeText(this, "重启失败: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

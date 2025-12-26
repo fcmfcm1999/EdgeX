@@ -78,7 +78,7 @@ object GestureManager {
             try {
                 // Pre-fetch keys
                 val keys = listOf(
-                    "gestures_enabled",
+                    "gestures_enabled", "debug_matrix_enabled",
                     "zone_enabled_left_mid", "zone_enabled_left_bottom",
                     "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
                     "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
@@ -89,14 +89,19 @@ object GestureManager {
                 )
                 
                 for (key in keys) {
-                     val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled") "boolean" else "string"
+                     val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled" || key == "debug_matrix_enabled") "boolean" else "string"
                      configCache[key] = queryConfigProvider(key, type)
                 }
                 lastConfigLoad = System.currentTimeMillis()
                 
                 // Refresh Views on Main Thread after Cache Update
                 Handler(Looper.getMainLooper()).post {
+                    // Update Debug Color for each view
+                    val debug = getConfig("debug_matrix_enabled", "boolean") == "true"
+                    val color = if (debug) 0x3300FF00.toInt() else 0x00000000
+                    
                     views.forEach { 
+                        it.updateDebugColor(color)
                         it.updateWindowRegion()
                         it.invalidate() 
                     }
@@ -117,7 +122,7 @@ object GestureManager {
         private val paint = android.graphics.Paint()
 
         init {
-            paint.color = 0x3300FF00.toInt() // Transparent Green for Debug
+            paint.color = 0x00000000 // Default Transparent
             paint.style = android.graphics.Paint.Style.FILL
             
             // CRITICAL: specific to generic Views, enables onDraw
@@ -240,6 +245,10 @@ object GestureManager {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+        
+        fun updateDebugColor(color: Int) {
+            paint.color = color
         }
         
         private fun isZoneEnabled(zone: String): Boolean {
