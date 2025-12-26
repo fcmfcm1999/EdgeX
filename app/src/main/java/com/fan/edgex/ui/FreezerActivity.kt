@@ -33,11 +33,13 @@ class FreezerActivity : AppCompatActivity() {
     data class AppItem(
         val info: ApplicationInfo,
         val label: String,
-        val isFrozen: Boolean
+        val isFrozen: Boolean,
+        var isChecked: Boolean = false
     )
 
     private val allApps = mutableListOf<AppItem>()
     private val displayedApps = mutableListOf<AppItem>()
+    private val freezerList = mutableSetOf<String>() // Set of package names
     private lateinit var adapter: AppListAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,9 +57,13 @@ class FreezerActivity : AppCompatActivity() {
         // Recycler View
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        adapter = AppListAdapter(displayedApps) { app ->
-            showAppDialog(app)
-        }
+        adapter = AppListAdapter(displayedApps, 
+            onClick = { app -> showAppDialog(app) },
+            onCheckChanged = { app, isChecked -> 
+                app.isChecked = isChecked
+                updateFreezerList(app.info.packageName, isChecked)
+            }
+        )
         recyclerView.adapter = adapter
 
         // Search Logic
@@ -66,7 +72,7 @@ class FreezerActivity : AppCompatActivity() {
         // Load Apps
         loadApps()
     }
-
+    
     private fun setupSearch() {
         val btnSearch = findViewById<ImageView>(R.id.btn_search)
         val etSearch = findViewById<EditText>(R.id.et_search)
@@ -78,9 +84,8 @@ class FreezerActivity : AppCompatActivity() {
                 tvTitle.visibility = View.GONE
                 etSearch.visibility = View.VISIBLE
                 etSearch.requestFocus()
-                // Show keyboard logic omitted for brevity, but standard
             } else {
-                // Close/Clear Search if empty, else just clear
+                // Close/Clear
                 if (etSearch.text.isEmpty()) {
                     etSearch.visibility = View.GONE
                     tvTitle.visibility = View.VISIBLE
@@ -97,14 +102,23 @@ class FreezerActivity : AppCompatActivity() {
 
     private fun loadApps() {
         lifecycleScope.launch(Dispatchers.IO) {
+            // Load saved list
+            val prefs = getSharedPreferences("config", MODE_PRIVATE)
+            val savedString = prefs.getString("freezer_app_list", "") ?: ""
+            freezerList.clear()
+            if (savedString.isNotEmpty()) {
+                freezerList.addAll(savedString.split(","))
+            }
+
             val pm = packageManager
-            val rawApps = pm.getInstalledApplications(0)  // Get all apps including disabled
+            val rawApps = pm.getInstalledApplications(0)
             
             val list = rawApps.map { info ->
                 AppItem(
                     info = info,
                     label = info.loadLabel(pm).toString(),
-                    isFrozen = !info.enabled
+                    isFrozen = !info.enabled,
+                    isChecked = freezerList.contains(info.packageName)
                 )
             }.sortedBy { it.label.lowercase() }
 
@@ -115,6 +129,24 @@ class FreezerActivity : AppCompatActivity() {
                 filterApps("")
             }
         }
+    }
+    
+    private fun updateFreezerList(packageName: String, add: Boolean) {
+        if (add) {
+            freezerList.add(packageName)
+        } else {
+            freezerList.remove(packageName)
+        }
+        
+        // Save to Prefs
+        val joined = freezerList.joinToString(",")
+        getSharedPreferences("config", MODE_PRIVATE)
+            .edit()
+            .putString("freezer_app_list", joined)
+            .apply()
+            
+        // Notify Provider
+        contentResolver.notifyChange(Uri.parse("content://com.fan.edgex.provider/config"), null)
     }
 
     private fun filterApps(query: String) {
@@ -139,7 +171,6 @@ class FreezerActivity : AppCompatActivity() {
         val btnFreeze = view.findViewById<View>(R.id.btn_freeze)
         val btnUnfreeze = view.findViewById<View>(R.id.btn_unfreeze)
         
-        // Toggle Buttons based on state
         if (app.isFrozen) {
             btnFreeze.visibility = View.GONE
             btnUnfreeze.visibility = View.VISIBLE
@@ -169,8 +200,6 @@ class FreezerActivity : AppCompatActivity() {
             dialog.dismiss()
         }
         
-        // Shell Commands for Freeze/Unfreeze
-        // Assuming Root access as this is Xposed Edge
         btnFreeze.setOnClickListener {
             if (runRootCommand("pm disable ${app.info.packageName}")) {
                 Toast.makeText(this, "Frozen ${app.label}", Toast.LENGTH_SHORT).show()
@@ -196,7 +225,6 @@ class FreezerActivity : AppCompatActivity() {
     }
     
     private fun refreshApp(app: AppItem) {
-        // Reload list to update status
         loadApps()
     }
 
@@ -212,7 +240,8 @@ class FreezerActivity : AppCompatActivity() {
 
     inner class AppListAdapter(
         private val apps: List<AppItem>,
-        private val onClick: (AppItem) -> Unit
+        private val onClick: (AppItem) -> Unit,
+        private val onCheckChanged: (AppItem, Boolean) -> Unit
     ) : RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
 
         inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -220,6 +249,7 @@ class FreezerActivity : AppCompatActivity() {
             val name: TextView = view.findViewById(R.id.app_name)
             val pkg: TextView = view.findViewById(R.id.app_package)
             val frozen: TextView = view.findViewById(R.id.tv_frozen_status)
+            val checkbox: android.widget.CheckBox = view.findViewById(R.id.cb_include)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -232,6 +262,13 @@ class FreezerActivity : AppCompatActivity() {
             holder.name.text = app.label
             holder.pkg.text = app.info.packageName
             holder.icon.setImageDrawable(app.info.loadIcon(packageManager))
+            
+            holder.checkbox.setOnCheckedChangeListener(null)
+            holder.checkbox.isChecked = app.isChecked
+            
+            holder.checkbox.setOnCheckedChangeListener { _, isChecked ->
+                onCheckChanged(app, isChecked)
+            }
             
             if (app.isFrozen) {
                 holder.frozen.visibility = View.VISIBLE

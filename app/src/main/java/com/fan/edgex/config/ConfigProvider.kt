@@ -44,9 +44,42 @@ class ConfigProvider : ContentProvider() {
         return cursor
     }
 
-    override fun getType(uri: Uri): String = "vnd.android.cursor.item/vnd.com.fan.edge.config"
+    override fun getType(uri: Uri): String? = "vnd.android.cursor.item/vnd.com.fan.edge.config"
 
-    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
-    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun insert(uri: Uri, values: ContentValues?): Uri? {
+        val context = context ?: return null
+        val key = values?.getAsString("key")
+        val value = values?.getAsString("value")
+        
+        if (key != null && value != null) {
+            context.getSharedPreferences("config", Context.MODE_PRIVATE)
+                .edit()
+                .putString(key, value)
+                .apply()
+            
+            context.contentResolver.notifyChange(CONTENT_URI, null) // Notify observers
+            return Uri.withAppendedPath(CONTENT_URI, key)
+        }
+        return null
+    }
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
+         val context = context ?: return 0
+         val key = selection
+         if (key != null) {
+              context.getSharedPreferences("config", Context.MODE_PRIVATE)
+                .edit()
+                .remove(key)
+                .apply()
+              context.contentResolver.notifyChange(CONTENT_URI, null)
+              return 1
+         }
+         return 0
+    }
+
+    override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int {
+        // Treat update same as insert for this simple KV store
+        val uriRes = insert(uri, values)
+        return if (uriRes != null) 1 else 0
+    }
 }
