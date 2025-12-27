@@ -46,7 +46,7 @@ object GestureManager {
     private fun addGestureView(gravity: Int) {
         val wm = context?.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = context?.resources?.displayMetrics
-        val widthPx = if (metrics != null) (24 * metrics.density).toInt() else 72
+        val widthPx = if (metrics != null) (12 * metrics.density).toInt() else 72
         
         val view = GestureView(context!!, gravity)
         val params = WindowManager.LayoutParams(
