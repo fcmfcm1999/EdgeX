@@ -146,11 +146,17 @@ class ArcLayoutView(context: Context) : ViewGroup(context) {
         return false
     }
     
+    var onEmptySpaceClick: (() -> Unit)? = null
+    private var downX = 0f
+    private var downY = 0f
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         velocityTracker?.addMovement(event)
         
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
                 lastTouchY = event.y
                 scroller.forceFinished(true)
                 return true
@@ -167,6 +173,13 @@ class ArcLayoutView(context: Context) : ViewGroup(context) {
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                // Check for click (tap)
+                val moveX = abs(event.x - downX)
+                val moveY = abs(event.y - downY)
+                if (moveX < 10 && moveY < 10) { // Simple touch slop
+                     onEmptySpaceClick?.invoke()
+                }
+
                 velocityTracker?.computeCurrentVelocity(1000)
                 val velocityY = velocityTracker?.yVelocity ?: 0f
                 
@@ -190,7 +203,7 @@ class ArcLayoutView(context: Context) : ViewGroup(context) {
         }
         return super.onTouchEvent(event)
     }
-    
+
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             scrollAngle = scroller.currY.toFloat()

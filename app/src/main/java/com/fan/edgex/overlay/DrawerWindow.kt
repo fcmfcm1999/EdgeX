@@ -66,10 +66,13 @@ class DrawerWindow(private val context: Context) {
 
             // Arc Layout for Apps
             val arcLayout = ArcLayoutView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT
+                layoutParams = android.widget.FrameLayout.LayoutParams(
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                 )
+                onEmptySpaceClick = {
+                    dismiss()
+                }
             }
             
             // Load Apps
