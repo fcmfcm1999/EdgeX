@@ -1,24 +1,18 @@
 package com.fan.edgex.overlay
 
-import android.animation.ObjectAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
-import de.robv.android.xposed.XposedBridge
 import java.io.DataOutputStream
-import java.util.Comparator
 
 class DrawerWindow(private val context: Context) {
 
@@ -29,7 +23,7 @@ class DrawerWindow(private val context: Context) {
         if (rootView != null) return // Already showing
 
         rootView = FrameLayout(context).apply {
-            setBackgroundColor(Color.parseColor("#99000000")) // Semi-transparent dim background
+            setBackgroundColor(Color.TRANSPARENT) // Fully transparent background
             
             // Use OnTouchListener for immediate response, fixing "double tap" issues
             setOnTouchListener { _, event ->
@@ -57,33 +51,25 @@ class DrawerWindow(private val context: Context) {
             post { requestFocus() }
         }
 
-        val drawerContent = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+        val drawerContent = FrameLayout(context).apply {
+            // Transparent background - no white panel
+            setBackgroundColor(Color.TRANSPARENT)
             layoutParams = FrameLayout.LayoutParams(
-                600, // Width in pixels - adjust or make dp
+                ViewGroup.LayoutParams.MATCH_PARENT, // Take half width from parent
                 ViewGroup.LayoutParams.MATCH_PARENT
             ).apply {
-                gravity = Gravity.RIGHT
+                gravity = Gravity.RIGHT // Align to right side
             }
             
             // Prevent clicks on drawer passing through to dismiss
-            isClickable = true
-            setOnClickListener { } 
+            isClickable = false // Allow clicks to pass through empty areas
 
-            // Header
-            addView(TextView(context).apply {
-                text = "冰箱抽屉"
-                textSize = 24f
-                setPadding(40, 60, 40, 40)
-                setTextColor(Color.BLACK)
-            })
-
-            // Scrollable App Grid
-            val scrollView = ScrollView(context)
-            val grid = GridLayout(context).apply {
-                columnCount = 3
-                rowCount = GridLayout.UNDEFINED
+            // Arc Layout for Apps
+            val arcLayout = ArcLayoutView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                )
             }
             
             // Load Apps
@@ -157,7 +143,7 @@ class DrawerWindow(private val context: Context) {
                     setTextColor(Color.DKGRAY)
                     gravity = Gravity.CENTER
                 }
-                scrollView.addView(emptyMsg)
+                addView(emptyMsg)
             } else {
                 val shownPackages = mutableSetOf<String>()
                 
@@ -178,11 +164,17 @@ class DrawerWindow(private val context: Context) {
                         val appItem = LinearLayout(context).apply {
                             orientation = LinearLayout.VERTICAL
                             gravity = Gravity.CENTER
-                            setPadding(20, 20, 20, 20)
+                            setPadding(12, 12, 12, 12) // Smaller padding
+                            
+                            // Add opaque rounded background for better visibility
+                            background = android.graphics.drawable.GradientDrawable().apply {
+                                setColor(Color.parseColor("#F0F0F0")) // Opaque light gray-white
+                                cornerRadius = 24f
+                            }
                             
                             val icon = ImageView(context).apply {
                                 setImageDrawable(resolveInfo.loadIcon(pm)) 
-                                layoutParams = LinearLayout.LayoutParams(100, 100)
+                                layoutParams = LinearLayout.LayoutParams(55, 55) // Smaller icons
                                 
                                 if (isFrozen) {
                                     colorFilter = grayscaleFilter
@@ -194,10 +186,10 @@ class DrawerWindow(private val context: Context) {
                             }
                             val label = TextView(context).apply {
                                 text = resolveInfo.loadLabel(pm)
-                                textSize = 12f
+                                textSize = 9f // Smaller text
                                 gravity = Gravity.CENTER
                                 maxLines = 1
-                                setTextColor(if (isFrozen) Color.GRAY else Color.BLACK)
+                                setTextColor(if (isFrozen) Color.GRAY else Color.DKGRAY)
                             }
                             
                             addView(icon)
@@ -251,15 +243,14 @@ class DrawerWindow(private val context: Context) {
                                 }
                             }
                         }
-                        grid.addView(appItem)
+                        arcLayout.addItem(appItem)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
                 }
-                scrollView.addView(grid)
             }
             
-            addView(scrollView)
+            addView(arcLayout)
         }
 
         rootView?.addView(drawerContent)
@@ -269,17 +260,18 @@ class DrawerWindow(private val context: Context) {
             format = PixelFormat.TRANSLUCENT
             flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
             dimAmount = 0.5f
-            width = WindowManager.LayoutParams.MATCH_PARENT
+            
+            // Get screen width and set window to right half
+            val displayMetrics = context.resources.displayMetrics
+            width = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt() // Half screen width + 7dp
             height = WindowManager.LayoutParams.MATCH_PARENT
-            gravity = Gravity.TOP or Gravity.LEFT
+            gravity = Gravity.TOP or Gravity.RIGHT // Position on right side
         }
 
         try {
             windowManager.addView(rootView, params)
             
-            // Simple slide in animation
-            drawerContent.translationX = 600f
-            ObjectAnimator.ofFloat(drawerContent, "translationX", 0f).start()
+            // No animation needed for transparent arc layout
             
         } catch (e: Exception) {
             e.printStackTrace()
