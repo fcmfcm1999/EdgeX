@@ -74,6 +74,22 @@ class MainActivity : AppCompatActivity() {
             cbDebug.performClick()
         }
 
+        // 1.5 Arc Drawer Toggle
+        val cbArcDrawer = findViewById<android.widget.CheckBox>(R.id.checkbox_arc_drawer)
+        cbArcDrawer.isChecked = prefs.getBoolean("freezer_arc_drawer_enabled", false)
+
+        val onArcDrawerToggle = { isChecked: Boolean ->
+            prefs.edit().putBoolean("freezer_arc_drawer_enabled", isChecked).apply()
+            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+            cbArcDrawer.isChecked = isChecked
+        }
+
+        cbArcDrawer.setOnCheckedChangeListener { _, isChecked -> onArcDrawerToggle(isChecked) }
+
+        findViewById<View>(R.id.item_arc_drawer).setOnClickListener {
+            cbArcDrawer.performClick()
+        }
+
         // 2. Restart SystemUI
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
             val result = com.fan.edgex.utils.findProcessAndKill("com.android.systemui")

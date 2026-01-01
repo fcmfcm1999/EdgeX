@@ -9,8 +9,10 @@ import android.view.KeyEvent
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import java.io.DataOutputStream
 
@@ -22,8 +24,32 @@ class DrawerWindow(private val context: Context) {
     fun show() {
         if (rootView != null) return // Already showing
 
+        var useArcDrawer = false
+        try {
+            val cursor = context.contentResolver.query(
+                android.net.Uri.parse("content://com.fan.edgex.provider/config"),
+                null,
+                "freezer_arc_drawer_enabled",
+                arrayOf("false"),
+                "boolean"
+            )
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    useArcDrawer = it.getString(0).toBoolean()
+                }
+            }
+        } catch (e: Exception) {
+            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read arc drawer config: ${e.message}")
+        }
+
+        val displayMetrics = context.resources.displayMetrics
+        
         rootView = FrameLayout(context).apply {
-            setBackgroundColor(Color.TRANSPARENT) // Fully transparent background
+            if (useArcDrawer) {
+                setBackgroundColor(Color.TRANSPARENT) // Fully transparent background for Arc
+            } else {
+                setBackgroundColor(Color.parseColor("#99000000")) // Semi-transparent black for Legacy
+            }
             
             // Use OnTouchListener for immediate response, fixing "double tap" issues
             setOnTouchListener { _, event ->
@@ -51,6 +77,106 @@ class DrawerWindow(private val context: Context) {
             post { requestFocus() }
         }
 
+        // --- Content Loading ---
+        // Load Apps (Common)
+        val pm = context.packageManager
+        val displayApps = mutableListOf<android.content.pm.ResolveInfo>()
+
+        try {
+            // 0. Load Persistent Freezer List from ConfigProvider
+            try {
+                val cursor = context.contentResolver.query(
+                    android.net.Uri.parse("content://com.fan.edgex.provider/config"), 
+                    null, 
+                    "freezer_app_list", 
+                    null, 
+                    null
+                )
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val listStr = it.getString(0)
+                        if (!listStr.isNullOrEmpty()) {
+                            // Add to session history
+                            val packages = listStr.split(",")
+                            DrawerManager.frozenAppsHistory.addAll(packages)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
+            }
+
+            // Find all launcher activities
+            val mainIntent = Intent(Intent.ACTION_MAIN, null)
+            mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
+            
+            // Get everything allowed
+            val allActivities = pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+            
+            // 1. Update History with currently frozen apps (Auto-discovery)
+            for (resolveInfo in allActivities) {
+                val appInfo = resolveInfo.activityInfo.applicationInfo
+                 if (!appInfo.enabled) {
+                     DrawerManager.frozenAppsHistory.add(appInfo.packageName)
+                 }
+            }
+
+            // 2. Display Apps from History (Union of Persistent + Auto-detected)
+            for (resolveInfo in allActivities) {
+                 val appInfo = resolveInfo.activityInfo.applicationInfo
+                 // Only show if it is in our Freezer History
+                 if (DrawerManager.frozenAppsHistory.contains(appInfo.packageName)) {
+                     displayApps.add(resolveInfo)
+                 }
+            }
+            
+            // Sort by Name (Stable)
+            displayApps.sortWith(Comparator { o1, o2 ->
+                val label1 = o1.loadLabel(pm).toString()
+                val label2 = o2.loadLabel(pm).toString()
+                label1.compareTo(label2, ignoreCase = true)
+            })
+            
+        } catch (e: Exception) {
+            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: " + e.message)
+        }
+
+        // --- View Generation ---
+        if (useArcDrawer) {
+            setupArcLayout(displayApps, pm, displayMetrics)
+        } else {
+            setupLegacyLayout(displayApps, pm)
+        }
+
+        // --- Window Layout Params ---
+        val params = WindowManager.LayoutParams().apply {
+            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            format = PixelFormat.TRANSLUCENT
+            
+            if (useArcDrawer) {
+                // Arc Drawer: Full width, Transparent BG handles dim
+                width = WindowManager.LayoutParams.MATCH_PARENT
+                flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND // Dim the entire screen behind the transparent rootView
+                dimAmount = 0.5f // Dim amount for the background
+            } else {
+                // Legacy Drawer: Half width, System Dim
+                width = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt() // Half screen width + 7dp
+                flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
+                dimAmount = 0.5f
+            }
+            
+            height = WindowManager.LayoutParams.MATCH_PARENT
+            gravity = Gravity.TOP or Gravity.RIGHT // Position on right side
+        }
+        
+        try {
+            windowManager.addView(rootView, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun setupArcLayout(displayApps: List<android.content.pm.ResolveInfo>, pm: android.content.pm.PackageManager, displayMetrics: android.util.DisplayMetrics) {
         val drawerContent = FrameLayout(context).apply {
             // Transparent background - no white panel
             setBackgroundColor(Color.TRANSPARENT)
@@ -75,69 +201,6 @@ class DrawerWindow(private val context: Context) {
                 }
             }
             
-            // Load Apps
-            val pm = context.packageManager
-            val displayApps = mutableListOf<android.content.pm.ResolveInfo>()
-
-            try {
-                // 0. Load Persistent Freezer List from ConfigProvider
-                try {
-                    val cursor = context.contentResolver.query(
-                        android.net.Uri.parse("content://com.fan.edgex.provider/config"), 
-                        null, 
-                        "freezer_app_list", 
-                        null, 
-                        null
-                    )
-                    cursor?.use {
-                        if (it.moveToFirst()) {
-                            val listStr = it.getString(0)
-                            if (!listStr.isNullOrEmpty()) {
-                                // Add to session history
-                                val packages = listStr.split(",")
-                                DrawerManager.frozenAppsHistory.addAll(packages)
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
-                }
-
-                // Find all launcher activities
-                val mainIntent = Intent(Intent.ACTION_MAIN, null)
-                mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-                
-                // Get everything allowed
-                val allActivities = pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
-                
-                // 1. Update History with currently frozen apps (Auto-discovery)
-                for (resolveInfo in allActivities) {
-                    val appInfo = resolveInfo.activityInfo.applicationInfo
-                     if (!appInfo.enabled) {
-                         DrawerManager.frozenAppsHistory.add(appInfo.packageName)
-                     }
-                }
-
-                // 2. Display Apps from History (Union of Persistent + Auto-detected)
-                for (resolveInfo in allActivities) {
-                     val appInfo = resolveInfo.activityInfo.applicationInfo
-                     // Only show if it is in our Freezer History
-                     if (DrawerManager.frozenAppsHistory.contains(appInfo.packageName)) {
-                         displayApps.add(resolveInfo)
-                     }
-                }
-                
-                // Sort by Name (Stable)
-                displayApps.sortWith(Comparator { o1, o2 ->
-                    val label1 = o1.loadLabel(pm).toString()
-                    val label2 = o2.loadLabel(pm).toString()
-                    label1.compareTo(label2, ignoreCase = true)
-                })
-                
-            } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: " + e.message)
-            }
-
             if (displayApps.isEmpty()) {
                 val emptyMsg = TextView(context).apply {
                     text = "空空如也"
@@ -200,46 +263,7 @@ class DrawerWindow(private val context: Context) {
                             
                             setOnClickListener {
                                 if (isFrozen) {
-                                    // === UNFREEZE LOGIC ===
-                                    // 1. Attempt using System API 
-                                    Thread {
-                                        var success = false
-                                        try {
-                                            pm.setApplicationEnabledSetting(
-                                                packageName, 
-                                                android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 
-                                                0
-                                            )
-                                            success = true
-                                        } catch (e: Exception) {
-                                            de.robv.android.xposed.XposedBridge.log("EdgeX: PM API Failed: ${e.message}, trying Root fallback...")
-                                        }
-
-                                        if (!success) {
-                                            // 2. Fallback to Root Shell
-                                            try {
-                                                val process = Runtime.getRuntime().exec("su")
-                                                val os = DataOutputStream(process.outputStream)
-                                                os.writeBytes("pm enable $packageName\n")
-                                                os.writeBytes("exit\n")
-                                                os.flush()
-                                                 if (process.waitFor() == 0) success = true
-                                            } catch (e: Exception) {
-                                                e.printStackTrace()
-                                            }
-                                        }
-
-                                        if (success) {
-                                            post {
-                                                android.widget.Toast.makeText(context, "正在启动 ${resolveInfo.loadLabel(pm)}...", android.widget.Toast.LENGTH_SHORT).show()
-                                                launchApp(context, pm, packageName)
-                                            }
-                                        } else {
-                                           post {
-                                                android.widget.Toast.makeText(context, "解冻失败", android.widget.Toast.LENGTH_SHORT).show()
-                                           }
-                                        }
-                                    }.start() 
+                                    threadUnfreeze(packageName, resolveInfo.loadLabel(pm).toString(), pm)
                                 } else {
                                     // === STANDARD LAUNCH ===
                                     launchApp(context, pm, packageName)
@@ -257,28 +281,131 @@ class DrawerWindow(private val context: Context) {
         }
 
         rootView?.addView(drawerContent)
+    }
 
-        val params = WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            format = PixelFormat.TRANSLUCENT
-            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
-            dimAmount = 0.5f
-            
-            // Get screen width and set window to right half
-            val displayMetrics = context.resources.displayMetrics
-            width = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt() // Half screen width + 7dp
-            height = WindowManager.LayoutParams.MATCH_PARENT
-            gravity = Gravity.TOP or Gravity.RIGHT // Position on right side
+    private fun setupLegacyLayout(displayApps: List<android.content.pm.ResolveInfo>, pm: android.content.pm.PackageManager) {
+        val scrollView = ScrollView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        
+        val grid = GridLayout(context).apply {
+            columnCount = 4
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         }
 
-        try {
-            windowManager.addView(rootView, params)
-            
-            // No animation needed for transparent arc layout
-            
-        } catch (e: Exception) {
-            e.printStackTrace()
+        if (displayApps.isEmpty()) {
+            val emptyMsg = TextView(context).apply {
+                text = "空空如也"
+                textSize = 16f
+                setPadding(40, 40, 40, 40)
+                setTextColor(Color.DKGRAY)
+                gravity = Gravity.CENTER
+            }
+            scrollView.addView(emptyMsg)
+        } else {
+            val shownPackages = mutableSetOf<String>()
+            val matrix = android.graphics.ColorMatrix()
+            matrix.setSaturation(0f)
+            val grayscaleFilter = android.graphics.ColorMatrixColorFilter(matrix)
+
+            for (resolveInfo in displayApps) {
+                val appInfo = resolveInfo.activityInfo.applicationInfo
+                val packageName = appInfo.packageName
+                if (shownPackages.contains(packageName)) continue
+                shownPackages.add(packageName)
+
+                val isFrozen = !appInfo.enabled
+
+                val appItem = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(20, 20, 20, 20)
+                    
+                    val icon = ImageView(context).apply {
+                        setImageDrawable(resolveInfo.loadIcon(pm))
+                        layoutParams = LinearLayout.LayoutParams(100, 100)
+                         if (isFrozen) {
+                            colorFilter = grayscaleFilter
+                            alpha = 0.5f
+                        } else {
+                            colorFilter = null
+                            alpha = 1.0f
+                        }
+                    }
+                    val label = TextView(context).apply {
+                        text = resolveInfo.loadLabel(pm)
+                        textSize = 12f
+                        gravity = Gravity.CENTER
+                        maxLines = 1
+                        setTextColor(if (isFrozen) Color.GRAY else Color.BLACK) // Black for legacy
+                    }
+                    
+                    addView(icon)
+                    addView(label)
+                    
+                    setOnClickListener {
+                        if (isFrozen) {
+                             threadUnfreeze(packageName, resolveInfo.loadLabel(pm).toString(), pm)
+                        } else {
+                            launchApp(context, pm, packageName)
+                        }
+                    }
+                }
+                grid.addView(appItem)
+            }
         }
+        
+        scrollView.addView(grid)
+        rootView?.addView(scrollView)
+    }
+    
+    // Extract unfreeze logic to avoid duplication
+    private fun threadUnfreeze(packageName: String, label: String, pm: android.content.pm.PackageManager) {
+        Thread {
+            var success = false
+            try {
+                pm.setApplicationEnabledSetting(
+                    packageName, 
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 
+                    0
+                )
+                success = true
+            } catch (e: Exception) {
+                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API Failed: ${e.message}, trying Root fallback...")
+            }
+
+            if (!success) {
+                // 2. Fallback to Root Shell
+                try {
+                    val process = Runtime.getRuntime().exec("su")
+                    val os = DataOutputStream(process.outputStream)
+                    os.writeBytes("pm enable $packageName\n")
+                    os.writeBytes("exit\n")
+                    os.flush()
+                     if (process.waitFor() == 0) success = true
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            if (success) {
+                handler.post {
+                    android.widget.Toast.makeText(context, "正在启动 $label...", android.widget.Toast.LENGTH_SHORT).show()
+                    launchApp(context, pm, packageName)
+                }
+            } else {
+               handler.post {
+                    android.widget.Toast.makeText(context, "解冻失败", android.widget.Toast.LENGTH_SHORT).show()
+               }
+            }
+        }.start() 
     }
 
     private fun launchApp(context: Context, pm: android.content.pm.PackageManager, packageName: String) {
