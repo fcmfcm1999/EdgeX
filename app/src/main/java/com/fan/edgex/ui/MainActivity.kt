@@ -99,5 +99,26 @@ class MainActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(this, "重启失败: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
             }
         }
+
+        // About Section (Collapsible)
+        val aboutContent = findViewById<View>(R.id.about_content)
+        val aboutArrow = findViewById<android.widget.ImageView>(R.id.arrow_about)
+        var isAboutExpanded = false
+        
+        findViewById<View>(R.id.item_about).setOnClickListener {
+            isAboutExpanded = !isAboutExpanded
+            aboutContent.visibility = if (isAboutExpanded) View.VISIBLE else View.GONE
+            aboutArrow.rotation = if (isAboutExpanded) 180f else 0f
+        }
+
+        // Project URL Click Handler
+        findViewById<View>(R.id.item_project_url).setOnClickListener {
+            try {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/fantasy1999/EdgeX"))
+                startActivity(intent)
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(this, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
