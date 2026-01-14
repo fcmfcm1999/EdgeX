@@ -4,17 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.fan.edgex"
-    compileSdk {
-        version = release(36)
-    }
+    namespace = Configs.namespace
+    compileSdk = Configs.compileSdk
 
     defaultConfig {
-        applicationId = "com.fan.edgex"
-        minSdk = 35
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = Configs.applicationId
+        minSdk = Configs.minSdk
+        targetSdk = Configs.targetSdk
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: Configs.versionCode
+        versionName = System.getenv("VERSION_NAME") ?: Configs.versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -29,11 +27,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = Configs.javaVersion
+        targetCompatibility = Configs.javaVersion
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = Configs.jvmTarget
     }
 }
 
