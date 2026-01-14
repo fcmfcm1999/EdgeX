@@ -49,6 +49,10 @@
             android:orientation="vertical"
             android:paddingBottom="42dp">
 
+            <!-- ================= LEFT TOP ================= -->
+            <include layout="@layout/item_gesture_zone_left"
+                android:id="@+id/zone_left_top" />
+
             <!-- ================= LEFT MID ================= -->
             <include layout="@layout/item_gesture_zone_left"
                 android:id="@+id/zone_left_mid" />

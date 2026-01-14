@@ -50,8 +50,8 @@ object GestureManager {
         
         val view = GestureView(context!!, gravity)
         val params = WindowManager.LayoutParams(
-            widthPx, 
-            0, // Initial height 0 to prevent "full height flash" before config loads
+            widthPx,
+            WindowManager.LayoutParams.MATCH_PARENT, // Initial height 0 to prevent "full height flash" before config loads
             2027, // TYPE_MAGNIFICATION_OVERLAY
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -79,8 +79,9 @@ object GestureManager {
                 // Pre-fetch keys
                 val keys = listOf(
                     "gestures_enabled", "debug_matrix_enabled",
-                    "zone_enabled_left_mid", "zone_enabled_left_bottom",
+                    "zone_enabled_left_top", "zone_enabled_left_mid", "zone_enabled_left_bottom",
                     "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
+                    "left_top_swipe_left", "left_top_swipe_right", "left_top_swipe_up", "left_top_swipe_down",
                     "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
                     "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
                     "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
@@ -103,6 +104,8 @@ object GestureManager {
                     views.forEach { 
                         it.updateDebugColor(color)
                         it.updateWindowRegion()
+                        // Force clear drawing cache and invalidate
+                        it.destroyDrawingCache()
                         it.invalidate() 
                     }
                 }
@@ -116,6 +119,7 @@ object GestureManager {
         private var startX = 0f
         private var startY = 0f
         private var startTime = 0L
+        private var windowOffsetY = 0
         private val handler = Handler(Looper.getMainLooper())
 
 
@@ -127,6 +131,12 @@ object GestureManager {
             
             // CRITICAL: specific to generic Views, enables onDraw
             setWillNotDraw(false)
+            
+            // Use software layer to ensure canvas.drawColor CLEAR works correctly
+            setLayerType(LAYER_TYPE_SOFTWARE, null)
+            
+            // Set transparent background
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             
             // Register ContentObserver to update visuals ONLY when config changes
             val observer = object : android.database.ContentObserver(handler) {
@@ -146,34 +156,45 @@ object GestureManager {
         
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
-            // de.robv.android.xposed.XposedBridge.log("EdgeX: onDraw executing") // Debug log
+            
+            // Clear canvas first to prevent residual drawings when zones are disabled
+            canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
             
             if (!isGesturesEnabled()) return
             
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = android.util.DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+            val h = metrics.heightPixels.toFloat()
             val w = width.toFloat()
-            val h = height.toFloat()
+            
+            val offsetY = -windowOffsetY.toFloat()
             
             if (edgeGravity == Gravity.LEFT) {
-                // Left Mid (0 - 60%)
-                if (isZoneEnabled("left_mid")) {
-                    canvas.drawRect(0f, 0f, w, h * 0.6f, paint)
+                // Left Top
+                if (isZoneEnabled("left_top")) {
+                    canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
                 }
-                // Left Bottom (60% - 100%)
+                // Left Mid
+                if (isZoneEnabled("left_mid")) {
+                    canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
+                }
+                // Left Bottom
                 if (isZoneEnabled("left_bottom")) {
-                    canvas.drawRect(0f, h * 0.6f, w, h, paint)
+                    canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
                 }
             } else {
-                // Right Top (0 - 33%)
+                // Right Top
                  if (isZoneEnabled("right_top")) {
-                    canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
+                    canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
                 }
-                // Right Mid (33% - 66%)
+                // Right Mid
                 if (isZoneEnabled("right_mid")) {
-                    canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
+                    canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
                 }
-                // Right Bottom (66% - 100%)
+                // Right Bottom
                 if (isZoneEnabled("right_bottom")) {
-                    canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
                 }
             }
         }
@@ -184,20 +205,29 @@ object GestureManager {
         }
 
         fun updateWindowRegion() {
-            val h = context.resources.displayMetrics.heightPixels
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = android.util.DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+            val h = metrics.heightPixels
+            
             var minTop = h // Start from bottom
             var maxBottom = 0 // Start from top
             
             var hasEnabledZone = false
 
             if (edgeGravity == Gravity.LEFT) {
-                if (isZoneEnabled("left_mid")) {
+                if (isZoneEnabled("left_top")) {
                     minTop = kotlin.math.min(minTop, 0)
-                    maxBottom = kotlin.math.max(maxBottom, (h * 0.6f).toInt())
+                    maxBottom = kotlin.math.max(maxBottom, (h * 0.33f).toInt())
+                    hasEnabledZone = true
+                }
+                if (isZoneEnabled("left_mid")) {
+                    minTop = kotlin.math.min(minTop, (h * 0.33f).toInt())
+                    maxBottom = kotlin.math.max(maxBottom, (h * 0.66f).toInt())
                     hasEnabledZone = true
                 }
                 if (isZoneEnabled("left_bottom")) {
-                    minTop = kotlin.math.min(minTop, (h * 0.6f).toInt())
+                    minTop = kotlin.math.min(minTop, (h * 0.66f).toInt())
                     maxBottom = kotlin.math.max(maxBottom, h)
                     hasEnabledZone = true
                 }
@@ -227,12 +257,16 @@ object GestureManager {
                 if (!hasEnabledZone) {
                     // Hide completely
                     params.height = 0
+                    visibility = GONE
                 } else {
                     // Set precise coverage
+                    visibility = VISIBLE
                     params.gravity = Gravity.TOP or edgeGravity
                     params.y = minTop
                     params.height = maxBottom - minTop
                 }
+                
+                windowOffsetY = if (hasEnabledZone) minTop else 0
                 
                 wm.updateViewLayout(this, params)
                 
@@ -252,7 +286,9 @@ object GestureManager {
         }
         
         private fun isZoneEnabled(zone: String): Boolean {
-             return getConfig("zone_enabled_$zone", "boolean") == "true"
+            // Read directly from cache to avoid async reload race condition
+            val value = configCache["zone_enabled_$zone"]
+            return value == "true"
         }
 
         private val SWIPE_THRESHOLD = 50
@@ -400,18 +436,15 @@ object GestureManager {
         }
 
         private fun getZone(y: Float): String {
-            val h = context.resources.displayMetrics.heightPixels
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val metrics = android.util.DisplayMetrics()
+            wm.defaultDisplay.getRealMetrics(metrics)
+            val h = metrics.heightPixels
+
             return when {
-                y < h * 0.33 -> if (edgeGravity == Gravity.LEFT) "left_mid" else "right_top" 
-                else -> {
-                    if (edgeGravity == Gravity.LEFT) {
-                        if (y < h * 0.6) "left_mid" else "left_bottom"
-                    } else {
-                         if (y < h * 0.33) "right_top"
-                         else if (y < h * 0.66) "right_mid"
-                         else "right_bottom"
-                    }
-                }
+                y < h * 0.33 -> if (edgeGravity == Gravity.LEFT) "left_top" else "right_top" 
+                y < h * 0.66 -> if (edgeGravity == Gravity.LEFT) "left_mid" else "right_mid"
+                else -> if (edgeGravity == Gravity.LEFT) "left_bottom" else "right_bottom"
             }
         }
     }

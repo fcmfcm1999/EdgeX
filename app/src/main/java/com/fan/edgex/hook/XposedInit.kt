@@ -1,7 +1,5 @@
 package com.fan.edgex.hook
 
-import com.fan.edgex.overlay.GestureView
-
 import android.app.Application
 import android.content.Context
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -20,8 +18,7 @@ class XposedInit : IXposedHookLoadPackage {
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val context = param.thisObject as Context
-                    val gestureView = GestureView(context)
-                    gestureView.addToWindow()
+                    GestureManager.init(context)
                 }
             }
         )

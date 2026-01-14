@@ -24,12 +24,12 @@ class GestureView(context: Context) : View(context) {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         
-        // Position: Bottom Right
-        gravity = Gravity.BOTTOM or Gravity.RIGHT
+        // Position: Right Edge (Full Height)
+        gravity = Gravity.RIGHT
         width = 40 // Detection width in pixels (adjust as needed)
-        height = 400 // Detection height in pixels
+        height = WindowManager.LayoutParams.MATCH_PARENT
         x = 0
-        y = 0 // Offset from bottom
+        y = 0
     }
 
     private var startX = 0f

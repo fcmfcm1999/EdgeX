@@ -21,6 +21,7 @@ class GesturesActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
         // Initialize Zones
+        setupZone(findViewById(R.id.zone_left_top), "左上", "left_top", isLeft = true)
         setupZone(findViewById(R.id.zone_left_mid), "左中", "left_mid", isLeft = true)
         setupZone(findViewById(R.id.zone_left_bottom), "左下", "left_bottom", isLeft = true)
         
@@ -34,6 +35,7 @@ class GesturesActivity : AppCompatActivity() {
         // Refresh UI to show new selections
         // Re-run setup to refresh text. 
         // NOTE: This is slightly inefficient but safe/easy for this scale.
+        setupZone(findViewById(R.id.zone_left_top), "左上", "left_top", isLeft = true)
         setupZone(findViewById(R.id.zone_left_mid), "左中", "left_mid", isLeft = true)
         setupZone(findViewById(R.id.zone_left_bottom), "左下", "left_bottom", isLeft = true)
         setupZone(findViewById(R.id.zone_right_top), "右上", "right_top", isLeft = false)
