@@ -13,7 +13,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewConfiguration
+
 import android.view.WindowManager
 import android.widget.Toast
 import com.fan.edgex.overlay.DrawerManager
@@ -40,24 +40,14 @@ object GestureManager {
     private const val EXTRA_ACTION = "action"
 
     // Gesture detection variables (used in system_server process)
-    private var mDownTime = 0L
     private var mDownX = 0f
     private var mDownY = 0f
-    private var mIsLongPress = false
     private var mIsSwiping = false
     private var mIsInSection = false
     private var mActiveZone: String? = null
 
-    // Cooldown after triggering an action (e.g. opening drawer)
-    // During cooldown, edge tracking is disabled so that subsequent taps
-    // (like tapping to dismiss the drawer) are not intercepted.
-    private var actionCooldownUntil = 0L
-    private const val ACTION_COOLDOWN_MS = 500L
-
     private val TOUCH_SLOP = 24
     private val SWIPE_THRESHOLD = 50
-    private val LONG_PRESS_TIMEOUT = ViewConfiguration.getLongPressTimeout()
-    private val TAP_TIMEOUT = ViewConfiguration.getTapTimeout()
 
     private var mHandler: Handler? = null
 
@@ -67,17 +57,19 @@ object GestureManager {
     /**
      * Called from system_server (filterInputEvent hook).
      * Handles MotionEvent at the input pipeline level.
-     * Returns true if the event should be consumed (blocked from reaching apps).
      *
-     * Design: DOWN events are NEVER consumed. This allows taps on keyboard buttons
-     * in the edge zone to work normally. Only once a swipe is confirmed (finger moves
-     * beyond threshold) do we start consuming events.
+     * PASSIVE/OBSERVE-ONLY: This method NEVER consumes events (always returns false).
+     * All touch events pass through to the app/window normally.
+     * We only observe the touch sequence to detect edge swipe gestures,
+     * and trigger actions when a swipe is confirmed on ACTION_UP.
+     *
+     * This keeps InputDispatcher's touch state 100% clean, preventing
+     * issues with subsequent touches (drawer dismiss, keyboard, etc.)
      */
     fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
         // Lazily init system context
         if (systemContext == null) {
             systemContext = context
-            // Initial config load
             reloadConfigAsync()
         }
 
@@ -89,17 +81,11 @@ object GestureManager {
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
-                // Skip edge tracking during cooldown (e.g. right after opening drawer)
-                if (System.currentTimeMillis() < actionCooldownUntil) {
-                    mIsInSection = false
-                    return false
-                }
-
                 val dm = context.resources.displayMetrics
                 val screenWidth = dm.widthPixels
                 val screenHeight = dm.heightPixels
 
-                // Edge detection width: 12dp (matches original overlay width)
+                // Edge detection width: 12dp
                 val edgeThreshold = 12 * dm.density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
@@ -109,7 +95,6 @@ object GestureManager {
                     return false
                 }
 
-                // Determine which zone this touch is in
                 val side = if (isInLeftEdge) "left" else "right"
                 val verticalZone = when {
                     y < screenHeight * 0.33f -> "top"
@@ -118,23 +103,16 @@ object GestureManager {
                 }
                 val zone = "${side}_${verticalZone}"
 
-                // Check if this zone is enabled
                 if (!isZoneEnabled(zone)) {
                     mIsInSection = false
                     return false
                 }
 
-                // Start tracking but do NOT consume DOWN.
-                // Let the event pass through to the underlying app (keyboard, etc.)
-                // so that taps work normally.
                 mIsInSection = true
                 mActiveZone = zone
-                mDownTime = event.downTime
                 mDownX = x
                 mDownY = y
-                mIsLongPress = false
                 mIsSwiping = false
-                return false // Let DOWN pass through
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -147,58 +125,45 @@ object GestureManager {
                         mIsSwiping = true
                     }
                 }
-                if (!mIsLongPress && (event.eventTime - mDownTime) > LONG_PRESS_TIMEOUT) {
-                    mIsLongPress = true
-                }
-                // Only consume MOVE events once a swipe is confirmed
-                return mIsSwiping
             }
 
             MotionEvent.ACTION_UP -> {
                 if (!mIsInSection) return false
 
                 val zone = mActiveZone
-                var gestureType: String? = null
 
-                if (mIsSwiping) {
+                if (mIsSwiping && zone != null) {
                     val dx = x - mDownX
                     val dy = y - mDownY
+                    var gestureType: String? = null
+
                     if (abs(dx) > abs(dy)) {
-                        // Horizontal swipe
                         if (abs(dx) > SWIPE_THRESHOLD) {
                             gestureType = if (dx < 0) "swipe_left" else "swipe_right"
                         }
                     } else {
-                        // Vertical swipe
                         if (abs(dy) > SWIPE_THRESHOLD) {
                             gestureType = if (dy < 0) "swipe_up" else "swipe_down"
                         }
                     }
-                } else if (mIsLongPress) {
-                    gestureType = "long_press"
+
+                    if (gestureType != null) {
+                        XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
+                        triggerAction(zone, gestureType, context)
+                    }
                 }
 
-                if (gestureType != null && zone != null) {
-                    XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
-                    triggerAction(zone, gestureType, context)
-                    // Start cooldown so subsequent taps (e.g. dismissing drawer) aren't intercepted
-                    actionCooldownUntil = System.currentTimeMillis() + ACTION_COOLDOWN_MS
-                }
-
-                val wasSwipe = mIsSwiping
                 mIsInSection = false
                 mActiveZone = null
-                // Only consume UP if we were swiping (tap UP passes through naturally)
-                return wasSwipe
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 mIsInSection = false
                 mActiveZone = null
-                return false
             }
         }
 
+        // NEVER consume events - purely passive observation
         return false
     }
 
