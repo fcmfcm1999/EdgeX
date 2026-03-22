@@ -45,11 +45,8 @@ class DrawerWindow(private val context: Context) {
         val displayMetrics = context.resources.displayMetrics
         
         rootView = FrameLayout(context).apply {
-            if (useArcDrawer) {
-                setBackgroundColor(Color.TRANSPARENT) // Fully transparent background for Arc
-            } else {
-                setBackgroundColor(Color.parseColor("#99000000")) // Semi-transparent black for Legacy
-            }
+            // Always transparent - legacy drawer background is on the right-aligned container
+            setBackgroundColor(Color.TRANSPARENT)
             
             // Use OnTouchListener for immediate response, fixing "double tap" issues
             setOnTouchListener { _, event ->
@@ -152,21 +149,12 @@ class DrawerWindow(private val context: Context) {
         val params = WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             format = PixelFormat.TRANSLUCENT
-            
-            if (useArcDrawer) {
-                // Arc Drawer: Full width, Transparent BG handles dim
-                width = WindowManager.LayoutParams.MATCH_PARENT
-                flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND // Dim the entire screen behind the transparent rootView
-                dimAmount = 0.5f // Dim amount for the background
-            } else {
-                // Legacy Drawer: Half width, System Dim
-                width = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt() // Half screen width + 7dp
-                flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
-                dimAmount = 0.5f
-            }
-            
+            // Always full-width so taps on the left dim area are within
+            // window bounds and properly trigger dismiss.
+            width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
-            gravity = Gravity.TOP or Gravity.RIGHT // Position on right side
+            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
+            dimAmount = 0.5f
         }
         
         try {
@@ -284,6 +272,22 @@ class DrawerWindow(private val context: Context) {
     }
 
     private fun setupLegacyLayout(displayApps: List<android.content.pm.ResolveInfo>, pm: android.content.pm.PackageManager) {
+        val displayMetrics = context.resources.displayMetrics
+        val drawerWidth = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt()
+
+        // Right-aligned container to hold the legacy drawer content
+        val drawerContainer = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                drawerWidth,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ).apply {
+                gravity = Gravity.RIGHT
+            }
+            setBackgroundColor(Color.parseColor("#99000000"))
+            // Prevent taps on drawer content from propagating to rootView's dismiss
+            isClickable = true
+        }
+
         val scrollView = ScrollView(context).apply {
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -343,7 +347,7 @@ class DrawerWindow(private val context: Context) {
                         textSize = 12f
                         gravity = Gravity.CENTER
                         maxLines = 1
-                        setTextColor(if (isFrozen) Color.GRAY else Color.BLACK) // Black for legacy
+                        setTextColor(if (isFrozen) Color.GRAY else Color.BLACK)
                     }
                     
                     addView(icon)
@@ -362,7 +366,8 @@ class DrawerWindow(private val context: Context) {
         }
         
         scrollView.addView(grid)
-        rootView?.addView(scrollView)
+        drawerContainer.addView(scrollView)
+        rootView?.addView(drawerContainer)
     }
     
     // Extract unfreeze logic to avoid duplication
