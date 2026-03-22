@@ -58,13 +58,10 @@ object GestureManager {
      * Called from system_server (filterInputEvent hook).
      * Handles MotionEvent at the input pipeline level.
      *
-     * PASSIVE/OBSERVE-ONLY: This method NEVER consumes events (always returns false).
-     * All touch events pass through to the app/window normally.
-     * We only observe the touch sequence to detect edge swipe gestures,
-     * and trigger actions when a swipe is confirmed on ACTION_UP.
-     *
-     * This keeps InputDispatcher's touch state 100% clean, preventing
-     * issues with subsequent touches (drawer dismiss, keyboard, etc.)
+     * We NEVER consume events (always return false) to keep InputDispatcher's state clean.
+     * However, to prevent background apps (like the keyboard) from reacting to our edge swipes,
+     * we mutate the MotionEvent to ACTION_CANCEL once a swipe is confirmed.
+     * This safely terminates the touch in the app without breaking the system touch state.
      */
     fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
         // Lazily init system context
@@ -125,6 +122,11 @@ object GestureManager {
                         mIsSwiping = true
                     }
                 }
+
+                // If swipe is confirmed, mutate event to CANCEL to abort touch in the background app
+                if (mIsSwiping) {
+                    event.action = MotionEvent.ACTION_CANCEL
+                }
             }
 
             MotionEvent.ACTION_UP -> {
@@ -151,6 +153,9 @@ object GestureManager {
                         XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
                         triggerAction(zone, gestureType, context)
                     }
+
+                    // Mutate to CANCEL just to be safe, so background app doesn't receive UP
+                    event.action = MotionEvent.ACTION_CANCEL
                 }
 
                 mIsInSection = false
@@ -163,7 +168,7 @@ object GestureManager {
             }
         }
 
-        // NEVER consume events - purely passive observation
+        // ALWAYS return false to let InputDispatcher finish processing the event safely
         return false
     }
 
