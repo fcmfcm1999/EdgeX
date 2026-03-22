@@ -1,150 +1,289 @@
 package com.fan.edgex.hook
 
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.Cursor
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Toast
 import com.fan.edgex.overlay.DrawerManager
+import de.robv.android.xposed.XposedBridge
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 @SuppressLint("StaticFieldLeak")
 object GestureManager {
 
-    private var context: Context? = null
+    private const val TAG = "EdgeX"
+
+    // system_server context (from filterInputEvent hook, for config queries)
+    private var systemContext: Context? = null
+    // SystemUI context (for overlay windows like DrawerWindow)
+    private var systemUIContext: Context? = null
     private var windowManager: WindowManager? = null
-    
+
     // Config URI
     private val CONFIG_URI = Uri.parse("content://com.fan.edgex.provider/config")
 
-    fun init(ctx: Context) {
-        if (context != null) return // Already initialized
-        context = ctx
-        windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        
-        // Add Left Edge
-        addGestureView(Gravity.LEFT)
-        // Add Right Edge
-        addGestureView(Gravity.RIGHT)
-        
-        // Load initial config to set correct size immediately
-        reloadConfigAsync()
-        
-        de.robv.android.xposed.XposedBridge.log("EdgeX: GestureManager initialized")
+    // Broadcast action for cross-process communication (system_server -> SystemUI)
+    private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
+    private const val EXTRA_ACTION = "action"
+
+    // Gesture detection variables (used in system_server process)
+    private var mDownTime = 0L
+    private var mDownX = 0f
+    private var mDownY = 0f
+    private var mIsLongPress = false
+    private var mIsSwiping = false
+    private var mIsInSection = false
+    private var mActiveZone: String? = null
+
+    private val TOUCH_SLOP = 24
+    private val SWIPE_THRESHOLD = 50
+    private val LONG_PRESS_TIMEOUT = ViewConfiguration.getLongPressTimeout()
+    private val TAP_TIMEOUT = ViewConfiguration.getTapTimeout()
+
+    private var mHandler: Handler? = null
+
+    // Debug overlay views (in SystemUI process)
+    private val debugViews = mutableListOf<DebugOverlayView>()
+
+    /**
+     * Called from system_server (filterInputEvent hook).
+     * Handles MotionEvent at the input pipeline level.
+     * Returns true if the event should be consumed (blocked from reaching apps).
+     */
+    fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
+        // Lazily init system context
+        if (systemContext == null) {
+            systemContext = context
+            // Initial config load
+            reloadConfigAsync()
+        }
+
+        if (!isGesturesEnabled()) return false
+
+        val action = event.actionMasked
+        val x = event.rawX
+        val y = event.rawY
+
+        when (action) {
+            MotionEvent.ACTION_DOWN -> {
+                val dm = context.resources.displayMetrics
+                val screenWidth = dm.widthPixels
+                val screenHeight = dm.heightPixels
+
+                // Edge detection width: ~5% of screen width
+                val edgeThreshold = screenWidth * 0.05f
+                val isInLeftEdge = x < edgeThreshold
+                val isInRightEdge = x > (screenWidth - edgeThreshold)
+
+                if (!isInLeftEdge && !isInRightEdge) {
+                    mIsInSection = false
+                    return false
+                }
+
+                // Determine which zone this touch is in
+                val side = if (isInLeftEdge) "left" else "right"
+                val verticalZone = when {
+                    y < screenHeight * 0.33f -> "top"
+                    y < screenHeight * 0.66f -> "mid"
+                    else -> "bottom"
+                }
+                val zone = "${side}_${verticalZone}"
+
+                // Check if this zone is enabled
+                if (!isZoneEnabled(zone)) {
+                    mIsInSection = false
+                    return false
+                }
+
+                mIsInSection = true
+                mActiveZone = zone
+                mDownTime = event.downTime
+                mDownX = x
+                mDownY = y
+                mIsLongPress = false
+                mIsSwiping = false
+                XposedBridge.log("$TAG: Touch intercepted in zone [$zone] at ($x, $y)")
+                return true // Consume DOWN event
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (!mIsInSection) return false
+
+                if (!mIsSwiping) {
+                    val dx = x - mDownX
+                    val dy = y - mDownY
+                    if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
+                        mIsSwiping = true
+                    }
+                }
+                if (!mIsLongPress && (event.eventTime - mDownTime) > LONG_PRESS_TIMEOUT) {
+                    mIsLongPress = true
+                }
+                return true // Consume MOVE event
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (!mIsInSection) return false
+
+                val zone = mActiveZone
+                var gestureType: String? = null
+
+                if (mIsSwiping) {
+                    val dx = x - mDownX
+                    val dy = y - mDownY
+                    if (abs(dx) > abs(dy)) {
+                        // Horizontal swipe
+                        if (abs(dx) > SWIPE_THRESHOLD) {
+                            gestureType = if (dx < 0) "swipe_left" else "swipe_right"
+                        }
+                    } else {
+                        // Vertical swipe
+                        if (abs(dy) > SWIPE_THRESHOLD) {
+                            gestureType = if (dy < 0) "swipe_up" else "swipe_down"
+                        }
+                    }
+                } else if (mIsLongPress) {
+                    gestureType = "long_press"
+                } else {
+                    // Tap - not consumed, let it pass through
+                    XposedBridge.log("$TAG: Tap detected in zone [$zone], passing through")
+                    mIsInSection = false
+                    mActiveZone = null
+                    return false
+                }
+
+                if (gestureType != null && zone != null) {
+                    XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
+                    triggerAction(zone, gestureType, context)
+                } else {
+                    XposedBridge.log("$TAG: Swipe detected but below threshold. dx=${x - mDownX}, dy=${y - mDownY}")
+                }
+
+                mIsInSection = false
+                mActiveZone = null
+                return true // Consume UP event
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                mIsInSection = false
+                mActiveZone = null
+                return false
+            }
+        }
+
+        return mIsInSection
     }
 
-    private val views = mutableListOf<GestureView>()
+    /**
+     * Called from SystemUI process to initialize overlay windows and broadcast receiver.
+     * Used for debug visualization and DrawerWindow.
+     */
+    fun initSystemUI(ctx: Context) {
+        if (systemUIContext != null) return // Already initialized
+        systemUIContext = ctx
+        windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-    private fun addGestureView(gravity: Int) {
-        val wm = context?.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val metrics = context?.resources?.displayMetrics
-        val widthPx = if (metrics != null) (12 * metrics.density).toInt() else 72
-        
-        val view = GestureView(context!!, gravity)
+        // Register BroadcastReceiver to receive action commands from system_server
+        registerActionReceiver(ctx)
+
+        // Add debug overlay views (left + right edge)
+        addDebugOverlayView(Gravity.LEFT)
+        addDebugOverlayView(Gravity.RIGHT)
+
+        // Load initial config
+        reloadConfigAsyncForUI()
+
+        XposedBridge.log("$TAG: SystemUI overlay initialized with broadcast receiver")
+    }
+
+    /**
+     * Register a BroadcastReceiver in SystemUI to handle action commands
+     * sent from system_server via filterInputEvent hook.
+     */
+    private fun registerActionReceiver(ctx: Context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val action = intent.getStringExtra(EXTRA_ACTION) ?: return
+                XposedBridge.log("$TAG: SystemUI received action broadcast: $action")
+                performActionInSystemUI(action, context)
+            }
+        }
+
+        try {
+            val filter = IntentFilter(ACTION_PERFORM)
+            ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            XposedBridge.log("$TAG: Action BroadcastReceiver registered in SystemUI")
+        } catch (e: Exception) {
+            // Fallback for older Android versions without RECEIVER_NOT_EXPORTED
+            try {
+                val filter = IntentFilter(ACTION_PERFORM)
+                ctx.registerReceiver(receiver, filter)
+                XposedBridge.log("$TAG: Action BroadcastReceiver registered (legacy) in SystemUI")
+            } catch (e2: Exception) {
+                XposedBridge.log("$TAG: Failed to register BroadcastReceiver: ${e2.message}")
+            }
+        }
+    }
+
+    // ======== Debug Overlay View (SystemUI process, visual only) ========
+
+    private fun addDebugOverlayView(gravity: Int) {
+        val ctx = systemUIContext ?: return
+        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val metrics = ctx.resources.displayMetrics
+        val widthPx = (12 * metrics.density).toInt()
+
+        val view = DebugOverlayView(ctx, gravity)
         val params = WindowManager.LayoutParams(
             widthPx,
-            WindowManager.LayoutParams.MATCH_PARENT, // Initial height 0 to prevent "full height flash" before config loads
+            WindowManager.LayoutParams.MATCH_PARENT,
             2027, // TYPE_MAGNIFICATION_OVERLAY
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or  // NOT touchable
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         )
         params.gravity = gravity
-        
-        windowManager?.addView(view, params)
-        views.add(view) // Track view
-        de.robv.android.xposed.XposedBridge.log("EdgeX: Added GestureView with gravity $gravity width $widthPx")
+
+        wm.addView(view, params)
+        debugViews.add(view)
+        XposedBridge.log("$TAG: Added DebugOverlayView with gravity $gravity width $widthPx")
     }
 
-    // Configuration Cache
-    private var configCache = mutableMapOf<String, String>()
-    private var lastConfigLoad = 0L
-    private val CONFIG_CACHE_TTL = 2000L // 2 seconds
-
-    private fun reloadConfigAsync() {
-        if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
-        
-        // Simple async update
-        val thread = Thread {
-            try {
-                // Pre-fetch keys
-                val keys = listOf(
-                    "gestures_enabled", "debug_matrix_enabled",
-                    "zone_enabled_left_top", "zone_enabled_left_mid", "zone_enabled_left_bottom",
-                    "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
-                    "left_top_swipe_left", "left_top_swipe_right", "left_top_swipe_up", "left_top_swipe_down",
-                    "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
-                    "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
-                    "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
-                    "right_mid_swipe_left", "right_mid_swipe_right", "right_mid_swipe_up", "right_mid_swipe_down",
-                    "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down"
-                )
-                
-                for (key in keys) {
-                     val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled" || key == "debug_matrix_enabled") "boolean" else "string"
-                     configCache[key] = queryConfigProvider(key, type)
-                }
-                lastConfigLoad = System.currentTimeMillis()
-                
-                // Refresh Views on Main Thread after Cache Update
-                Handler(Looper.getMainLooper()).post {
-                    // Update Debug Color for each view
-                    val debug = getConfig("debug_matrix_enabled", "boolean") == "true"
-                    val color = if (debug) 0x3300FF00.toInt() else 0x00000000
-                    
-                    views.forEach { 
-                        it.updateDebugColor(color)
-                        it.updateWindowRegion()
-                        // Force clear drawing cache and invalidate
-                        it.destroyDrawingCache()
-                        it.invalidate() 
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        thread.start()
-    }
-    class GestureView(context: Context, val edgeGravity: Int) : View(context) {
-        private var startX = 0f
-        private var startY = 0f
-        private var startTime = 0L
+    /**
+     * Debug-only overlay view. Not touchable - purely for visual feedback.
+     */
+    class DebugOverlayView(context: Context, val edgeGravity: Int) : View(context) {
         private var windowOffsetY = 0
         private val handler = Handler(Looper.getMainLooper())
-
-
         private val paint = android.graphics.Paint()
 
         init {
-            paint.color = 0x00000000 // Default Transparent
+            paint.color = 0x00000000
             paint.style = android.graphics.Paint.Style.FILL
-            
-            // CRITICAL: specific to generic Views, enables onDraw
+
             setWillNotDraw(false)
-            
-            // Use software layer to ensure canvas.drawColor CLEAR works correctly
             setLayerType(LAYER_TYPE_SOFTWARE, null)
-            
-            // Set transparent background
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            
-            // Register ContentObserver to update visuals ONLY when config changes
+
             val observer = object : android.database.ContentObserver(handler) {
                 override fun onChange(selfChange: Boolean) {
-                    // Force cache refresh
-                    lastConfigLoad = 0 
-                    reloadConfigAsync()
-                    // postInvalidate handled by reloadConfigAsync completion
+                    lastConfigLoad = 0
+                    reloadConfigAsyncForUI()
                 }
             }
             try {
@@ -153,66 +292,47 @@ object GestureManager {
                 e.printStackTrace()
             }
         }
-        
+
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
-            
-            // Clear canvas first to prevent residual drawings when zones are disabled
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
-            
+
             if (!isGesturesEnabled()) return
-            
+
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val metrics = android.util.DisplayMetrics()
             wm.defaultDisplay.getRealMetrics(metrics)
             val h = metrics.heightPixels.toFloat()
             val w = width.toFloat()
-            
+
             val offsetY = -windowOffsetY.toFloat()
-            
+
             if (edgeGravity == Gravity.LEFT) {
-                // Left Top
-                if (isZoneEnabled("left_top")) {
+                if (isZoneEnabled("left_top"))
                     canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
-                }
-                // Left Mid
-                if (isZoneEnabled("left_mid")) {
+                if (isZoneEnabled("left_mid"))
                     canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
-                }
-                // Left Bottom
-                if (isZoneEnabled("left_bottom")) {
+                if (isZoneEnabled("left_bottom"))
                     canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
-                }
             } else {
-                // Right Top
-                 if (isZoneEnabled("right_top")) {
+                if (isZoneEnabled("right_top"))
                     canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
-                }
-                // Right Mid
-                if (isZoneEnabled("right_mid")) {
+                if (isZoneEnabled("right_mid"))
                     canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
-                }
-                // Right Bottom
-                if (isZoneEnabled("right_bottom")) {
+                if (isZoneEnabled("right_bottom"))
                     canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
-                }
             }
         }
 
-        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-            super.onLayout(changed, left, top, right, bottom)
-            // No-op here, layout update handled via ContentObserver -> reloadConfig -> main thread handler
-        }
-
         fun updateWindowRegion() {
-            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val ctx = context ?: return
+            val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val metrics = android.util.DisplayMetrics()
             wm.defaultDisplay.getRealMetrics(metrics)
             val h = metrics.heightPixels
-            
-            var minTop = h // Start from bottom
-            var maxBottom = 0 // Start from top
-            
+
+            var minTop = h
+            var maxBottom = 0
             var hasEnabledZone = false
 
             if (edgeGravity == Gravity.LEFT) {
@@ -232,7 +352,7 @@ object GestureManager {
                     hasEnabledZone = true
                 }
             } else {
-                 if (isZoneEnabled("right_top")) {
+                if (isZoneEnabled("right_top")) {
                     minTop = kotlin.math.min(minTop, 0)
                     maxBottom = kotlin.math.max(maxBottom, (h * 0.33f).toInt())
                     hasEnabledZone = true
@@ -248,204 +368,91 @@ object GestureManager {
                     hasEnabledZone = true
                 }
             }
-            
-            // Update Window Layout Params
+
             try {
-                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 val params = layoutParams as WindowManager.LayoutParams
-                
                 if (!hasEnabledZone) {
-                    // Hide completely
                     params.height = 0
                     visibility = GONE
                 } else {
-                    // Set precise coverage
                     visibility = VISIBLE
                     params.gravity = Gravity.TOP or edgeGravity
                     params.y = minTop
                     params.height = maxBottom - minTop
                 }
-                
+
                 windowOffsetY = if (hasEnabledZone) minTop else 0
-                
                 wm.updateViewLayout(this, params)
-                
-                // Also update exclusion rects based on the NEW local coordinates
-                // Note: exclusion rects are usually relative to the window content
-                val exclusionRects = mutableListOf<Rect>()
-                exclusionRects.add(Rect(0, 0, width, params.height)) 
-                systemGestureExclusionRects = exclusionRects
-                
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-        
+
         fun updateDebugColor(color: Int) {
             paint.color = color
         }
-        
-        private fun isZoneEnabled(zone: String): Boolean {
-            // Read directly from cache to avoid async reload race condition
-            val value = configCache["zone_enabled_$zone"]
-            return value == "true"
-        }
+    }
 
-        private val SWIPE_THRESHOLD = 50
+    // ======== Configuration ========
 
-        override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (!isGesturesEnabled()) return false
-            
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    startX = event.rawX
-                    startY = event.rawY
-                    startTime = System.currentTimeMillis()
-                    // de.robv.android.xposed.XposedBridge.log("EdgeX: Touch Down at $startX, $startY")
-                    return true
-                }
-                MotionEvent.ACTION_UP -> {
-                    val endX = event.rawX
-                    val endY = event.rawY
-                    
-                    // Logic from GestureView.kt: diff = start - end
-                    val diffX = startX - endX 
-                    val diffY = startY - endY
-                    val duration = System.currentTimeMillis() - startTime
-                    
-                    if (abs(diffX) > abs(diffY)) {
-                        // Horizontal Swipe
-                        if (abs(diffX) > SWIPE_THRESHOLD) {
-                            if (diffX > 0) {
-                                // Start > End -> Swipe LEFT
-                                if (edgeGravity == Gravity.RIGHT) triggerAction("swipe_left")
-                            } else {
-                                // Start < End -> Swipe RIGHT
-                                if (edgeGravity == Gravity.LEFT) triggerAction("swipe_right")
-                            }
-                        } else {
-                            // Tap / Click handling (if movement is small)
-                            // User requested to remove Click features to fix obstruction.
-                            // So we trigger Pass-Through immediately.
-                            injectInputEvent(endX, endY)
-                        }
-                    } else {
-                        // Vertical Swipe
-                        if (abs(diffY) > SWIPE_THRESHOLD) {
-                             if (diffY > 0) {
-                                 // Start > End -> Swipe UP
-                                 triggerAction("swipe_up")
-                             } else {
-                                 // Start < End -> Swipe DOWN
-                                 triggerAction("swipe_down")
-                             }
-                        } else {
-                            injectInputEvent(endX, endY)
-                        }
-                    }
-                    return true
-                }
-            }
-            return false
-        }
-        
-        private fun injectInputEvent(x: Float, y: Float) {
-            val handler = android.os.Handler(android.os.Looper.getMainLooper())
-            
-            // 1. Temporarily disable touch to let event pass through THIS window
-            handler.post { setTouchable(false) }
-            
-            // 2. Wait for WindowManager to update InputWindows (approx 16-32ms frames, safe 50ms)
-            handler.postDelayed({
-                // 3. Inject Event (Async)
-                Thread {
-                    var success = false
-                    try {
-                        val method = Class.forName("android.hardware.input.InputManager")
-                            .getMethod("getInstance")
-                        val instance = method.invoke(null)
-                        val injectMethod = instance.javaClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
+    private var configCache = mutableMapOf<String, String>()
+    private var lastConfigLoad = 0L
+    private val CONFIG_CACHE_TTL = 2000L
 
-                        val downTime = android.os.SystemClock.uptimeMillis()
-                        
-                        // DOWN
-                        val downEvent = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
-                        downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
-                        injectMethod.invoke(instance, downEvent, 0)
-                        downEvent.recycle()
-                        
-                        // Delay for valid tap duration (10-20ms)
-                        Thread.sleep(15)
+    private fun reloadConfigAsync() {
+        if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
 
-                        // UP
-                        val eventTime = android.os.SystemClock.uptimeMillis()
-                        val upEvent = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_UP, x, y, 0)
-                        upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
-                        injectMethod.invoke(instance, upEvent, 0)
-                        upEvent.recycle()
-                        
-                        success = true
-                    } catch (e: Exception) {
-                        de.robv.android.xposed.XposedBridge.log("EdgeX: Reflection Injection Failed: ${e.message}")
-                    }
-                    
-                    if (!success) {
-                        // Fallback to Shell
-                        try {
-                            Runtime.getRuntime().exec("input tap ${x.toInt()} ${y.toInt()}")
-                        } catch (e: Exception) {
-                             de.robv.android.xposed.XposedBridge.log("EdgeX: Shell Injection Failed: ${e.message}")
-                        }
-                    }
-
-                    // 4. Restore Touch (Main Thread)
-                    handler.post { setTouchable(true) }
-                }.start()
-            }, 100) // Increased delay to 100ms for WM stability
-        }
-        
-        private fun setTouchable(touchable: Boolean) {
+        Thread {
             try {
-                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                val params = layoutParams as WindowManager.LayoutParams
-                if (touchable) {
-                    // remove FLAG_NOT_TOUCHABLE -> Become Touchable
-                    params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                } else {
-                    // add FLAG_NOT_TOUCHABLE -> Become Untouchable (Transparent to events)
-                    params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                }
-                wm.updateViewLayout(this, params)
+                loadConfigKeys()
+                lastConfigLoad = System.currentTimeMillis()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-        
+        }.start()
+    }
 
+    private fun reloadConfigAsyncForUI() {
+        if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
 
-        private fun triggerAction(event: String) {
-            val zone = getZone(startY)
-            val configKey = "${zone}_${event}"
-            
-            // Query Config
-            val action = getConfig(configKey)
-            
-            if (action.isEmpty() || action == "default" || action == "none") return
-            
-            performAction(action)
-        }
+        Thread {
+            try {
+                loadConfigKeys()
+                lastConfigLoad = System.currentTimeMillis()
 
-        private fun getZone(y: Float): String {
-            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val metrics = android.util.DisplayMetrics()
-            wm.defaultDisplay.getRealMetrics(metrics)
-            val h = metrics.heightPixels
+                Handler(Looper.getMainLooper()).post {
+                    val debug = getConfig("debug_matrix_enabled", "boolean") == "true"
+                    val color = if (debug) 0x3300FF00.toInt() else 0x00000000
 
-            return when {
-                y < h * 0.33 -> if (edgeGravity == Gravity.LEFT) "left_top" else "right_top" 
-                y < h * 0.66 -> if (edgeGravity == Gravity.LEFT) "left_mid" else "right_mid"
-                else -> if (edgeGravity == Gravity.LEFT) "left_bottom" else "right_bottom"
+                    debugViews.forEach {
+                        it.updateDebugColor(color)
+                        it.updateWindowRegion()
+                        it.destroyDrawingCache()
+                        it.invalidate()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
+        }.start()
+    }
+
+    private fun loadConfigKeys() {
+        val keys = listOf(
+            "gestures_enabled", "debug_matrix_enabled",
+            "zone_enabled_left_top", "zone_enabled_left_mid", "zone_enabled_left_bottom",
+            "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
+            "left_top_swipe_left", "left_top_swipe_right", "left_top_swipe_up", "left_top_swipe_down",
+            "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
+            "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
+            "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
+            "right_mid_swipe_left", "right_mid_swipe_right", "right_mid_swipe_up", "right_mid_swipe_down",
+            "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down"
+        )
+
+        for (key in keys) {
+            val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled" || key == "debug_matrix_enabled") "boolean" else "string"
+            configCache[key] = queryConfigProvider(key, type)
         }
     }
 
@@ -453,22 +460,27 @@ object GestureManager {
         return getConfig("gestures_enabled", "boolean", "true") != "false"
     }
 
-    
+    private fun isZoneEnabled(zone: String): Boolean {
+        val value = configCache["zone_enabled_$zone"]
+        return value == "true"
+    }
+
     private fun getConfig(key: String, type: String = "string", defValue: String = ""): String {
-         reloadConfigAsync()
-         
-         if (configCache.containsKey(key)) {
-             return configCache[key] ?: defValue
-         }
-         
-         val value = queryConfigProvider(key, type)
-         if (value.isNotEmpty()) configCache[key] = value
-         return if (value.isNotEmpty()) value else defValue
+        reloadConfigAsync()
+
+        if (configCache.containsKey(key)) {
+            return configCache[key] ?: defValue
+        }
+
+        val value = queryConfigProvider(key, type)
+        if (value.isNotEmpty()) configCache[key] = value
+        return if (value.isNotEmpty()) value else defValue
     }
 
     private fun queryConfigProvider(key: String, type: String): String {
+        val ctx = systemContext ?: systemUIContext
         try {
-            val cursor: Cursor? = context?.contentResolver?.query(
+            val cursor: Cursor? = ctx?.contentResolver?.query(
                 CONFIG_URI,
                 null,
                 key,
@@ -486,74 +498,136 @@ object GestureManager {
         return ""
     }
 
-    private fun performAction(action: String) {
-        val ctx = context ?: return
-        
-        // Handle app shortcuts
-        if (action.startsWith("app_shortcut:")) {
-            launchShortcut(ctx, action)
-            return
+    // ======== Action Handling ========
+
+    private fun triggerAction(zone: String, gestureType: String, context: Context) {
+        val configKey = "${zone}_${gestureType}"
+        val action = getConfig(configKey)
+
+        XposedBridge.log("$TAG: triggerAction configKey=$configKey -> action='$action'")
+
+        if (action.isEmpty() || action == "default" || action == "none") return
+
+        performAction(action, context)
+    }
+
+    /**
+     * Called from system_server process. For shell-based actions, execute directly.
+     * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
+     */
+    private fun performAction(action: String, context: Context) {
+        XposedBridge.log("$TAG: performAction: $action")
+
+        when {
+            // Shell-based actions can run directly from system_server
+            action == "back" -> {
+                try { Runtime.getRuntime().exec("input keyevent 4") } catch (e: Exception) {}
+            }
+            action == "home" -> {
+                try { Runtime.getRuntime().exec("input keyevent 3") } catch (e: Exception) {}
+            }
+            action == "screenshot" -> {
+                try { Runtime.getRuntime().exec("input keyevent 120") } catch (e: Exception) {}
+            }
+            else -> {
+                // UI actions need SystemUI context -> send broadcast
+                sendActionToSystemUI(action, context)
+            }
         }
-        
-        when (action) {
-            "back" -> {
-                try { Runtime.getRuntime().exec("input keyevent 4") } catch(e:Exception){}
+    }
+
+    /**
+     * Send action command to SystemUI process via broadcast.
+     */
+    private fun sendActionToSystemUI(action: String, context: Context) {
+        try {
+            val intent = Intent(ACTION_PERFORM)
+            intent.setPackage("com.android.systemui")
+            intent.putExtra(EXTRA_ACTION, action)
+            context.sendBroadcast(intent)
+            XposedBridge.log("$TAG: Sent action broadcast to SystemUI: $action")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: Failed to send broadcast: ${e.message}")
+        }
+    }
+
+    /**
+     * Execute action within SystemUI process (called by BroadcastReceiver).
+     */
+    private fun performActionInSystemUI(action: String, context: Context) {
+        val ctx = systemUIContext ?: context
+
+        when {
+            action.startsWith("app_shortcut:") -> {
+                Handler(Looper.getMainLooper()).post {
+                    launchShortcut(ctx, action)
+                }
             }
-            "home" -> {
-                 try { Runtime.getRuntime().exec("input keyevent 3") } catch(e:Exception){}
+            action == "freezer_drawer" -> {
+                Handler(Looper.getMainLooper()).post {
+                    DrawerManager.showDrawer(ctx)
+                }
             }
-            "freezer_drawer" -> {
-                DrawerManager.showDrawer(context!!)
-            }
-            "screenshot" -> {
-                try { Runtime.getRuntime().exec("input keyevent 120") } catch(e:Exception){}
-            }
-            "refreeze" -> {
+            action == "refreeze" -> {
                 performRefreeze(ctx)
             }
-            else -> Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
+            else -> {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun showToast(context: Context, text: String) {
+        if (mHandler == null) mHandler = Handler(Looper.getMainLooper())
+        mHandler?.post {
+            try {
+                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+            } catch (t: Throwable) {}
         }
     }
 
     private fun launchShortcut(context: Context, action: String) {
         try {
-            // Parse: app_shortcut:{packageName}:{shortcutId}
             val parts = action.split(":")
             if (parts.size != 3) {
-                Toast.makeText(context, "快捷方式格式错误", Toast.LENGTH_SHORT).show()
+                showToast(context, "快捷方式格式错误")
                 return
             }
-            
+
             val packageName = parts[1]
             val shortcutId = parts[2]
-            
+
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
-                val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
-                
-                // Try to start the shortcut
+                val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE)
+                        as android.content.pm.LauncherApps
+
                 try {
-                    launcherApps.startShortcut(packageName, shortcutId, null, null, android.os.Process.myUserHandle())
+                    launcherApps.startShortcut(
+                        packageName, shortcutId, null, null,
+                        android.os.Process.myUserHandle()
+                    )
                 } catch (e: Exception) {
-                    de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to launch shortcut: ${e.message}")
-                    // Fallback: try to launch the app itself
+                    XposedBridge.log("$TAG: Failed to launch shortcut: ${e.message}")
                     try {
                         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
                         if (intent != null) {
                             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(intent)
                         } else {
-                            Toast.makeText(context, "无法启动快捷方式", Toast.LENGTH_SHORT).show()
+                            showToast(context, "无法启动快捷方式")
                         }
                     } catch (e2: Exception) {
-                        Toast.makeText(context, "启动失败", Toast.LENGTH_SHORT).show()
+                        showToast(context, "启动失败")
                     }
                 }
             } else {
-                Toast.makeText(context, "需要 Android 7.1 及以上版本", Toast.LENGTH_SHORT).show()
+                showToast(context, "需要 Android 7.1 及以上版本")
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            Toast.makeText(context, "快捷方式启动失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            showToast(context, "快捷方式启动失败: ${e.message}")
         }
     }
 
@@ -561,11 +635,9 @@ object GestureManager {
         val handler = Handler(Looper.getMainLooper())
         Thread {
             try {
-                // 1. Get List from Config (Persistent)
                 var listStr = queryConfigProvider("freezer_app_list", "string")
-                de.robv.android.xposed.XposedBridge.log("EdgeX: Refreeze - freezer_app_list query returned: '$listStr'")
-                
-                // 2. Fallback to Runtime History if persistent list is empty
+                XposedBridge.log("$TAG: Refreeze - freezer_app_list query returned: '$listStr'")
+
                 if (listStr.isEmpty()) {
                     val historySet = DrawerManager.frozenAppsHistory
                     if (historySet.isEmpty()) {
@@ -573,58 +645,56 @@ object GestureManager {
                         return@Thread
                     }
                     listStr = historySet.joinToString(",")
-                    de.robv.android.xposed.XposedBridge.log("EdgeX: Refreeze - using runtime history: '$listStr'")
+                    XposedBridge.log("$TAG: Refreeze - using runtime history: '$listStr'")
                 }
-                
+
                 val packages = listStr.split(",")
                 val pm = context.packageManager
                 var count = 0
-                
+
                 for (pkg in packages) {
                     if (pkg.isBlank()) continue
                     try {
-                        // Check if installed and enabled
-                        val info = pm.getApplicationInfo(pkg, 0) 
+                        val info = pm.getApplicationInfo(pkg, 0)
                         if (info.enabled) {
-                             // Freeze it
-                             var success = false
-                             // 1. Try API first (SystemUI context)
-                             try {
-                                 pm.setApplicationEnabledSetting(pkg, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-                                 success = true
-                             } catch (e: Exception) {
-                                  // Ignore, try Root
-                             }
-                             
-                             // 2. Fallback to Root
-                             if (!success) {
-                                 try {
+                            var success = false
+                            try {
+                                pm.setApplicationEnabledSetting(
+                                    pkg,
+                                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                                    0
+                                )
+                                success = true
+                            } catch (e: Exception) {}
+
+                            if (!success) {
+                                try {
                                     val p = Runtime.getRuntime().exec("su")
                                     val os = java.io.DataOutputStream(p.outputStream)
                                     os.writeBytes("pm disable $pkg\n")
                                     os.writeBytes("exit\n")
                                     os.flush()
                                     if (p.waitFor() == 0) success = true
-                                 } catch(e: Exception){
-                                     e.printStackTrace()
-                                 }
-                             }
-                             
-                             if (success) count++
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+
+                            if (success) count++
                         }
                     } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-                        // App not found, maybe uninstalled
+                        // App not found
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
                 }
-                
+
                 if (count > 0) {
                     handler.post { Toast.makeText(context, "已重新冻结 $count 个应用", Toast.LENGTH_SHORT).show() }
                 } else {
                     handler.post { Toast.makeText(context, "没有需要冻结的应用", Toast.LENGTH_SHORT).show() }
                 }
-                
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 handler.post { Toast.makeText(context, "冻结出错: ${e.message}", Toast.LENGTH_SHORT).show() }
