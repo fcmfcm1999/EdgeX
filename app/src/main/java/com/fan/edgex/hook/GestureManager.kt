@@ -62,6 +62,10 @@ object GestureManager {
      * Called from system_server (filterInputEvent hook).
      * Handles MotionEvent at the input pipeline level.
      * Returns true if the event should be consumed (blocked from reaching apps).
+     *
+     * Design: DOWN events are NEVER consumed. This allows taps on keyboard buttons
+     * in the edge zone to work normally. Only once a swipe is confirmed (finger moves
+     * beyond threshold) do we start consuming events.
      */
     fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
         // Lazily init system context
@@ -83,8 +87,8 @@ object GestureManager {
                 val screenWidth = dm.widthPixels
                 val screenHeight = dm.heightPixels
 
-                // Edge detection width: ~5% of screen width
-                val edgeThreshold = screenWidth * 0.05f
+                // Edge detection width: 12dp (matches original overlay width)
+                val edgeThreshold = 12 * dm.density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
@@ -108,6 +112,9 @@ object GestureManager {
                     return false
                 }
 
+                // Start tracking but do NOT consume DOWN.
+                // Let the event pass through to the underlying app (keyboard, etc.)
+                // so that taps work normally.
                 mIsInSection = true
                 mActiveZone = zone
                 mDownTime = event.downTime
@@ -115,8 +122,7 @@ object GestureManager {
                 mDownY = y
                 mIsLongPress = false
                 mIsSwiping = false
-                XposedBridge.log("$TAG: Touch intercepted in zone [$zone] at ($x, $y)")
-                return true // Consume DOWN event
+                return false // Let DOWN pass through
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -132,7 +138,8 @@ object GestureManager {
                 if (!mIsLongPress && (event.eventTime - mDownTime) > LONG_PRESS_TIMEOUT) {
                     mIsLongPress = true
                 }
-                return true // Consume MOVE event
+                // Only consume MOVE events once a swipe is confirmed
+                return mIsSwiping
             }
 
             MotionEvent.ACTION_UP -> {
@@ -157,24 +164,18 @@ object GestureManager {
                     }
                 } else if (mIsLongPress) {
                     gestureType = "long_press"
-                } else {
-                    // Tap - not consumed, let it pass through
-                    XposedBridge.log("$TAG: Tap detected in zone [$zone], passing through")
-                    mIsInSection = false
-                    mActiveZone = null
-                    return false
                 }
 
                 if (gestureType != null && zone != null) {
                     XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
                     triggerAction(zone, gestureType, context)
-                } else {
-                    XposedBridge.log("$TAG: Swipe detected but below threshold. dx=${x - mDownX}, dy=${y - mDownY}")
                 }
 
+                val wasSwipe = mIsSwiping
                 mIsInSection = false
                 mActiveZone = null
-                return true // Consume UP event
+                // Only consume UP if we were swiping (tap UP passes through naturally)
+                return wasSwipe
             }
 
             MotionEvent.ACTION_CANCEL -> {
@@ -184,7 +185,7 @@ object GestureManager {
             }
         }
 
-        return mIsInSection
+        return false
     }
 
     /**
