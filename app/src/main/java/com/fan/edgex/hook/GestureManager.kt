@@ -48,6 +48,12 @@ object GestureManager {
     private var mIsInSection = false
     private var mActiveZone: String? = null
 
+    // Cooldown after triggering an action (e.g. opening drawer)
+    // During cooldown, edge tracking is disabled so that subsequent taps
+    // (like tapping to dismiss the drawer) are not intercepted.
+    private var actionCooldownUntil = 0L
+    private const val ACTION_COOLDOWN_MS = 500L
+
     private val TOUCH_SLOP = 24
     private val SWIPE_THRESHOLD = 50
     private val LONG_PRESS_TIMEOUT = ViewConfiguration.getLongPressTimeout()
@@ -83,6 +89,12 @@ object GestureManager {
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
+                // Skip edge tracking during cooldown (e.g. right after opening drawer)
+                if (System.currentTimeMillis() < actionCooldownUntil) {
+                    mIsInSection = false
+                    return false
+                }
+
                 val dm = context.resources.displayMetrics
                 val screenWidth = dm.widthPixels
                 val screenHeight = dm.heightPixels
@@ -169,6 +181,8 @@ object GestureManager {
                 if (gestureType != null && zone != null) {
                     XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
                     triggerAction(zone, gestureType, context)
+                    // Start cooldown so subsequent taps (e.g. dismissing drawer) aren't intercepted
+                    actionCooldownUntil = System.currentTimeMillis() + ACTION_COOLDOWN_MS
                 }
 
                 val wasSwipe = mIsSwiping
