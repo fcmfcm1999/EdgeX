@@ -58,24 +58,22 @@ class DrawerWindow(private val context: Context) {
                 }
                 return super.dispatchTouchEvent(ev)
             }
+
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    dismiss()
+                    return true
+                }
+                return super.dispatchKeyEvent(event)
+            }
         }.apply {
             // Always transparent - drawer content has its own background
             setBackgroundColor(Color.TRANSPARENT)
 
-            // Handle Back key to close
+            // Focusable for key events (back key), but NOT focusableInTouchMode
+            // to avoid consuming the first touch for focus acquisition.
             isFocusable = true
-            isFocusableInTouchMode = true
-            setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                    dismiss()
-                    true
-                } else {
-                    false
-                }
-            }
-
-            // Ensure window takes focus immediately
-            post { requestFocus() }
+            isFocusableInTouchMode = false
         }
 
         // --- Content Loading ---
