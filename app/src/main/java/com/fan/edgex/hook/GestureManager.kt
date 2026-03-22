@@ -150,7 +150,6 @@ object GestureManager {
                     }
 
                     if (gestureType != null) {
-                        XposedBridge.log("$TAG: Gesture [$gestureType] in zone [$zone]")
                         triggerAction(zone, gestureType, context)
                     }
 
@@ -202,7 +201,6 @@ object GestureManager {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-                XposedBridge.log("$TAG: SystemUI received action broadcast: $action")
                 performActionInSystemUI(action, context)
             }
         }
@@ -246,7 +244,6 @@ object GestureManager {
 
         wm.addView(view, params)
         debugViews.add(view)
-        XposedBridge.log("$TAG: Added DebugOverlayView with gravity $gravity width $widthPx")
     }
 
     /**
@@ -487,31 +484,25 @@ object GestureManager {
 
     private fun triggerAction(zone: String, gestureType: String, context: Context) {
         val configKey = "${zone}_${gestureType}"
-        val action = getConfig(configKey)
+        val action = configCache[configKey]
 
-        XposedBridge.log("$TAG: triggerAction configKey=$configKey -> action='$action'")
-
-        if (action.isEmpty() || action == "default" || action == "none") return
-
-        performAction(action, context)
+        if (!action.isNullOrEmpty() && action != "none") {
+            performAction(action, context)
+        }
     }
-
     /**
      * Called from system_server process. For shell-based actions, execute directly.
      * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
      */
     private fun performAction(action: String, context: Context) {
-        XposedBridge.log("$TAG: performAction: $action")
-
-        when {
-            // Shell-based actions can run directly from system_server
-            action == "back" -> {
+        when (action) {
+            "back" -> {
                 try { Runtime.getRuntime().exec("input keyevent 4") } catch (e: Exception) {}
             }
-            action == "home" -> {
+            "home" -> {
                 try { Runtime.getRuntime().exec("input keyevent 3") } catch (e: Exception) {}
             }
-            action == "screenshot" -> {
+            "screenshot" -> {
                 try { Runtime.getRuntime().exec("input keyevent 120") } catch (e: Exception) {}
             }
             else -> {
@@ -526,11 +517,10 @@ object GestureManager {
      */
     private fun sendActionToSystemUI(action: String, context: Context) {
         try {
-            val intent = Intent(ACTION_PERFORM)
-            intent.setPackage("com.android.systemui")
-            intent.putExtra(EXTRA_ACTION, action)
+            val intent = Intent(ACTION_PERFORM).apply {
+                putExtra(EXTRA_ACTION, action)
+            }
             context.sendBroadcast(intent)
-            XposedBridge.log("$TAG: Sent action broadcast to SystemUI: $action")
         } catch (e: Exception) {
             XposedBridge.log("$TAG: Failed to send broadcast: ${e.message}")
         }
@@ -620,24 +610,37 @@ object GestureManager {
         val handler = Handler(Looper.getMainLooper())
         Thread {
             try {
-                var listStr = queryConfigProvider("freezer_app_list", "string")
-                XposedBridge.log("$TAG: Refreeze - freezer_app_list query returned: '$listStr'")
+                val packageList = mutableListOf<String>()
+                val cursor: Cursor? = systemContext?.contentResolver?.query(
+                    CONFIG_URI,
+                    null,
+                    "freezer_app_list",
+                    arrayOf(""),
+                    "string"
+                )
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val listStr = it.getString(0)
+                        if (!listStr.isNullOrEmpty()) {
+                            val packages = listStr.split(",")
+                            packageList.addAll(packages)
+                        }
+                    }
+                }
 
-                if (listStr.isEmpty()) {
+                if (packageList.isEmpty()) {
                     val historySet = DrawerManager.frozenAppsHistory
                     if (historySet.isEmpty()) {
                         handler.post { Toast.makeText(context, "冰箱列表为空", Toast.LENGTH_SHORT).show() }
                         return@Thread
                     }
-                    listStr = historySet.joinToString(",")
-                    XposedBridge.log("$TAG: Refreeze - using runtime history: '$listStr'")
+                    packageList.addAll(historySet)
                 }
 
-                val packages = listStr.split(",")
                 val pm = context.packageManager
                 var count = 0
 
-                for (pkg in packages) {
+                for (pkg in packageList) {
                     if (pkg.isBlank()) continue
                     try {
                         val info = pm.getApplicationInfo(pkg, 0)
