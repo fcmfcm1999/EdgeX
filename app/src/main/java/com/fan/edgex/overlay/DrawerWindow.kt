@@ -20,6 +20,9 @@ class DrawerWindow(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
+    // Left boundary of drawer content area.
+    // Taps to the left of this X coordinate dismiss the drawer.
+    private var contentLeftBound = 0
 
     fun show() {
         if (rootView != null) return // Already showing
@@ -44,20 +47,21 @@ class DrawerWindow(private val context: Context) {
 
         val displayMetrics = context.resources.displayMetrics
         
-        rootView = FrameLayout(context).apply {
-            // Always transparent - legacy drawer background is on the right-aligned container
-            setBackgroundColor(Color.TRANSPARENT)
-            
-            // Use OnTouchListener for immediate response, fixing "double tap" issues
-            setOnTouchListener { _, event ->
-                if (event.action == android.view.MotionEvent.ACTION_DOWN) {
-                    dismiss()
-                    true
-                } else {
-                    false
+        rootView = object : FrameLayout(context) {
+            override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+                if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
+                    // If tap is LEFT of the drawer content, dismiss immediately
+                    if (ev.x < contentLeftBound) {
+                        dismiss()
+                        return true
+                    }
                 }
+                return super.dispatchTouchEvent(ev)
             }
-            
+        }.apply {
+            // Always transparent - drawer content has its own background
+            setBackgroundColor(Color.TRANSPARENT)
+
             // Handle Back key to close
             isFocusable = true
             isFocusableInTouchMode = true
@@ -69,7 +73,7 @@ class DrawerWindow(private val context: Context) {
                     false
                 }
             }
-            
+
             // Ensure window takes focus immediately
             post { requestFocus() }
         }
@@ -144,6 +148,15 @@ class DrawerWindow(private val context: Context) {
         } else {
             setupLegacyLayout(displayApps, pm)
         }
+
+        // Set the content left boundary for dismiss-on-tap detection
+        val drawerWidth = if (useArcDrawer) {
+            // Arc items occupy roughly the right 200dp
+            (200 * displayMetrics.density).toInt()
+        } else {
+            displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt()
+        }
+        contentLeftBound = displayMetrics.widthPixels - drawerWidth
 
         // --- Window Layout Params ---
         val params = WindowManager.LayoutParams().apply {
