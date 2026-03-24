@@ -14,6 +14,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.fan.edgex.R
 import java.io.DataOutputStream
 
 class DrawerWindow(private val context: Context) {
@@ -202,7 +203,7 @@ class DrawerWindow(private val context: Context) {
             
             if (displayApps.isEmpty()) {
                 val emptyMsg = TextView(context).apply {
-                    text = "空空如也"
+                    text = context.getString(R.string.label_empty_drawer)
                     textSize = 16f
                     setPadding(40, 40, 40, 40)
                     setTextColor(Color.DKGRAY)
@@ -316,7 +317,7 @@ class DrawerWindow(private val context: Context) {
 
         if (displayApps.isEmpty()) {
             val emptyMsg = TextView(context).apply {
-                text = "空空如也"
+                text = context.getString(R.string.label_empty_drawer)
                 textSize = 16f
                 setPadding(40, 40, 40, 40)
                 setTextColor(Color.DKGRAY)
@@ -413,12 +414,12 @@ class DrawerWindow(private val context: Context) {
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
             if (success) {
                 handler.post {
-                    android.widget.Toast.makeText(context, "正在启动 $label...", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_launching, label), android.widget.Toast.LENGTH_SHORT).show()
                     launchApp(context, pm, packageName)
                 }
             } else {
                handler.post {
-                    android.widget.Toast.makeText(context, "解冻失败", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_unfreeze_failed_drawer), android.widget.Toast.LENGTH_SHORT).show()
                }
             }
         }.start() 
@@ -442,11 +443,11 @@ class DrawerWindow(private val context: Context) {
                     if (retries < 10) { 
                         handler.postDelayed(task!!, 200)
                     } else {
-                        android.widget.Toast.makeText(context, "启动超时，请手动打开", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(context, context.getString(R.string.toast_launch_timeout), android.widget.Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                 android.widget.Toast.makeText(context, "启动出错: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                 android.widget.Toast.makeText(context, context.getString(R.string.toast_launch_error, e.message), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
         task.run()

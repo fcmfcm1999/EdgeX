@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"
             android:layout_height="?attr/actionBarSize"
             android:gravity="center_vertical"
-            android:text="EdgeX"
+            android:text="@string/header_main"
             android:textColor="@color/ui_header_text"
             android:textSize="20sp"
             android:textStyle="normal" />
@@ -66,7 +66,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:text="手势"
+                    android:text="@string/menu_gestures"
                     android:textColor="@color/ui_text_primary"
                     android:textSize="16sp" />
 
@@ -107,7 +107,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:text="冰箱"
+                    android:text="@string/menu_freezer"
                     android:textColor="@color/ui_text_primary"
                     android:textSize="16sp" />
                 
@@ -143,7 +143,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:text="高级选项"
+                    android:text="@string/menu_advanced"
                     android:textColor="@color/ui_text_primary"
                     android:textSize="16sp" />
 
@@ -200,14 +200,14 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="调试模式"
+                            android:text="@string/menu_debug_matrix"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="16sp" />
                         
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="显示手势触发区域 (绿色矩阵)"
+                            android:text="@string/menu_debug_matrix_desc"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -257,14 +257,14 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="启用弧形冰箱"
+                            android:text="@string/menu_arc_drawer"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="16sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="在屏幕右侧以弧形显示应用列表"
+                            android:text="@string/menu_arc_drawer_desc"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -309,7 +309,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
                         android:layout_weight="1"
-                        android:text="重启 SystemUI"
+                        android:text="@string/menu_restart_sysui"
                         android:textColor="@color/ui_text_primary"
                         android:textSize="16sp" />
                 </LinearLayout>
@@ -344,7 +344,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:text="关于"
+                    android:text="@string/menu_about"
                     android:textColor="@color/ui_text_primary"
                     android:textSize="16sp" />
 
@@ -385,14 +385,14 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="作者"
+                            android:text="@string/label_author"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="fantasy1999"
+                            android:text="@string/value_author"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -422,14 +422,14 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="项目地址"
+                            android:text="@string/label_project_url"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="github.com/fantasy1999/EdgeX"
+                            android:text="@string/value_project_url"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
@@ -456,14 +456,14 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="版本"
+                            android:text="@string/label_version"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0.1"
+                            android:text="@string/value_version"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>

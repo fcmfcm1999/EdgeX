@@ -22,7 +22,7 @@
             android:id="@+id/action_subtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="默认"
+            android:text="@string/label_default_action"
             android:textColor="@color/ui_text_secondary"
             android:textSize="12sp"/>
     </LinearLayout>

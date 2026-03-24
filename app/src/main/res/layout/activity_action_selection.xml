@@ -39,7 +39,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="选择动作"
+                android:text="@string/header_action_selection"
                 android:textColor="@color/ui_header_text"
                 android:textSize="20sp"
                 android:textStyle="normal" />
@@ -48,7 +48,7 @@
                 android:id="@+id/tv_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Zone / Event"
+                android:text="@string/label_zone_event_subtitle"
                 android:textColor="#B3FFFFFF"
                 android:textSize="14sp" />
         </LinearLayout>

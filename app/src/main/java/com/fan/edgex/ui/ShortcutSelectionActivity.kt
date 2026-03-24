@@ -52,7 +52,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             val actionCode = "app_shortcut:${item.packageName}:${item.shortcutId}"
             val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
             prefs.edit().putString(prefKey, actionCode).apply()
-            prefs.edit().putString(prefKey + "_label", "快捷方式: ${item.label}").apply()
+            prefs.edit().putString(prefKey + "_label", getString(R.string.label_shortcut_prefix, item.label)).apply()
             
             // Notify Hook
             contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
@@ -67,7 +67,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
 
     private fun loadShortcuts() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
-            Toast.makeText(this, "需要 Android 7.1 及以上版本", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.toast_requires_android_71), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -246,9 +246,9 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                      shortcuts.addAll(rootShortcuts)
                      shortcuts.sortWith(compareBy({ it.appLabel }, { it.label }))
                      adapter.notifyDataSetChanged()
-                     Toast.makeText(this, "通过 Root 加载了 ${rootShortcuts.size} 个快捷方式", Toast.LENGTH_SHORT).show()
+                     Toast.makeText(this, getString(R.string.toast_shortcuts_loaded_via_root, rootShortcuts.size), Toast.LENGTH_SHORT).show()
                  } else {
-                     Toast.makeText(this, "未找到快捷方式 (Root 尝试失败)", Toast.LENGTH_SHORT).show()
+                     Toast.makeText(this, getString(R.string.toast_no_shortcuts_found), Toast.LENGTH_SHORT).show()
                  }
             }
         }.start()

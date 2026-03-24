@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EdgeX</string>
+
+    <!-- 界面标题 -->
+    <string name="header_main">EdgeX</string>
+    <string name="header_gestures">手势</string>
+    <string name="header_freezer">冰箱</string>
+    <string name="header_action_selection">选择动作</string>
+    <string name="header_shortcut_selection">选择快捷方式</string>
+
+    <!-- 主界面菜单项 -->
+    <string name="menu_gestures">手势</string>
+    <string name="menu_gestures_desc">配置边缘手势区域</string>
+    <string name="menu_freezer">冰箱</string>
+    <string name="menu_freezer_desc">管理冻结应用</string>
+    <string name="menu_advanced">高级选项</string>
+    <string name="menu_debug_matrix">调试模式</string>
+    <string name="menu_debug_matrix_desc">显示手势触发区域 (绿色矩阵)</string>
+    <string name="menu_arc_drawer">启用弧形冰箱</string>
+    <string name="menu_arc_drawer_desc">在屏幕右侧以弧形显示应用列表</string>
+    <string name="menu_restart_sysui">重启 SystemUI</string>
+    <string name="menu_about">关于</string>
+    <string name="label_author">作者</string>
+    <string name="label_project_url">项目地址</string>
+    <string name="label_version">版本</string>
+    <string name="value_author">fantasy1999</string>
+    <string name="value_project_url">github.com/fantasy1999/EdgeX</string>
+    <string name="value_version">0.1</string>
+
+    <!-- 手势区域名称 -->
+    <string name="zone_left_top">左上</string>
+    <string name="zone_left_mid">左中</string>
+    <string name="zone_left_bottom">左下</string>
+    <string name="zone_right_top">右上</string>
+    <string name="zone_right_mid">右中</string>
+    <string name="zone_right_bottom">右下</string>
+    <string name="zone_left_default_title">左侧区域</string>
+    <string name="zone_right_default_title">右侧区域</string>
+
+    <!-- 手势事件类型 -->
+    <string name="gesture_click">单击</string>
+    <string name="gesture_double_click">双击</string>
+    <string name="gesture_long_press">长按</string>
+    <string name="gesture_swipe_up">上划</string>
+    <string name="gesture_swipe_down">下划</string>
+    <string name="gesture_swipe_left">左划</string>
+    <string name="gesture_swipe_right">右划</string>
+
+    <!-- 动作选择列表 -->
+    <string name="action_default">默认</string>
+    <string name="action_none">无</string>
+    <string name="action_back">返回</string>
+    <string name="action_home">主页</string>
+    <string name="action_recents">最近应用</string>
+    <string name="action_freezer_drawer">冰箱抽屉</string>
+    <string name="action_refreeze">重新冻结</string>
+    <string name="action_screenshot">截屏</string>
+    <string name="action_app_shortcut">应用快捷方式</string>
+
+    <!-- 对话框按钮 -->
+    <string name="dialog_freeze">冻结</string>
+    <string name="dialog_unfreeze">解冻</string>
+    <string name="dialog_run">运行</string>
+    <string name="dialog_app_info">应用信息</string>
+
+    <!-- 标签与提示 -->
+    <string name="hint_search_apps">搜索应用…</string>
+    <string name="label_frozen">已冻结</string>
+    <string name="label_zone_event_subtitle">区域 / 事件</string>
+    <string name="label_default_action">默认</string>
+    <string name="label_empty_drawer">空空如也</string>
+    <string name="content_desc_icon">图标</string>
+
+    <!-- Toast 提示 -->
+    <string name="toast_restarting_sysui">正在重启 SystemUI…</string>
+    <string name="toast_restart_failed">重启失败: %s</string>
+    <string name="toast_cannot_open_browser">无法打开浏览器</string>
+    <string name="toast_frozen">已冻结 %s</string>
+    <string name="toast_unfrozen">已解冻 %s</string>
+    <string name="toast_cannot_launch">无法启动此应用</string>
+    <string name="toast_error">出错: %s</string>
+    <string name="toast_freeze_failed">冻结失败，请检查 Root 权限。</string>
+    <string name="toast_unfreeze_failed">解冻失败，请检查 Root 权限。</string>
+    <string name="toast_requires_android_71">需要 Android 7.1 及以上版本</string>
+    <string name="toast_shortcuts_loaded_via_root">通过 Root 加载了 %d 个快捷方式</string>
+    <string name="toast_no_shortcuts_found">未找到快捷方式 (Root 尝试失败)</string>
+    <string name="toast_launching">正在启动 %s…</string>
+    <string name="toast_unfreeze_failed_drawer">解冻失败</string>
+    <string name="toast_launch_timeout">启动超时，请手动打开</string>
+    <string name="toast_launch_error">启动出错: %s</string>
+    <string name="label_shortcut_prefix">快捷方式: %s</string>
+
+    <!-- GestureManager 提示 -->
+    <string name="toast_unknown_action">未知动作: %s</string>
+    <string name="toast_shortcut_format_error">快捷方式格式错误</string>
+    <string name="toast_cannot_launch_shortcut">无法启动快捷方式</string>
+    <string name="toast_launch_failed">启动失败</string>
+    <string name="toast_shortcut_launch_failed">快捷方式启动失败: %s</string>
+    <string name="toast_freezer_list_empty">冰箱列表为空</string>
+    <string name="toast_refrozen_apps">已重新冻结 %d 个应用</string>
+    <string name="toast_no_apps_to_freeze">没有需要冻结的应用</string>
+    <string name="toast_freeze_error">冻结出错: %s</string>
+</resources>

@@ -16,6 +16,7 @@ import android.view.View
 
 import android.view.WindowManager
 import android.widget.Toast
+import com.fan.edgex.R
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import kotlin.math.abs
@@ -548,7 +549,7 @@ object GestureManager {
             }
             else -> {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(ctx, "未知动作: $action", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(ctx, ctx.getString(R.string.toast_unknown_action, action), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -567,7 +568,7 @@ object GestureManager {
         try {
             val parts = action.split(":")
             if (parts.size != 3) {
-                showToast(context, "快捷方式格式错误")
+                showToast(context, context.getString(R.string.toast_shortcut_format_error))
                 return
             }
 
@@ -591,18 +592,18 @@ object GestureManager {
                             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(intent)
                         } else {
-                            showToast(context, "无法启动快捷方式")
+                            showToast(context, context.getString(R.string.toast_cannot_launch_shortcut))
                         }
                     } catch (e2: Exception) {
-                        showToast(context, "启动失败")
+                        showToast(context, context.getString(R.string.toast_launch_failed))
                     }
                 }
             } else {
-                showToast(context, "需要 Android 7.1 及以上版本")
+                showToast(context, context.getString(R.string.toast_requires_android_71))
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            showToast(context, "快捷方式启动失败: ${e.message}")
+            showToast(context, context.getString(R.string.toast_shortcut_launch_failed, e.message))
         }
     }
 
@@ -631,7 +632,7 @@ object GestureManager {
                 if (packageList.isEmpty()) {
                     val historySet = DrawerManager.frozenAppsHistory
                     if (historySet.isEmpty()) {
-                        handler.post { Toast.makeText(context, "冰箱列表为空", Toast.LENGTH_SHORT).show() }
+                        handler.post { Toast.makeText(context, context.getString(R.string.toast_freezer_list_empty), Toast.LENGTH_SHORT).show() }
                         return@Thread
                     }
                     packageList.addAll(historySet)
@@ -678,14 +679,14 @@ object GestureManager {
                 }
 
                 if (count > 0) {
-                    handler.post { Toast.makeText(context, "已重新冻结 $count 个应用", Toast.LENGTH_SHORT).show() }
+                    handler.post { Toast.makeText(context, context.getString(R.string.toast_refrozen_apps, count), Toast.LENGTH_SHORT).show() }
                 } else {
-                    handler.post { Toast.makeText(context, "没有需要冻结的应用", Toast.LENGTH_SHORT).show() }
+                    handler.post { Toast.makeText(context, context.getString(R.string.toast_no_apps_to_freeze), Toast.LENGTH_SHORT).show() }
                 }
 
             } catch (e: Exception) {
                 e.printStackTrace()
-                handler.post { Toast.makeText(context, "冻结出错: ${e.message}", Toast.LENGTH_SHORT).show() }
+                handler.post { Toast.makeText(context, context.getString(R.string.toast_freeze_error, e.message), Toast.LENGTH_SHORT).show() }
             }
         }.start()
     }

@@ -21,13 +21,13 @@ class GesturesActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
         // Initialize Zones
-        setupZone(findViewById(R.id.zone_left_top), "左上", "left_top", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_mid), "左中", "left_mid", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_bottom), "左下", "left_bottom", isLeft = true)
+        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", isLeft = true)
+        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", isLeft = true)
+        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", isLeft = true)
         
-        setupZone(findViewById(R.id.zone_right_top), "右上", "right_top", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_mid), "右中", "right_mid", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_bottom), "右下", "right_bottom", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", isLeft = false)
     }
 
     override fun onResume() {
@@ -35,12 +35,12 @@ class GesturesActivity : AppCompatActivity() {
         // Refresh UI to show new selections
         // Re-run setup to refresh text. 
         // NOTE: This is slightly inefficient but safe/easy for this scale.
-        setupZone(findViewById(R.id.zone_left_top), "左上", "left_top", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_mid), "左中", "left_mid", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_bottom), "左下", "left_bottom", isLeft = true)
-        setupZone(findViewById(R.id.zone_right_top), "右上", "right_top", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_mid), "右中", "right_mid", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_bottom), "右下", "right_bottom", isLeft = false)
+        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", isLeft = true)
+        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", isLeft = true)
+        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", isLeft = true)
+        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", isLeft = false)
     }
 
     private fun setupZone(root: View, title: String, zoneKey: String, isLeft: Boolean) {
@@ -80,17 +80,17 @@ class GesturesActivity : AppCompatActivity() {
         }
 
         // Setup Action Labels & Clicks
-        setupAction(root.findViewById(R.id.action_click), "单击", zoneKey, "click", title)
-        setupAction(root.findViewById(R.id.action_double_click), "双击", zoneKey, "double_click", title)
-        setupAction(root.findViewById(R.id.action_long_press), "长按", zoneKey, "long_press", title)
-        setupAction(root.findViewById(R.id.action_swipe_up), "上划", zoneKey, "swipe_up", title)
-        setupAction(root.findViewById(R.id.action_swipe_down), "下划", zoneKey, "swipe_down", title)
+        setupAction(root.findViewById(R.id.action_click), getString(R.string.gesture_click), zoneKey, "click", title)
+        setupAction(root.findViewById(R.id.action_double_click), getString(R.string.gesture_double_click), zoneKey, "double_click", title)
+        setupAction(root.findViewById(R.id.action_long_press), getString(R.string.gesture_long_press), zoneKey, "long_press", title)
+        setupAction(root.findViewById(R.id.action_swipe_up), getString(R.string.gesture_swipe_up), zoneKey, "swipe_up", title)
+        setupAction(root.findViewById(R.id.action_swipe_down), getString(R.string.gesture_swipe_down), zoneKey, "swipe_down", title)
 
         // Conditional Swipe
         if (isLeft) {
-            setupAction(root.findViewById(R.id.action_swipe_right), "右划", zoneKey, "swipe_right", title)
+            setupAction(root.findViewById(R.id.action_swipe_right), getString(R.string.gesture_swipe_right), zoneKey, "swipe_right", title)
         } else {
-             setupAction(root.findViewById(R.id.action_swipe_left), "左划", zoneKey, "swipe_left", title)
+             setupAction(root.findViewById(R.id.action_swipe_left), getString(R.string.gesture_swipe_left), zoneKey, "swipe_left", title)
         }
     }
 
@@ -104,7 +104,7 @@ class GesturesActivity : AppCompatActivity() {
         
         // Load Saved Action Label
         val prefs = getSharedPreferences("config", android.content.Context.MODE_PRIVATE)
-        val savedLabel = prefs.getString(fullKey + "_label", "默认")
+        val savedLabel = prefs.getString(fullKey + "_label", getString(R.string.label_default_action))
         subtitleView.text = savedLabel
         
         // Set Click Listener

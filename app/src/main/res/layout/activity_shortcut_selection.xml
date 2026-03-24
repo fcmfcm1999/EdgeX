@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="32dp"
             android:layout_weight="1"
-            android:text="选择快捷方式"
+            android:text="@string/header_shortcut_selection"
             android:textColor="@color/ui_header_text"
             android:textSize="20sp"
             android:textStyle="normal" />

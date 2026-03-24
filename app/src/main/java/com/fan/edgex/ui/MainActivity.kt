@@ -94,9 +94,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
             val result = com.fan.edgex.utils.findProcessAndKill("com.android.systemui")
             result.onSuccess {
-                android.widget.Toast.makeText(this, "正在重启 SystemUI...", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(this, getString(R.string.toast_restarting_sysui), android.widget.Toast.LENGTH_SHORT).show()
             }.onFailure {
-                android.widget.Toast.makeText(this, "重启失败: ${it.message}", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(this, getString(R.string.toast_restart_failed, it.message), android.widget.Toast.LENGTH_LONG).show()
             }
         }
 
@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
                 val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/fantasy1999/EdgeX"))
                 startActivity(intent)
             } catch (e: Exception) {
-                android.widget.Toast.makeText(this, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(this, getString(R.string.toast_cannot_open_browser), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
     }

@@ -33,7 +33,7 @@
             android:layout_height="?attr/actionBarSize"
             android:layout_marginStart="32dp"
             android:gravity="center_vertical"
-            android:text="手势"
+            android:text="@string/header_gestures"
             android:textColor="@color/ui_header_text"
             android:textSize="20sp"
             android:textStyle="normal" />

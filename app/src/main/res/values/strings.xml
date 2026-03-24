@@ -1,3 +1,103 @@
 <resources>
     <string name="app_name">EdgeX</string>
+
+    <!-- Screen Headers -->
+    <string name="header_main">EdgeX</string>
+    <string name="header_gestures">Gestures</string>
+    <string name="header_freezer">Freezer</string>
+    <string name="header_action_selection">Select Action</string>
+    <string name="header_shortcut_selection">Select Shortcut</string>
+
+    <!-- Main Screen Menu Items -->
+    <string name="menu_gestures">Gestures</string>
+    <string name="menu_gestures_desc">Configure edge gesture zones</string>
+    <string name="menu_freezer">Freezer</string>
+    <string name="menu_freezer_desc">Manage frozen apps</string>
+    <string name="menu_advanced">Advanced Options</string>
+    <string name="menu_debug_matrix">Debug Mode</string>
+    <string name="menu_debug_matrix_desc">Show gesture trigger area (green matrix)</string>
+    <string name="menu_arc_drawer">Enable Arc Freezer</string>
+    <string name="menu_arc_drawer_desc">Display app list in arc on right side</string>
+    <string name="menu_restart_sysui">Restart SystemUI</string>
+    <string name="menu_about">About</string>
+    <string name="label_author">Author</string>
+    <string name="label_project_url">Project URL</string>
+    <string name="label_version">Version</string>
+    <string name="value_author">fantasy1999</string>
+    <string name="value_project_url">github.com/fantasy1999/EdgeX</string>
+    <string name="value_version">0.1</string>
+
+    <!-- Gesture Zone Titles -->
+    <string name="zone_left_top">Top-Left</string>
+    <string name="zone_left_mid">Mid-Left</string>
+    <string name="zone_left_bottom">Bottom-Left</string>
+    <string name="zone_right_top">Top-Right</string>
+    <string name="zone_right_mid">Mid-Right</string>
+    <string name="zone_right_bottom">Bottom-Right</string>
+    <string name="zone_left_default_title">Left Zone</string>
+    <string name="zone_right_default_title">Right Zone</string>
+
+    <!-- Gesture Event Types -->
+    <string name="gesture_click">Single Tap</string>
+    <string name="gesture_double_click">Double Tap</string>
+    <string name="gesture_long_press">Long Press</string>
+    <string name="gesture_swipe_up">Swipe Up</string>
+    <string name="gesture_swipe_down">Swipe Down</string>
+    <string name="gesture_swipe_left">Swipe Left</string>
+    <string name="gesture_swipe_right">Swipe Right</string>
+
+    <!-- Action Selection Items -->
+    <string name="action_default">Default</string>
+    <string name="action_none">None</string>
+    <string name="action_back">Back</string>
+    <string name="action_home">Home</string>
+    <string name="action_recents">Recents</string>
+    <string name="action_freezer_drawer">Freezer Drawer</string>
+    <string name="action_refreeze">Refreeze</string>
+    <string name="action_screenshot">Screenshot</string>
+    <string name="action_app_shortcut">App Shortcut</string>
+
+    <!-- Dialog Buttons -->
+    <string name="dialog_freeze">Freeze</string>
+    <string name="dialog_unfreeze">Unfreeze</string>
+    <string name="dialog_run">Run</string>
+    <string name="dialog_app_info">App Info</string>
+
+    <!-- Labels and Hints -->
+    <string name="hint_search_apps">Search apps…</string>
+    <string name="label_frozen">FROZEN</string>
+    <string name="label_zone_event_subtitle">Zone / Event</string>
+    <string name="label_default_action">Default</string>
+    <string name="label_empty_drawer">Nothing here</string>
+    <string name="content_desc_icon">Icon</string>
+
+    <!-- Toast Messages -->
+    <string name="toast_restarting_sysui">Restarting SystemUI…</string>
+    <string name="toast_restart_failed">Restart failed: %s</string>
+    <string name="toast_cannot_open_browser">Cannot open browser</string>
+    <string name="toast_frozen">Frozen %s</string>
+    <string name="toast_unfrozen">Unfrozen %s</string>
+    <string name="toast_cannot_launch">Cannot launch this app</string>
+    <string name="toast_error">Error: %s</string>
+    <string name="toast_freeze_failed">Failed to freeze. Check Root.</string>
+    <string name="toast_unfreeze_failed">Failed to unfreeze. Check Root.</string>
+    <string name="toast_requires_android_71">Requires Android 7.1 or higher</string>
+    <string name="toast_shortcuts_loaded_via_root">Loaded %d shortcuts via root</string>
+    <string name="toast_no_shortcuts_found">No shortcuts found (root attempt failed)</string>
+    <string name="toast_launching">Launching %s…</string>
+    <string name="toast_unfreeze_failed_drawer">Failed to unfreeze</string>
+    <string name="toast_launch_timeout">Launch timed out, please open manually</string>
+    <string name="toast_launch_error">Launch error: %s</string>
+    <string name="label_shortcut_prefix">Shortcut: %s</string>
+
+    <!-- GestureManager Toasts -->
+    <string name="toast_unknown_action">Unknown action: %s</string>
+    <string name="toast_shortcut_format_error">Shortcut format error</string>
+    <string name="toast_cannot_launch_shortcut">Cannot launch shortcut</string>
+    <string name="toast_launch_failed">Launch failed</string>
+    <string name="toast_shortcut_launch_failed">Shortcut launch failed: %s</string>
+    <string name="toast_freezer_list_empty">Freezer list is empty</string>
+    <string name="toast_refrozen_apps">Refrozen %d apps</string>
+    <string name="toast_no_apps_to_freeze">No apps to freeze</string>
+    <string name="toast_freeze_error">Freeze error: %s</string>
 </resources>

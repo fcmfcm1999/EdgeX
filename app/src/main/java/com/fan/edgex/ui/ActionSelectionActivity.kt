@@ -17,16 +17,16 @@ class ActionSelectionActivity : AppCompatActivity() {
 
     data class ActionItem(val label: String, val code: String, val iconRes: Int)
 
-    private val actions = listOf(
-        ActionItem("默认 (Default)", "default", R.drawable.ic_action_dot),
-        ActionItem("无 (None)", "none", R.drawable.ic_action_dot),
-        ActionItem("返回 (Back)", "back", R.drawable.ic_arrow_back),
-        ActionItem("主页 (Home)", "home", R.drawable.ic_edge_panel), // Placeholder icon
-        ActionItem("最近应用 (Recents)", "recents", R.drawable.ic_edge_panel), // Placeholder icon
-        ActionItem("冰箱抽屉 (Freezer Drawer)", "freezer_drawer", R.drawable.ic_freezer),
-        ActionItem("重新冻结 (Refreeze)", "refreeze", R.drawable.ic_freezer),
-        ActionItem("截屏 (Screenshot)", "screenshot", R.drawable.ic_camera),
-        ActionItem("应用快捷方式 (App Shortcut)", "app_shortcut", R.drawable.ic_apps)
+    private val actions get() = listOf(
+        ActionItem(getString(R.string.action_default), "default", R.drawable.ic_action_dot),
+        ActionItem(getString(R.string.action_none), "none", R.drawable.ic_action_dot),
+        ActionItem(getString(R.string.action_back), "back", R.drawable.ic_arrow_back),
+        ActionItem(getString(R.string.action_home), "home", R.drawable.ic_edge_panel),
+        ActionItem(getString(R.string.action_recents), "recents", R.drawable.ic_edge_panel),
+        ActionItem(getString(R.string.action_freezer_drawer), "freezer_drawer", R.drawable.ic_freezer),
+        ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
+        ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
+        ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

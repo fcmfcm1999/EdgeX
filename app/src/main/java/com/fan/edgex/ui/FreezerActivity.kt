@@ -186,10 +186,10 @@ class FreezerActivity : AppCompatActivity() {
                      startActivity(intent)
                      dialog.dismiss()
                  } else {
-                     Toast.makeText(this, "Cannot launch this app", Toast.LENGTH_SHORT).show()
+                 Toast.makeText(this, getString(R.string.toast_cannot_launch), Toast.LENGTH_SHORT).show()
                  }
              } catch (e: Exception) {
-                 Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                 Toast.makeText(this, getString(R.string.toast_error, e.message), Toast.LENGTH_SHORT).show()
              }
         }
         
@@ -202,21 +202,21 @@ class FreezerActivity : AppCompatActivity() {
         
         btnFreeze.setOnClickListener {
             if (runRootCommand("pm disable ${app.info.packageName}")) {
-                Toast.makeText(this, "Frozen ${app.label}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_frozen, app.label), Toast.LENGTH_SHORT).show()
                 refreshApp(app)
                 dialog.dismiss()
             } else {
-                Toast.makeText(this, "Failed to freeze. Check Root.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_freeze_failed), Toast.LENGTH_SHORT).show()
             }
         }
         
         btnUnfreeze.setOnClickListener {
              if (runRootCommand("pm enable ${app.info.packageName}")) {
-                Toast.makeText(this, "Unfrozen ${app.label}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_unfrozen, app.label), Toast.LENGTH_SHORT).show()
                 refreshApp(app)
                 dialog.dismiss()
             } else {
-                Toast.makeText(this, "Failed to unfreeze. Check Root.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_unfreeze_failed), Toast.LENGTH_SHORT).show()
             }
         }
 

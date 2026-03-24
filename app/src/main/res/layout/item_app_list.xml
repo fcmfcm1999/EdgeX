@@ -13,7 +13,7 @@
         android:id="@+id/app_icon"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:contentDescription="Icon" />
+        android:contentDescription="@string/content_desc_icon" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -47,7 +47,7 @@
         android:id="@+id/tv_frozen_status"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="FROZEN"
+        android:text="@string/label_frozen"
         android:textStyle="bold"
         android:textColor="#FF5252"
         android:textSize="10sp"
