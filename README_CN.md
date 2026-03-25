@@ -3,7 +3,7 @@
 > 向 `Xposed Edge` 致敬。`EdgeX` 是一个基于 LSPosed/Xposed 的 Android 手势增强模块，用于在屏幕边缘提供自定义手势触发、快捷动作和应用冷冻抽屉能力。
 
 <p align="center">
-  <img src="docs/icon/logo.png" alt="EdgeX Banner" />
+  <img src="docs/icon/logo.png" alt="EdgeX Banner" width="240" />
 </p>
 
 <p align="center">

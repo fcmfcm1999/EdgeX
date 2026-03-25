@@ -3,7 +3,7 @@
 > Inspired by `Xposed Edge`, `EdgeX` is an LSPosed/Xposed-based Android module that brings customizable edge gestures, quick actions, and an app freezer drawer to your device.
 
 <p align="center">
-  <img src="docs/icon/logo.png" alt="EdgeX Banner" />
+  <img src="docs/icon/logo.png" alt="EdgeX Banner" width="240" />
 </p>
 
 <p align="center">
