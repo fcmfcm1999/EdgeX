@@ -11,7 +11,9 @@ import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 
@@ -559,7 +561,7 @@ object GestureManager {
                 try { Runtime.getRuntime().exec("input keyevent 3") } catch (e: Exception) {}
             }
             "screenshot" -> {
-                try { Runtime.getRuntime().exec("input keyevent 120") } catch (e: Exception) {}
+                performScreenshot(context)
             }
             else -> {
                 // UI actions need SystemUI context -> send broadcast
@@ -752,5 +754,54 @@ object GestureManager {
                 }
             }
         }.start()
+    }
+
+    private fun performScreenshot(context: Context) {
+        val now = SystemClock.uptimeMillis()
+        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
+        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
+        val errors = mutableListOf<String>()
+
+        // Path A: use context system service instance (works on newer Android).
+        try {
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
+            if (inputManager != null) {
+                val injectMethod = inputManager.javaClass.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType
+                )
+                injectMethod.invoke(inputManager, down, 0) // ASYNC
+                injectMethod.invoke(inputManager, up, 0)
+                return
+            }
+        } catch (t: Throwable) {
+            errors.add("INPUT_SERVICE: ${t.message}")
+        }
+
+        // Path B: InputManagerGlobal singleton (works on some builds).
+        try {
+            val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
+            val getInstance = globalCls.getMethod("getInstance")
+            val global = getInstance.invoke(null)
+            val injectMethod = globalCls.getMethod(
+                "injectInputEvent",
+                Class.forName("android.view.InputEvent"),
+                Int::class.javaPrimitiveType
+            )
+            injectMethod.invoke(global, down, 0)
+            injectMethod.invoke(global, up, 0)
+            return
+        } catch (t: Throwable) {
+            errors.add("InputManagerGlobal: ${t.message}")
+        }
+
+        // Path C fallback: shell command (may be denied in system_server).
+        try {
+            Runtime.getRuntime().exec("input keyevent 120")
+        } catch (e: Exception) {
+            errors.add("shell: ${e.message}")
+            XposedBridge.log("$TAG: screenshot failed -> ${errors.joinToString(" | ")}")
+        }
     }
 }
