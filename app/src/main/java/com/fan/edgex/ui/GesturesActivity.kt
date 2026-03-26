@@ -50,14 +50,18 @@ class GesturesActivity : AppCompatActivity() {
         // Zone Enabled Checkbox
         val checkBox = root.findViewById<android.widget.CheckBox>(R.id.checkbox)
         val prefs = getSharedPreferences("config", android.content.Context.MODE_PRIVATE)
+        val prefKey = "zone_enabled_$zoneKey"
         
         // Load State (Default false)
-        val isZoneEnabled = prefs.getBoolean("zone_enabled_$zoneKey", false)
+        val isZoneEnabled = prefs.getBoolean(prefKey, false)
+        checkBox.setOnCheckedChangeListener(null)
         checkBox.isChecked = isZoneEnabled
         
         // Save State
-        checkBox.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("zone_enabled_$zoneKey", isChecked).apply()
+        checkBox.setOnCheckedChangeListener { buttonView, isChecked ->
+            // Ignore programmatic state changes (e.g. orientation/layout restore)
+            if (!buttonView.isPressed) return@setOnCheckedChangeListener
+            prefs.edit().putBoolean(prefKey, isChecked).commit()
             // Notify Hook to refresh
             contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
         }

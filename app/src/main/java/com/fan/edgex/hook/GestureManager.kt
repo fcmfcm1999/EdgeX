@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.database.Cursor
 import android.graphics.PixelFormat
+import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -88,12 +89,17 @@ object GestureManager {
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
-                val dm = context.resources.displayMetrics
-                val screenWidth = dm.widthPixels
-                val screenHeight = dm.heightPixels
-
+                // Use getRealSize to get rotated screen dimensions (consistent with debug overlay)
+                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val realSize = android.graphics.Point()
+                wm.defaultDisplay.getRealSize(realSize)
+                val screenWidth = realSize.x
+                val screenHeight = realSize.y
+                
+                val density = context.resources.displayMetrics.density
+                
                 // Edge detection width: 12dp
-                val edgeThreshold = 12 * dm.density
+                val edgeThreshold = 12 * density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
@@ -109,7 +115,6 @@ object GestureManager {
                     else -> "bottom"
                 }
                 val zone = "${side}_${verticalZone}"
-
                 if (!isZoneEnabled(zone)) {
                     mIsInSection = false
                     return false
@@ -269,8 +274,20 @@ object GestureManager {
      */
     class DebugOverlayView(context: Context, val edgeGravity: Int) : View(context) {
         private var windowOffsetY = 0
+        private var lastScreenHeight = 0
         private val handler = Handler(Looper.getMainLooper())
         private val paint = android.graphics.Paint()
+        private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        private val displayListener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) = Unit
+            override fun onDisplayRemoved(displayId: Int) = Unit
+            override fun onDisplayChanged(displayId: Int) {
+                handler.post {
+                    updateWindowRegion()
+                    invalidate()
+                }
+            }
+        }
 
         init {
             paint.color = 0x00000000
@@ -293,6 +310,16 @@ object GestureManager {
             }
         }
 
+        override fun onAttachedToWindow() {
+            super.onAttachedToWindow()
+            displayManager.registerDisplayListener(displayListener, handler)
+        }
+
+        override fun onDetachedFromWindow() {
+            super.onDetachedFromWindow()
+            displayManager.unregisterDisplayListener(displayListener)
+        }
+
         override fun onDraw(canvas: android.graphics.Canvas) {
             super.onDraw(canvas)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
@@ -300,9 +327,19 @@ object GestureManager {
             if (!isGesturesEnabled()) return
 
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val metrics = android.util.DisplayMetrics()
-            wm.defaultDisplay.getRealMetrics(metrics)
-            val h = metrics.heightPixels.toFloat()
+            val realSize = android.graphics.Point()
+            wm.defaultDisplay.getRealSize(realSize)
+            
+            // Detect screen rotation and update overlay region
+            if (realSize.y != lastScreenHeight) {
+                lastScreenHeight = realSize.y
+                handler.post {
+                    updateWindowRegion()
+                }
+            }
+            
+            // realSize.y is always the height in current orientation
+            val h = realSize.y.toFloat()
             val w = width.toFloat()
 
             val offsetY = -windowOffsetY.toFloat()
@@ -327,9 +364,12 @@ object GestureManager {
         fun updateWindowRegion() {
             val ctx = context ?: return
             val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val metrics = android.util.DisplayMetrics()
-            wm.defaultDisplay.getRealMetrics(metrics)
-            val h = metrics.heightPixels
+            
+            // Get real screen size (rotated)
+            val realSize = android.graphics.Point()
+            wm.defaultDisplay.getRealSize(realSize)
+            // realSize.y is always the height in current orientation
+            val h = realSize.y
 
             var minTop = h
             var maxBottom = 0
@@ -368,7 +408,6 @@ object GestureManager {
                     hasEnabledZone = true
                 }
             }
-
             try {
                 val params = layoutParams as WindowManager.LayoutParams
                 if (!hasEnabledZone) {
@@ -461,8 +500,7 @@ object GestureManager {
     }
 
     private fun isZoneEnabled(zone: String): Boolean {
-        val value = configCache["zone_enabled_$zone"]
-        return value == "true"
+        return getConfig("zone_enabled_$zone", "boolean", "false") == "true"
     }
 
     private fun getConfig(key: String, type: String = "string", defValue: String = ""): String {

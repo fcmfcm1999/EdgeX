@@ -57,7 +57,7 @@ class ConfigProvider : ContentProvider() {
             context.getSharedPreferences("config", Context.MODE_PRIVATE)
                 .edit()
                 .putString(key, value)
-                .apply()
+                .commit()
             
             context.contentResolver.notifyChange(CONTENT_URI, null) // Notify observers
             return Uri.withAppendedPath(CONTENT_URI, key)
