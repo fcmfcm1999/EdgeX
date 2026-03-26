@@ -48,6 +48,15 @@ object GestureManager {
     private var mActiveZone: String? = null
 
     private val TOUCH_SLOP = 24
+    
+    // Simple bilingual support for SystemUI process (can't access app resources)
+    private fun isChinese(context: Context): Boolean {
+        return context.resources.configuration.locales[0].language == "zh"
+    }
+    
+    private fun getLocalizedString(context: Context, en: String, zh: String): String {
+        return if (isChinese(context)) zh else en
+    }
     private val SWIPE_THRESHOLD = 50
 
     private var mHandler: Handler? = null
@@ -131,7 +140,11 @@ object GestureManager {
             }
 
             MotionEvent.ACTION_UP -> {
-                if (!mIsInSection) return false
+                if (!mIsInSection) {
+                    // Reset state even if not in section
+                    mIsSwiping = false
+                    return false
+                }
 
                 val zone = mActiveZone
 
@@ -158,13 +171,17 @@ object GestureManager {
                     event.action = MotionEvent.ACTION_CANCEL
                 }
 
+                // Reset all state
                 mIsInSection = false
                 mActiveZone = null
+                mIsSwiping = false
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                // Reset all state
                 mIsInSection = false
                 mActiveZone = null
+                mIsSwiping = false
             }
         }
 
@@ -568,7 +585,7 @@ object GestureManager {
         try {
             val parts = action.split(":")
             if (parts.size != 3) {
-                showToast(context, context.getString(R.string.toast_shortcut_format_error))
+                showToast(context, getLocalizedString(context, "Shortcut format error", "快捷方式格式错误"))
                 return
             }
 
@@ -592,18 +609,18 @@ object GestureManager {
                             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(intent)
                         } else {
-                            showToast(context, context.getString(R.string.toast_cannot_launch_shortcut))
+                            showToast(context, getLocalizedString(context, "Cannot launch shortcut", "无法启动快捷方式"))
                         }
                     } catch (e2: Exception) {
-                        showToast(context, context.getString(R.string.toast_launch_failed))
+                        showToast(context, getLocalizedString(context, "Launch failed", "启动失败"))
                     }
                 }
             } else {
-                showToast(context, context.getString(R.string.toast_requires_android_71))
+                showToast(context, getLocalizedString(context, "Requires Android 7.1 or higher", "需要 Android 7.1 或更高版本"))
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            showToast(context, context.getString(R.string.toast_shortcut_launch_failed, e.message))
+            showToast(context, getLocalizedString(context, "Shortcut launch failed: ${e.message}", "快捷方式启动失败：${e.message}"))
         }
     }
 
@@ -632,7 +649,13 @@ object GestureManager {
                 if (packageList.isEmpty()) {
                     val historySet = DrawerManager.frozenAppsHistory
                     if (historySet.isEmpty()) {
-                        handler.post { Toast.makeText(context, context.getString(R.string.toast_freezer_list_empty), Toast.LENGTH_SHORT).show() }
+                        handler.post { 
+                            Toast.makeText(
+                                context, 
+                                getLocalizedString(context, "Freezer list is empty", "冰箱列表为空"), 
+                                Toast.LENGTH_SHORT
+                            ).show() 
+                        }
                         return@Thread
                     }
                     packageList.addAll(historySet)
@@ -654,19 +677,10 @@ object GestureManager {
                                     0
                                 )
                                 success = true
-                            } catch (e: Exception) {}
-
-                            if (!success) {
-                                try {
-                                    val p = Runtime.getRuntime().exec("su")
-                                    val os = java.io.DataOutputStream(p.outputStream)
-                                    os.writeBytes("pm disable $pkg\n")
-                                    os.writeBytes("exit\n")
-                                    os.flush()
-                                    if (p.waitFor() == 0) success = true
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
+                                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API freeze SUCCESS for $pkg")
+                            } catch (e: Exception) {
+                                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API freeze FAILED for $pkg: ${e.message}")
+                                // DO NOT fallback to su in SystemUI process - it causes system crashes
                             }
 
                             if (success) count++
@@ -678,15 +692,26 @@ object GestureManager {
                     }
                 }
 
-                if (count > 0) {
-                    handler.post { Toast.makeText(context, context.getString(R.string.toast_refrozen_apps, count), Toast.LENGTH_SHORT).show() }
-                } else {
-                    handler.post { Toast.makeText(context, context.getString(R.string.toast_no_apps_to_freeze), Toast.LENGTH_SHORT).show() }
+                // Silent on success - no toast needed
+                if (count == 0) {
+                    handler.post { 
+                        Toast.makeText(
+                            context, 
+                            getLocalizedString(context, "No apps to freeze", "没有应用需要冷冻"), 
+                            Toast.LENGTH_SHORT
+                        ).show() 
+                    }
                 }
 
             } catch (e: Exception) {
                 e.printStackTrace()
-                handler.post { Toast.makeText(context, context.getString(R.string.toast_freeze_error, e.message), Toast.LENGTH_SHORT).show() }
+                handler.post { 
+                    Toast.makeText(
+                        context, 
+                        getLocalizedString(context, "Freeze error: ${e.message}", "冷冻错误：${e.message}"), 
+                        Toast.LENGTH_SHORT
+                    ).show() 
+                }
             }
         }.start()
     }

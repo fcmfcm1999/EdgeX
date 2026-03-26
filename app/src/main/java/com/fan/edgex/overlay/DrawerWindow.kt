@@ -24,6 +24,15 @@ class DrawerWindow(private val context: Context) {
     // Left boundary of drawer content area.
     // Taps to the left of this X coordinate dismiss the drawer.
     private var contentLeftBound = 0
+    
+    // Simple bilingual support for SystemUI process (can't access app resources)
+    private val isChinese: Boolean by lazy {
+        context.resources.configuration.locales[0].language == "zh"
+    }
+    
+    private fun getLocalizedString(en: String, zh: String): String {
+        return if (isChinese) zh else en
+    }
 
     fun show() {
         if (rootView != null) return // Already showing
@@ -203,7 +212,7 @@ class DrawerWindow(private val context: Context) {
             
             if (displayApps.isEmpty()) {
                 val emptyMsg = TextView(context).apply {
-                    text = context.getString(R.string.label_empty_drawer)
+                    text = getLocalizedString("Nothing here", "空空如也")
                     textSize = 16f
                     setPadding(40, 40, 40, 40)
                     setTextColor(Color.DKGRAY)
@@ -317,7 +326,7 @@ class DrawerWindow(private val context: Context) {
 
         if (displayApps.isEmpty()) {
             val emptyMsg = TextView(context).apply {
-                text = context.getString(R.string.label_empty_drawer)
+                text = getLocalizedString("Nothing here", "空空如也")
                 textSize = 16f
                 setPadding(40, 40, 40, 40)
                 setTextColor(Color.DKGRAY)
@@ -384,6 +393,7 @@ class DrawerWindow(private val context: Context) {
     
     // Extract unfreeze logic to avoid duplication
     private fun threadUnfreeze(packageName: String, label: String, pm: android.content.pm.PackageManager) {
+        de.robv.android.xposed.XposedBridge.log("EdgeX: DrawerWindow.threadUnfreeze - packageName: $packageName")
         Thread {
             var success = false
             try {
@@ -393,33 +403,25 @@ class DrawerWindow(private val context: Context) {
                     0
                 )
                 success = true
+                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze SUCCESS for $packageName")
             } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API Failed: ${e.message}, trying Root fallback...")
-            }
-
-            if (!success) {
-                // 2. Fallback to Root Shell
-                try {
-                    val process = Runtime.getRuntime().exec("su")
-                    val os = DataOutputStream(process.outputStream)
-                    os.writeBytes("pm enable $packageName\n")
-                    os.writeBytes("exit\n")
-                    os.flush()
-                     if (process.waitFor() == 0) success = true
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze FAILED for $packageName: ${e.message}")
+                // DO NOT fallback to su in SystemUI process - it causes system crashes
             }
 
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
             if (success) {
                 handler.post {
-                    android.widget.Toast.makeText(context, context.getString(R.string.toast_launching, label), android.widget.Toast.LENGTH_SHORT).show()
+                    // Silent on success - user will see the app launch
                     launchApp(context, pm, packageName)
                 }
             } else {
                handler.post {
-                    android.widget.Toast.makeText(context, context.getString(R.string.toast_unfreeze_failed_drawer), android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(
+                        context, 
+                        getLocalizedString("Failed to unfreeze", "解冻失败"), 
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                }
             }
         }.start() 
@@ -443,11 +445,19 @@ class DrawerWindow(private val context: Context) {
                     if (retries < 10) { 
                         handler.postDelayed(task!!, 200)
                     } else {
-                        android.widget.Toast.makeText(context, context.getString(R.string.toast_launch_timeout), android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(
+                            context, 
+                            getLocalizedString("Launch timed out, please open manually", "启动超时，请手动打开"), 
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             } catch (e: Exception) {
-                 android.widget.Toast.makeText(context, context.getString(R.string.toast_launch_error, e.message), android.widget.Toast.LENGTH_SHORT).show()
+                 android.widget.Toast.makeText(
+                     context, 
+                     getLocalizedString("Launch error: ${e.message}", "启动错误：${e.message}"), 
+                     android.widget.Toast.LENGTH_SHORT
+                 ).show()
             }
         }
         task.run()
