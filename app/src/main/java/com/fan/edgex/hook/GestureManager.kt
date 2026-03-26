@@ -326,6 +326,7 @@ object GestureManager {
             super.onDraw(canvas)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
+            if (getConfig("debug_matrix_enabled", "boolean", "false") != "true") return
             if (!isGesturesEnabled()) return
 
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
