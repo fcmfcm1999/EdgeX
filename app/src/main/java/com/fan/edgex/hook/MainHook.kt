@@ -107,6 +107,7 @@ class MainHook : IXposedHookLoadPackage {
 
             // 2) Enable InputFilter so native InputDispatcher calls filterInputEvent
             enableInputFilter(inputManagerService, lpparam.classLoader)
+            UniversalCopyManager.installHooks(lpparam.classLoader)
 
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: Error during InputManagerService hook: ${t.message}")

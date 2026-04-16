@@ -46,6 +46,8 @@ object GestureManager {
     // Gesture detection variables (used in system_server process)
     private var mDownX = 0f
     private var mDownY = 0f
+    private var mTargetX = 0f
+    private var mTargetY = 0f
     private var mIsSwiping = false
     private var mIsInSection = false
     private var mActiveZone: String? = null
@@ -69,12 +71,8 @@ object GestureManager {
 
     /**
      * Called from system_server (filterInputEvent hook).
-     * Handles MotionEvent at the input pipeline level.
-     *
-     * We NEVER consume events (always return false) to keep InputDispatcher's state clean.
-     * However, to prevent background apps (like the keyboard) from reacting to our edge swipes,
-     * we mutate the MotionEvent to ACTION_CANCEL once a swipe is confirmed.
-     * This safely terminates the touch in the app without breaking the system touch state.
+     * Handles MotionEvent at the input pipeline level and consumes touches
+     * once a gesture starts from an enabled edge zone.
      */
     fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
         // Lazily init system context
@@ -89,9 +87,9 @@ object GestureManager {
         val x = event.rawX
         val y = event.rawY
 
+
         when (action) {
             MotionEvent.ACTION_DOWN -> {
-                // Use getRealSize to get rotated screen dimensions (consistent with debug overlay)
                 val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
                 val realSize = android.graphics.Point()
                 wm.defaultDisplay.getRealSize(realSize)
@@ -100,7 +98,6 @@ object GestureManager {
                 
                 val density = context.resources.displayMetrics.density
                 
-                // Edge detection width: 12dp
                 val edgeThreshold = 12 * density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
@@ -126,11 +123,15 @@ object GestureManager {
                 mActiveZone = zone
                 mDownX = x
                 mDownY = y
+                mTargetX = x
+                mTargetY = y
                 mIsSwiping = false
+                return true // consume: prevent app from seeing edge touch
             }
 
             MotionEvent.ACTION_MOVE -> {
                 if (!mIsInSection) return false
+                updateTargetPoint(x, y)
 
                 if (!mIsSwiping) {
                     val dx = x - mDownX
@@ -139,16 +140,11 @@ object GestureManager {
                         mIsSwiping = true
                     }
                 }
-
-                // If swipe is confirmed, mutate event to CANCEL to abort touch in the background app
-                if (mIsSwiping) {
-                    event.action = MotionEvent.ACTION_CANCEL
-                }
+                return true // consume while tracking
             }
 
             MotionEvent.ACTION_UP -> {
                 if (!mIsInSection) {
-                    // Reset state even if not in section
                     mIsSwiping = false
                     return false
                 }
@@ -156,6 +152,7 @@ object GestureManager {
                 val zone = mActiveZone
 
                 if (mIsSwiping && zone != null) {
+                    updateTargetPoint(x, y)
                     val dx = x - mDownX
                     val dy = y - mDownY
                     var gestureType: String? = null
@@ -171,29 +168,46 @@ object GestureManager {
                     }
 
                     if (gestureType != null) {
-                        triggerAction(zone, gestureType, context)
+                        triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
-
-                    // Mutate to CANCEL just to be safe, so background app doesn't receive UP
-                    event.action = MotionEvent.ACTION_CANCEL
                 }
 
-                // Reset all state
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
+                return true // consume
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                // Reset all state
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
+                return true // consume
             }
         }
 
-        // ALWAYS return false to let InputDispatcher finish processing the event safely
         return false
+    }
+
+    private fun updateTargetPoint(x: Float, y: Float) {
+        when {
+            mActiveZone?.startsWith("left_") == true -> {
+                if (x > mTargetX) {
+                    mTargetX = x
+                    mTargetY = y
+                }
+            }
+            mActiveZone?.startsWith("right_") == true -> {
+                if (x < mTargetX) {
+                    mTargetX = x
+                    mTargetY = y
+                }
+            }
+            else -> {
+                mTargetX = x
+                mTargetY = y
+            }
+        }
     }
 
     /**
@@ -232,10 +246,10 @@ object GestureManager {
 
         try {
             val filter = IntentFilter(ACTION_PERFORM)
-            ctx.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            // Must use RECEIVER_EXPORTED so system_server (different UID) can reach us
+            ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
             XposedBridge.log("$TAG: Action BroadcastReceiver registered in SystemUI")
         } catch (e: Exception) {
-            // Fallback for older Android versions without RECEIVER_NOT_EXPORTED
             try {
                 val filter = IntentFilter(ACTION_PERFORM)
                 ctx.registerReceiver(receiver, filter)
@@ -260,7 +274,7 @@ object GestureManager {
             WindowManager.LayoutParams.MATCH_PARENT,
             2027, // TYPE_MAGNIFICATION_OVERLAY
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or  // NOT touchable
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
@@ -437,7 +451,7 @@ object GestureManager {
 
     // ======== Configuration ========
 
-    private var configCache = mutableMapOf<String, String>()
+    private val configCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var lastConfigLoad = 0L
     private val CONFIG_CACHE_TTL = 2000L
 
@@ -508,20 +522,15 @@ object GestureManager {
 
     private fun getConfig(key: String, type: String = "string", defValue: String = ""): String {
         reloadConfigAsync()
-
-        if (configCache.containsKey(key)) {
-            return configCache[key] ?: defValue
-        }
-
-        val value = queryConfigProvider(key, type)
-        if (value.isNotEmpty()) configCache[key] = value
-        return if (value.isNotEmpty()) value else defValue
+        // NEVER do sync IPC here — this runs on the InputDispatcher thread.
+        // Return cached value or default; async reload will populate cache.
+        return configCache[key] ?: defValue
     }
 
     private fun queryConfigProvider(key: String, type: String): String {
-        val ctx = systemContext ?: systemUIContext
+        val ctx = systemContext ?: systemUIContext ?: return ""
         try {
-            val cursor: Cursor? = ctx?.contentResolver?.query(
+            val cursor: Cursor? = ctx.contentResolver.query(
                 CONFIG_URI,
                 null,
                 key,
@@ -534,26 +543,30 @@ object GestureManager {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            // Expected on Binder-restricted threads; async reload will handle it
         }
         return ""
     }
 
     // ======== Action Handling ========
 
-    private fun triggerAction(zone: String, gestureType: String, context: Context) {
+    private fun triggerAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float) {
         val configKey = "${zone}_${gestureType}"
-        val action = configCache[configKey]
+        val action = getConfig(configKey, "string")
 
-        if (!action.isNullOrEmpty() && action != "none") {
-            performAction(action, context)
+        if (action.isNotEmpty() && action != "none") {
+            // Post to main handler — NEVER block the InputDispatcher thread with action execution
+            val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
+            handler.post {
+                performAction(action, context, touchX, touchY)
+            }
         }
     }
     /**
      * Called from system_server process. For shell-based actions, execute directly.
      * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
      */
-    private fun performAction(action: String, context: Context) {
+    private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
         when (action) {
             "back" -> {
                 try { Runtime.getRuntime().exec("input keyevent 4") } catch (e: Exception) {}
@@ -564,6 +577,21 @@ object GestureManager {
             "screenshot" -> {
                 performScreenshot(context)
             }
+            "universal_copy" -> {
+                UniversalCopyManager.collectAllTexts(context) { result ->
+                    when (result.status) {
+                        UniversalCopyManager.CollectStatus.FOUND -> {
+                            CopyPanelOverlay.show(context, result.texts)
+                        }
+                        UniversalCopyManager.CollectStatus.NO_TEXT -> {
+                            showToast(context, getLocalizedString(context, "No text found", "未找到可复制文本"))
+                        }
+                        UniversalCopyManager.CollectStatus.UNAVAILABLE -> {
+                            showToast(context, getLocalizedString(context, "Global copy unavailable", "全局复制不可用"))
+                        }
+                    }
+                }
+            }
             else -> {
                 // UI actions need SystemUI context -> send broadcast
                 sendActionToSystemUI(action, context)
@@ -573,15 +601,20 @@ object GestureManager {
 
     /**
      * Send action command to SystemUI process via broadcast.
+     * Uses sendBroadcastAsUser to handle system_server context properly.
      */
     private fun sendActionToSystemUI(action: String, context: Context) {
         try {
             val intent = Intent(ACTION_PERFORM).apply {
                 putExtra(EXTRA_ACTION, action)
+                setPackage("com.android.systemui")
             }
-            context.sendBroadcast(intent)
+            val userHandle = android.os.UserHandle::class.java
+                .getField("CURRENT").get(null) as android.os.UserHandle
+            context.sendBroadcastAsUser(intent, userHandle)
         } catch (e: Exception) {
             XposedBridge.log("$TAG: Failed to send broadcast: ${e.message}")
+            e.printStackTrace()
         }
     }
 

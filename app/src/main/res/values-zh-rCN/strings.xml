@@ -56,6 +56,7 @@
     <string name="action_freezer_drawer">冰箱抽屉</string>
     <string name="action_refreeze">重新冻结</string>
     <string name="action_screenshot">截屏</string>
+    <string name="action_universal_copy">全局复制</string>
     <string name="action_app_shortcut">应用快捷方式</string>
 
     <!-- 对话框按钮 -->

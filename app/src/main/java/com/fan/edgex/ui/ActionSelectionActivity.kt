@@ -26,6 +26,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_freezer_drawer), "freezer_drawer", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
+        ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps)
     )
 
