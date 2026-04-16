@@ -1,7 +1,10 @@
 package com.fan.edgex.hook
 
+import android.os.Handler
+import android.os.Looper
 import android.view.InputEvent
 import android.view.MotionEvent
+import com.fan.edgex.BuildConfig
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -25,6 +28,9 @@ class MainHook : IXposedHookLoadPackage {
     /**
      * Hook InputManagerService.filterInputEvent in system_server
      * to intercept touch events at the input pipeline level.
+     *
+     * Also enables InputFilter via nativeSetInputFilterEnabled so that
+     * the native InputDispatcher actually calls filterInputEvent.
      */
     private fun hookInputManager(lpparam: XC_LoadPackage.LoadPackageParam) {
         XposedBridge.log("$TAG: Initializing filterInputEvent hook (system_server)")
@@ -34,6 +40,7 @@ class MainHook : IXposedHookLoadPackage {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
+            // 1) Hook filterInputEvent to intercept touch events
             val hook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val event = param.args[0] as InputEvent
@@ -78,7 +85,7 @@ class MainHook : IXposedHookLoadPackage {
                 }
             }
 
-            // Attempt 3: Reflective fallback - find any method named filterInputEvent
+            // Attempt 3: Reflective fallback
             if (!hooked) {
                 for (m: Method in inputManagerService.declaredMethods) {
                     if (m.name == "filterInputEvent") {
@@ -98,9 +105,119 @@ class MainHook : IXposedHookLoadPackage {
                 XposedBridge.log("$TAG: ERROR - Failed to hook filterInputEvent with any method signature")
             }
 
+            // 2) Enable InputFilter so native InputDispatcher calls filterInputEvent
+            enableInputFilter(inputManagerService, lpparam.classLoader)
+
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: Error during InputManagerService hook: ${t.message}")
         }
+    }
+
+    /**
+     * Enable InputFilter so that the native InputDispatcher calls filterInputEvent.
+     * Without this, filterInputEvent is never invoked because InputFilterEnabled defaults to false.
+     *
+     * Android 16+: NativeInputManagerService$NativeImpl.setInputFilterEnabled(boolean)
+     * Legacy:      InputManagerService.nativeSetInputFilterEnabled(long, boolean)
+     */
+    private fun enableInputFilter(inputManagerService: Class<*>, classLoader: ClassLoader) {
+        // Android 16+: NativeInputManagerService$NativeImpl
+        try {
+            val nativeImplClass = XposedHelpers.findClass(
+                "com.android.server.input.NativeInputManagerService\$NativeImpl",
+                classLoader
+            )
+
+            // Hook setInputFilterEnabled to always force true
+            XposedHelpers.findAndHookMethod(nativeImplClass, "setInputFilterEnabled",
+                Boolean::class.javaPrimitiveType,
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        param.args[0] = true
+                    }
+                })
+
+            // Hook start() to initially enable InputFilter
+            XposedHelpers.findAndHookMethod(nativeImplClass, "start",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        try {
+                            XposedHelpers.callMethod(param.thisObject, "setInputFilterEnabled", true)
+                            XposedBridge.log("$TAG: InputFilter enabled via NativeImpl.start()")
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to enable InputFilter: ${t.message}")
+                        }
+                        if (BuildConfig.ENABLE_AUTO_SYSTEMUI_RESTART) {
+                            XposedBridge.log("$TAG: Auto SystemUI restart enabled for local development")
+                            scheduleSystemUIRestart()
+                        }
+                    }
+                })
+
+            XposedBridge.log("$TAG: Hooked NativeImpl for InputFilter control (Android 16+)")
+            return
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: NativeImpl not found, trying legacy approach: ${t.message}")
+        }
+
+        // Legacy: nativeSetInputFilterEnabled(long ptr, boolean enable)
+        try {
+            val nativeMethod = inputManagerService.getDeclaredMethod(
+                "nativeSetInputFilterEnabled",
+                Long::class.javaPrimitiveType,
+                Boolean::class.javaPrimitiveType
+            )
+            nativeMethod.isAccessible = true
+
+            XposedBridge.hookMethod(nativeMethod, object : XC_MethodHook() {
+                override fun beforeHookedMethod(param: MethodHookParam) {
+                    param.args[param.args.size - 1] = true
+                }
+            })
+
+            XposedHelpers.findAndHookMethod(inputManagerService, "start",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        try {
+                            val ptr = XposedHelpers.getLongField(param.thisObject, "mPtr")
+                            nativeMethod.invoke(null, ptr, true)
+                            XposedBridge.log("$TAG: InputFilter enabled via legacy nativeSetInputFilterEnabled")
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Legacy InputFilter enable failed: ${t.message}")
+                        }
+                    }
+                })
+
+            XposedBridge.log("$TAG: Hooked legacy nativeSetInputFilterEnabled for InputFilter control")
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: All InputFilter enable approaches failed: ${t.message}")
+        }
+    }
+
+    /**
+     * Local-development workaround for environments where SystemUI injection
+     * is missing after boot. Disabled by default and only enabled via build flag.
+     */
+    private fun scheduleSystemUIRestart() {
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val activityThread = Class.forName("android.app.ActivityThread")
+                val currentApp = activityThread.getMethod("currentApplication").invoke(null)
+                if (currentApp != null) {
+                    val ctx = currentApp as android.content.Context
+                    val activityManager = ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE)
+                        as android.app.ActivityManager
+                    val processes = activityManager.runningAppProcesses
+                    val systemUIProcess = processes?.find { it.processName == "com.android.systemui" }
+                    if (systemUIProcess != null) {
+                        XposedBridge.log("$TAG: Restarting SystemUI (PID ${systemUIProcess.pid}) for local development")
+                        android.os.Process.killProcess(systemUIProcess.pid)
+                    }
+                }
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: SystemUI restart failed: ${t.message}")
+            }
+        }, 15000)
     }
 
     /**

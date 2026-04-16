@@ -1,11 +1,30 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use(::load)
+    }
+}
+
+val enableAutoSystemUiRestart = providers
+    .gradleProperty("edgex.enableAutoSystemUiRestart")
+    .orElse(localProperties.getProperty("edgex.enableAutoSystemUiRestart") ?: "false")
+    .get()
+    .toBoolean()
+
 android {
     namespace = Configs.namespace
     compileSdk = Configs.compileSdk
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = Configs.applicationId
@@ -15,6 +34,11 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: Configs.versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "boolean",
+            "ENABLE_AUTO_SYSTEMUI_RESTART",
+            enableAutoSystemUiRestart.toString()
+        )
     }
 
     buildTypes {
