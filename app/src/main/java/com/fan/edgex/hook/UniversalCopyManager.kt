@@ -25,9 +25,14 @@ object UniversalCopyManager {
         UNAVAILABLE
     }
 
+    data class TextBlock(
+        val text: String,
+        val bounds: Rect
+    )
+
     data class CollectResult(
         val status: CollectStatus,
-        val texts: List<String> = emptyList()
+        val blocks: List<TextBlock> = emptyList()
     )
 
     @Volatile
@@ -165,10 +170,10 @@ object UniversalCopyManager {
             try {
                 val callbackResult = when {
                     !result.rootAvailable -> CollectResult(CollectStatus.UNAVAILABLE)
-                    result.texts.isEmpty() -> CollectResult(CollectStatus.NO_TEXT)
-                    else -> CollectResult(CollectStatus.FOUND, result.texts)
+                    result.items.isEmpty() -> CollectResult(CollectStatus.NO_TEXT)
+                    else -> CollectResult(CollectStatus.FOUND, result.items)
                 }
-                XposedBridge.log("$TAG: Universal copy collected ${result.texts.size} text items, status=${callbackResult.status}")
+                XposedBridge.log("$TAG: Universal copy collected ${result.items.size} text blocks, status=${callbackResult.status}")
                 onResult(callbackResult)
             } finally {
                 if (disableAfter) {
@@ -182,12 +187,12 @@ object UniversalCopyManager {
                 getRootInActiveWindow()
             } catch (_: Throwable) {
                 null
-            } ?: return QueryResult(rootAvailable = false, texts = emptyList())
+            } ?: return QueryResult(rootAvailable = false, items = emptyList())
 
             return try {
                 QueryResult(
                     rootAvailable = true,
-                    texts = PageTextCollector.collectAll(root)
+                    items = PageTextCollector.collectAll(root)
                 )
             } finally {
                 root.recycle()
@@ -266,7 +271,7 @@ object UniversalCopyManager {
 
     private data class QueryResult(
         val rootAvailable: Boolean,
-        val texts: List<String>
+        val items: List<TextBlock>
     )
 
     /**
@@ -276,13 +281,11 @@ object UniversalCopyManager {
     private object PageTextCollector {
         private val tempRect = Rect()
 
-        fun collectAll(root: AccessibilityNodeInfo): List<String> {
+        fun collectAll(root: AccessibilityNodeInfo): List<TextBlock> {
             val items = mutableListOf<TextItem>()
             traverse(root, items)
-            // Sort by vertical position (top), then horizontal (left)
-            items.sortWith(compareBy({ it.top }, { it.left }))
-            // Deduplicate: remove items whose text is a substring of an adjacent item
-            return deduplicate(items).map { it.text }
+            items.sortWith(compareBy({ it.bounds.top }, { it.bounds.left }))
+            return deduplicate(items).map { TextBlock(it.text, it.bounds) }
         }
 
         private fun traverse(node: AccessibilityNodeInfo, items: MutableList<TextItem>) {
@@ -309,7 +312,7 @@ object UniversalCopyManager {
 
             val text = normalizeText(node.text) ?: normalizeText(node.contentDescription) ?: return
             node.getBoundsInScreen(tempRect)
-            items += TextItem(text, tempRect.top, tempRect.left)
+            items += TextItem(text, Rect(tempRect))
         }
 
         private fun deduplicate(items: List<TextItem>): List<TextItem> {
@@ -336,6 +339,6 @@ object UniversalCopyManager {
             return trimmed
         }
 
-        private data class TextItem(val text: String, val top: Int, val left: Int)
+        private data class TextItem(val text: String, val bounds: Rect)
     }
 }

@@ -581,7 +581,7 @@ object GestureManager {
                 UniversalCopyManager.collectAllTexts(context) { result ->
                     when (result.status) {
                         UniversalCopyManager.CollectStatus.FOUND -> {
-                            CopyPanelOverlay.show(context, result.texts)
+                            TextSelectionOverlay.show(context, result.blocks)
                         }
                         UniversalCopyManager.CollectStatus.NO_TEXT -> {
                             showToast(context, getLocalizedString(context, "No text found", "未找到可复制文本"))
