@@ -132,6 +132,11 @@ class MainActivity : AppCompatActivity() {
             UpdateChecker.checkNow(this)
         }
 
+        // Donate
+        findViewById<View>(R.id.item_donate).setOnClickListener {
+            com.fan.edgex.utils.DonateDialog.show(this)
+        }
+
         // Auto update check on launch
         UpdateChecker.checkOnLaunch(this)
     }

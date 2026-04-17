@@ -35,6 +35,15 @@
     <string name="update_no_changelog">暂无更新说明。</string>
     <string name="update_checking">正在检查更新…</string>
 
+    <!-- 打赏 -->
+    <string name="label_donate">打赏</string>
+    <string name="label_donate_desc">帮我用上更好的AI模型</string>
+    <string name="donate_title">打赏作者</string>
+    <string name="donate_subtitle">帮我用上更好的AI模型</string>
+    <string name="donate_alipay">支付宝</string>
+    <string name="donate_wechat">微信支付</string>
+    <string name="donate_wechat_scan">打开微信扫一扫捐赠</string>
+
     <!-- 手势区域名称 -->
     <string name="zone_left_top">左上</string>
     <string name="zone_left_mid">左中</string>

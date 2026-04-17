@@ -34,6 +34,14 @@
     <string name="update_no_changelog">No changelog available.</string>
     <string name="update_checking">Checking for updates…</string>
 
+    <string name="label_donate">Tip me</string>
+    <string name="label_donate_desc">Buy me more AI token</string>
+    <string name="donate_title">Tip me</string>
+    <string name="donate_subtitle">Buy me more AI token</string>
+    <string name="donate_alipay">Alipay 支付宝</string>
+    <string name="donate_wechat">WeChat Pay 微信</string>
+    <string name="donate_wechat_scan">Scan with WeChat to donate</string>
+
     <!-- Gesture Zone Titles -->
     <string name="zone_left_top">Top-Left</string>
     <string name="zone_left_mid">Mid-Left</string>
