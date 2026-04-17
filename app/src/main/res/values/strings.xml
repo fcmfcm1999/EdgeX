@@ -29,7 +29,6 @@
 
     <!-- Update Checker -->
     <string name="update_new_version_title">New version %s available</string>
-    <string name="update_download">Download</string>
     <string name="update_skip_version">Skip this version</string>
     <string name="update_already_latest">Already up to date</string>
     <string name="update_no_changelog">No changelog available.</string>

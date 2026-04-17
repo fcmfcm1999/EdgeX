@@ -1,20 +1,31 @@
 package com.fan.edgex.utils
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.net.Uri
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.method.LinkMovementMethod
 import android.text.style.BulletSpan
+import android.text.style.ClickableSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -76,27 +87,106 @@ object UpdateChecker {
         if (activity.isFinishing || activity.isDestroyed) return
         val body = release.body.ifBlank { activity.getString(R.string.update_no_changelog) }
         val styledBody = parseMarkdown(body)
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle(activity.getString(R.string.update_new_version_title, release.versionName))
-            .setMessage(styledBody)
-            .setPositiveButton(R.string.update_download) { _, _ ->
-                try {
-                    activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.htmlUrl)))
-                } catch (_: Exception) {
-                    android.widget.Toast.makeText(
-                        activity, activity.getString(R.string.toast_cannot_open_browser),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+        // Make URLs open in browser instead of crashing
+        val clickableBody = makeLinksClickable(styledBody, activity)
+
+        val dp = { value: Int -> (value * activity.resources.displayMetrics.density + 0.5f).toInt() }
+
+        // Title
+        val titleView = TextView(activity).apply {
+            text = activity.getString(R.string.update_new_version_title, release.versionName)
+            setTextColor(Color.BLACK)
+            setTypeface(null, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18f)
+            setPadding(dp(20), dp(20), dp(20), dp(8))
+        }
+
+        // Content
+        val contentView = TextView(activity).apply {
+            setText(clickableBody)
+            setTextColor(0xFF333333.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
+            setPadding(dp(20), 0, dp(20), 0)
+            movementMethod = LinkMovementMethod.getInstance()
+            setLinkTextColor(0xFF009688.toInt())
+        }
+
+        val scrollView = ScrollView(activity).apply {
+            addView(contentView, ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+
+        // Skip button
+        val skipButton = TextView(activity).apply {
+            text = activity.getString(R.string.update_skip_version)
+            setTextColor(0xFF009688.toInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f)
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            val bg = GradientDrawable().apply { cornerRadius = dp(4).toFloat() }
+            background = bg
+        }
+
+        val buttonBar = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(dp(12), dp(8), dp(12), dp(16))
+            addView(skipButton, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+
+        // Root layout
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(titleView, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(scrollView, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(buttonBar, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+
+        val dialog = AlertDialog.Builder(activity).create()
+        dialog.setView(root)
+        dialog.window?.let { window ->
+            val shape = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(0xFFF5F5F5.toInt())
+            }
+            val inset = dp(24)
+            window.setBackgroundDrawable(InsetDrawable(shape, inset, inset, inset, inset))
+        }
+        dialog.show()
+
+        skipButton.setOnClickListener {
+            activity.getSharedPreferences(PREF_NAME, Activity.MODE_PRIVATE)
+                .edit().putString(KEY_SKIPPED_VERSION, release.tagName).apply()
+            dialog.dismiss()
+        }
+    }
+
+    /** Replace URLSpans with ones that open browser via Intent */
+    private fun makeLinksClickable(spannable: SpannableStringBuilder, activity: Activity): SpannableStringBuilder {
+        val urls = spannable.getSpans(0, spannable.length, URLSpan::class.java)
+        for (urlSpan in urls) {
+            val start = spannable.getSpanStart(urlSpan)
+            val end = spannable.getSpanEnd(urlSpan)
+            val flags = spannable.getSpanFlags(urlSpan)
+            val url = urlSpan.url
+            spannable.removeSpan(urlSpan)
+            spannable.setSpan(object : ClickableSpan() {
+                override fun onClick(widget: android.view.View) {
+                    try {
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    } catch (_: Exception) {
+                        android.widget.Toast.makeText(activity,
+                            activity.getString(R.string.toast_cannot_open_browser),
+                            android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
-            }
-            .setNegativeButton(R.string.update_skip_version) { _, _ ->
-                activity.getSharedPreferences(PREF_NAME, Activity.MODE_PRIVATE)
-                    .edit().putString(KEY_SKIPPED_VERSION, release.tagName).apply()
-            }
-            .show()
-        // Enable clickable links in the message TextView
-        dialog.findViewById<android.widget.TextView>(android.R.id.message)?.movementMethod =
-            android.text.method.LinkMovementMethod.getInstance()
+            }, start, end, flags)
+        }
+        return spannable
     }
 
     /**
@@ -195,6 +285,7 @@ object UpdateChecker {
                 val body = json.optString("body", "")
                 val htmlUrl = json.optString("html_url", "")
                 val versionName = tagName.removePrefix("v")
+
                 callback(ReleaseInfo(tagName, versionName, body, htmlUrl))
             } catch (e: Exception) {
                 Log.w(TAG, "Update check failed", e)
