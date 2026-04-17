@@ -19,7 +19,6 @@ import android.view.View
 
 import android.view.WindowManager
 import android.widget.Toast
-import com.fan.edgex.R
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import kotlin.math.abs
@@ -56,7 +55,12 @@ object GestureManager {
     
     // Simple bilingual support for SystemUI process (can't access app resources)
     private fun isChinese(context: Context): Boolean {
-        return context.resources.configuration.locales[0].language == "zh"
+        return try {
+            val locales = context.resources.configuration.locales
+            locales.size() > 0 && locales[0].language == "zh"
+        } catch (t: Throwable) {
+            false
+        }
     }
     
     private fun getLocalizedString(context: Context, en: String, zh: String): String {
@@ -223,8 +227,12 @@ object GestureManager {
         registerActionReceiver(ctx)
 
         // Add debug overlay views (left + right edge)
-        addDebugOverlayView(Gravity.LEFT)
-        addDebugOverlayView(Gravity.RIGHT)
+        try {
+            addDebugOverlayView(Gravity.LEFT)
+            addDebugOverlayView(Gravity.RIGHT)
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: Failed to add debug overlay views: ${t.message}")
+        }
 
         // Load initial config
         reloadConfigAsyncForUI()
@@ -640,7 +648,7 @@ object GestureManager {
             }
             else -> {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(ctx, ctx.getString(R.string.toast_unknown_action, action), Toast.LENGTH_SHORT).show()
+                    showToast(ctx, getLocalizedString(ctx, "Unknown action: $action", "未知操作：$action"))
                 }
             }
         }

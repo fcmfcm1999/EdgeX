@@ -228,15 +228,24 @@ class MainHook : IXposedHookLoadPackage {
     private fun hookSystemUI(lpparam: XC_LoadPackage.LoadPackageParam) {
         XposedBridge.log("$TAG: Initializing SystemUI hook for overlay windows")
 
-        XposedHelpers.findAndHookMethod(
-            android.app.Application::class.java,
-            "onCreate",
-            object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val context = param.thisObject as android.content.Context
-                    GestureManager.initSystemUI(context)
+        try {
+            XposedHelpers.findAndHookMethod(
+                android.app.Application::class.java,
+                "onCreate",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        try {
+                            val context = param.thisObject as android.content.Context
+                            GestureManager.initSystemUI(context)
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Error in SystemUI initSystemUI: ${t.message}")
+                            t.printStackTrace()
+                        }
+                    }
                 }
-            }
-        )
+            )
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: Failed to hook SystemUI Application.onCreate: ${t.message}")
+        }
     }
 }
