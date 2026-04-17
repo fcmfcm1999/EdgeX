@@ -1,21 +1,16 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Keep Xposed hook entry points
+-keep class com.fan.edgex.hook.MainHook { *; }
+-keep class * implements de.robv.android.xposed.IXposedHookLoadPackage { *; }
+-keep class * implements de.robv.android.xposed.IXposedHookZygoteInit { *; }
+-keep class * implements de.robv.android.xposed.IXposedHookInitPackageResources { *; }
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep all hook/overlay/ui classes (referenced via reflection by Xposed)
+-keep class com.fan.edgex.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Xposed API
+-keep class de.robv.android.xposed.** { *; }
+-dontwarn de.robv.android.xposed.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep line numbers for crash debugging
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

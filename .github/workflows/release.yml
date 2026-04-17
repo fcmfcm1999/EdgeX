@@ -36,7 +36,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
@@ -55,7 +55,7 @@ jobs:
           echo "path=$NEW_PATH" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.path }}
           generate_release_notes: true
