@@ -17,7 +17,7 @@ import android.widget.TextView
 import com.fan.edgex.R
 import java.io.DataOutputStream
 
-class DrawerWindow(private val context: Context) {
+class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
@@ -463,6 +463,8 @@ class DrawerWindow(private val context: Context) {
         task.run()
     }
 
+    fun isShowing() = rootView != null
+
     private fun dismiss() {
         if (rootView != null) {
             try {
@@ -471,6 +473,7 @@ class DrawerWindow(private val context: Context) {
                 // Ignore if already removed
             }
             rootView = null
+            onDismiss?.invoke()
         }
     }
 }
