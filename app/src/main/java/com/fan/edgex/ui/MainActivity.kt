@@ -2,8 +2,11 @@ package com.fan.edgex.ui
 
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
+import com.fan.edgex.utils.UpdateChecker
 
 class MainActivity : AppCompatActivity() {
 
@@ -120,5 +123,16 @@ class MainActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(this, getString(R.string.toast_cannot_open_browser), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+
+        // Version display (from BuildConfig)
+        findViewById<TextView>(R.id.text_version_value).text = BuildConfig.VERSION_NAME
+
+        // Manual update check on version row click
+        findViewById<View>(R.id.item_version).setOnClickListener {
+            UpdateChecker.checkNow(this)
+        }
+
+        // Auto update check on launch
+        UpdateChecker.checkOnLaunch(this)
     }
 }

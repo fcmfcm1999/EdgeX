@@ -27,6 +27,13 @@
     <string name="value_project_url">github.com/fantasy1999/EdgeX</string>
     <string name="value_version">0.1</string>
 
+    <!-- Update Checker -->
+    <string name="update_new_version_title">New version %s available</string>
+    <string name="update_skip_version">Skip this version</string>
+    <string name="update_already_latest">Already up to date</string>
+    <string name="update_no_changelog">No changelog available.</string>
+    <string name="update_checking">Checking for updates…</string>
+
     <!-- Gesture Zone Titles -->
     <string name="zone_left_top">Top-Left</string>
     <string name="zone_left_mid">Mid-Left</string>
