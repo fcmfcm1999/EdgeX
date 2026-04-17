@@ -437,6 +437,7 @@
 
                 <!-- Version -->
                 <LinearLayout
+                    android:id="@+id/item_version"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:background="?android:attr/selectableItemBackground"
@@ -461,9 +462,9 @@
                             android:textSize="14sp" />
 
                         <TextView
+                            android:id="@+id/text_version_value"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/value_version"
                             android:textColor="@color/ui_text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
