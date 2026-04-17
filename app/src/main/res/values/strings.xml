@@ -24,7 +24,7 @@
     <string name="label_project_url">Project URL</string>
     <string name="label_version">Version</string>
     <string name="value_author">fantasy1999</string>
-    <string name="value_project_url">github.com/fantasy1999/EdgeX</string>
+    <string name="value_project_url">github.com/fcmfcm1999/EdgeX</string>
     <string name="value_version">0.1</string>
 
     <!-- Update Checker -->
@@ -91,6 +91,7 @@
     <string name="toast_restarting_sysui">Restarting SystemUI…</string>
     <string name="toast_restart_failed">Restart failed: %s</string>
     <string name="toast_cannot_open_browser">Cannot open browser</string>
+    <string name="toast_star_reminder">If you use GitHub, don\'t forget to give me a star ⭐</string>
     <string name="toast_frozen">Frozen %s</string>
     <string name="toast_unfrozen">Unfrozen %s</string>
     <string name="toast_cannot_launch">Cannot launch this app</string>

@@ -25,7 +25,7 @@
     <string name="label_project_url">项目地址</string>
     <string name="label_version">版本</string>
     <string name="value_author">fantasy1999</string>
-    <string name="value_project_url">github.com/fantasy1999/EdgeX</string>
+    <string name="value_project_url">github.com/fcmfcm199/EdgeX</string>
     <string name="value_version">0.1</string>
 
     <!-- 更新检查 -->
@@ -93,6 +93,7 @@
     <string name="toast_restarting_sysui">正在重启 SystemUI…</string>
     <string name="toast_restart_failed">重启失败: %s</string>
     <string name="toast_cannot_open_browser">无法打开浏览器</string>
+    <string name="toast_star_reminder">如果你有 GitHub 账号，记得帮我点个 star 哦 ⭐</string>
     <string name="toast_frozen">已冻结 %s</string>
     <string name="toast_unfrozen">已解冻 %s</string>
     <string name="toast_cannot_launch">无法启动此应用</string>

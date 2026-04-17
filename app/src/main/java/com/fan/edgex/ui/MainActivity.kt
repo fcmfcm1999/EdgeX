@@ -116,8 +116,12 @@ class MainActivity : AppCompatActivity() {
 
         // Project URL Click Handler
         findViewById<View>(R.id.item_project_url).setOnClickListener {
+            android.widget.Toast.makeText(this, getString(R.string.toast_star_reminder), android.widget.Toast.LENGTH_LONG).apply {
+                setGravity(android.view.Gravity.CENTER, 0, 0)
+                show()
+            }
             try {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/fantasy1999/EdgeX"))
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/fcmfcm1999/EdgeX"))
                 startActivity(intent)
             } catch (e: Exception) {
                 android.widget.Toast.makeText(this, getString(R.string.toast_cannot_open_browser), android.widget.Toast.LENGTH_SHORT).show()
