@@ -90,7 +90,7 @@ object GestureManager {
         val action = event.actionMasked
         val x = event.rawX
         val y = event.rawY
-
+        val pointerCount = event.pointerCount
 
         when (action) {
             MotionEvent.ACTION_DOWN -> {
@@ -107,6 +107,9 @@ object GestureManager {
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
                 if (!isInLeftEdge && !isInRightEdge) {
+                    if (mIsInSection) {
+                        XposedBridge.log("$TAG: [Gesture] DOWN outside edge while mIsInSection=true — resetting state")
+                    }
                     mIsInSection = false
                     return false
                 }
@@ -123,6 +126,7 @@ object GestureManager {
                     return false
                 }
 
+                XposedBridge.log("$TAG: [Gesture] DOWN zone=$zone x=${"%.1f".format(x)} y=${"%.1f".format(y)} pointers=$pointerCount")
                 mIsInSection = true
                 mActiveZone = zone
                 mDownX = x
@@ -131,6 +135,15 @@ object GestureManager {
                 mTargetY = y
                 mIsSwiping = false
                 return true // consume: prevent app from seeing edge touch
+            }
+
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                XposedBridge.log("$TAG: [Gesture] POINTER_DOWN pointers=$pointerCount mIsInSection=$mIsInSection — cancelling gesture")
+                // Extra finger added: cancel the gesture to avoid direction confusion
+                mIsInSection = false
+                mActiveZone = null
+                mIsSwiping = false
+                return false
             }
 
             MotionEvent.ACTION_MOVE -> {
@@ -142,6 +155,7 @@ object GestureManager {
                     val dy = y - mDownY
                     if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
                         mIsSwiping = true
+                        XposedBridge.log("$TAG: [Gesture] SWIPING started zone=$mActiveZone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)}")
                     }
                 }
                 return true // consume while tracking
@@ -171,9 +185,13 @@ object GestureManager {
                         }
                     }
 
+                    XposedBridge.log("$TAG: [Gesture] UP zone=$zone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)} => gestureType=$gestureType pointers=$pointerCount")
+
                     if (gestureType != null) {
                         triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
+                } else {
+                    XposedBridge.log("$TAG: [Gesture] UP zone=$zone mIsSwiping=$mIsSwiping — no gesture triggered")
                 }
 
                 mIsInSection = false
@@ -183,10 +201,17 @@ object GestureManager {
             }
 
             MotionEvent.ACTION_CANCEL -> {
+                XposedBridge.log("$TAG: [Gesture] CANCEL zone=$mActiveZone")
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
                 return true // consume
+            }
+
+            else -> {
+                if (mIsInSection) {
+                    XposedBridge.log("$TAG: [Gesture] unhandled action=$action pointers=$pointerCount mIsInSection=$mIsInSection")
+                }
             }
         }
 
@@ -561,6 +586,8 @@ object GestureManager {
     private fun triggerAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float) {
         val configKey = "${zone}_${gestureType}"
         val action = getConfig(configKey, "string")
+
+        XposedBridge.log("$TAG: [Gesture] triggerAction key=$configKey action='$action'")
 
         if (action.isNotEmpty() && action != "none") {
             // Post to main handler — NEVER block the InputDispatcher thread with action execution
