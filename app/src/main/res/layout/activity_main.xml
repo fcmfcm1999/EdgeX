@@ -102,25 +102,21 @@
                         android:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
-                <LinearLayout
+                <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
                     android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/menu_keys"
-                        android:textColor="@color/ui_text_primary"
-                        android:textSize="16sp" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/menu_keys_desc"
-                        android:textColor="@color/ui_text_secondary"
-                        android:textSize="12sp" />
-                </LinearLayout>
+                    android:text="@string/menu_keys"
+                    android:textColor="@color/ui_text_primary"
+                    android:textSize="16sp" />
+
+                <CheckBox
+                    android:id="@+id/checkbox_keys"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="false"
+                    android:buttonTint="@color/ui_checkbox_tint" />
             </LinearLayout>
 
             <!-- Item 2: Freezer -->

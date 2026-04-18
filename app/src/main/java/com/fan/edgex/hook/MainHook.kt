@@ -17,6 +17,22 @@ class MainHook : IXposedHookLoadPackage {
 
     companion object {
         private const val TAG = "EdgeX"
+        
+        /**
+         * Check if the current call was initiated by our own code.
+         * This is used to detect injected events and skip processing them.
+         * Following Xposed Edge Pro's approach.
+         */
+        fun isCalledByUs(): Boolean {
+            val stackTrace = Throwable().stackTrace
+            for (i in 2 until stackTrace.size) {
+                // Check if our package is in the call stack
+                if (stackTrace[i].className.startsWith("com.fan.edgex")) {
+                    return true
+                }
+            }
+            return false
+        }
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -82,6 +98,11 @@ class MainHook : IXposedHookLoadPackage {
                     Int::class.javaPrimitiveType,
                     object : XC_MethodHook() {
                         override fun beforeHookedMethod(param: MethodHookParam) {
+                            // Check if this is our own injected event
+                            if (isCalledByUs()) {
+                                return  // Let original method handle it
+                            }
+                            
                             val keyEvent = param.args[1] as KeyEvent
                             
                             // Process key through KeyManager
@@ -103,6 +124,13 @@ class MainHook : IXposedHookLoadPackage {
             // This is called when InputFilter is enabled and receives all input events
             val hook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
+                    // Check if this event was injected by us (call stack check)
+                    // Following Xposed Edge Pro's approach
+                    if (isCalledByUs()) {
+                        XposedBridge.log("$TAG: Skipping event from our own injection (call stack)")
+                        return  // Let original method handle it
+                    }
+                    
                     val event = param.args[0] as InputEvent
                     val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
                         as android.content.Context
@@ -115,10 +143,23 @@ class MainHook : IXposedHookLoadPackage {
                             }
                         }
                         is KeyEvent -> {
-                            val consumed = GestureManager.handleKeyEvent(event, context, param)
-                            if (consumed) {
-                                param.setResult(false)
+                            // Get policyFlags (second parameter if available)
+                            val policyFlags = if (param.args.size > 1 && param.args[1] is Int) {
+                                param.args[1] as Int
+                            } else {
+                                0
                             }
+                            val consumed = GestureManager.handleKeyEvent(event, context, param, policyFlags)
+                            XposedBridge.log("$TAG: filterInputEvent KeyEvent keyCode=${event.keyCode} action=${event.action} consumed=$consumed")
+                            if (consumed) {
+                                // Consume the event (don't let system handle it)
+                                XposedBridge.log("$TAG: Setting result=false to drop event")
+                                param.setResult(false)
+                            } else {
+                                XposedBridge.log("$TAG: Letting original filterInputEvent handle the event")
+                            }
+                            // If not consumed (including injected events we're skipping):
+                            // Do nothing - let original filterInputEvent run
                         }
                     }
                 }

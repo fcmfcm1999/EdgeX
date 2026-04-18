@@ -1,35 +1,26 @@
 package com.fan.edgex.hook
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.ViewConfiguration
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 
 /**
  * KeyManager handles hardware key interception and action triggering.
  * Keys are trigger sources parallel to gestures.
  * 
+ * Following Xposed Edge Pro's approach:
+ * - Save MethodHookParam to forward events later if needed
+ * - Use g(param) to invoke original method when we don't want to consume
+ * 
  * Supported interaction modes:
  * - click (0): Quick press and release
  * - double_click (1): Two quick presses  
  * - long_press (2): Hold beyond threshold
- * 
- * State machine:
- * [IDLE] -> KEY_DOWN -> [PRESSED]
- *                          |
- *          +---------------+---------------+
- *          |               |               |
- *      timeout         KEY_UP          KEY_DOWN again
- *      (long_press)    (short)         (potential double)
- *          |               |               |
- *          v               v               v
- *     [LONG_PRESS]     [WAITING]     [DOUBLE_CLICK]
- *          |               |               |
- *          v           timeout              v
- *     execute          execute          execute
- *     long_press       click            double_click
  */
 object KeyManager {
 
@@ -54,6 +45,9 @@ object KeyManager {
     private const val STATE_IDLE = 0
     private const val STATE_PRESSED = 1
     private const val STATE_WAITING_DOUBLE = 2
+    
+    // Android 10+ requires copying KeyEvent (like Xposed Edge Pro's z.E flag)
+    private val needsCopyEvent = Build.VERSION.SDK_INT > Build.VERSION_CODES.Q
 
     // Current state per key
     private val keyStates = mutableMapOf<Int, Int>()
@@ -61,11 +55,17 @@ object KeyManager {
     // Track press times for timing calculations
     private val keyDownTimes = mutableMapOf<Int, Long>()
     
-    // Store pending key events for forwarding if no action, or for double-tap timing
-    private val pendingKeyDownEvents = mutableMapOf<Int, KeyEvent>()
+    // Store pending KeyEvents for forwarding (like Xposed Edge Pro's H and I)
+    // H = DOWN event, I = UP event (for double-tap waiting)
+    private val pendingDownEvents = mutableMapOf<Int, KeyEvent>()
+    private val pendingUpEvents = mutableMapOf<Int, KeyEvent>()
     
     // Track if we consumed the key (should not forward)
     private val keyConsumed = mutableMapOf<Int, Boolean>()
+    
+    // Track injected events to avoid infinite loop
+    // We store (downTime, eventTime) pairs of events we injected
+    private val injectedEventTimes = mutableSetOf<Long>()
 
     // Timeouts
     private var longPressTimeout = 500L
@@ -132,27 +132,144 @@ object KeyManager {
     }
 
     /**
-     * Handle key event from filterInputEvent hook.
+     * Copy KeyEvent for later forwarding (like Xposed Edge Pro's s() method).
+     * On Android 10+, we need to copy the KeyEvent to avoid issues.
+     */
+    private fun copyKeyEvent(event: KeyEvent): KeyEvent {
+        return if (needsCopyEvent) KeyEvent(event) else event
+    }
+    
+    /**
+     * Forward key events by injecting them via InputManager.
+     * This is more reliable than invokeOriginalMethod, especially for delayed forwarding.
+     * Like Xposed Edge Pro's approach using InputManager.injectInputEvent.
+     */
+    private fun injectKeyEvent(event: KeyEvent, context: Context) {
+        // Mark this event as injected by us (using eventTime as identifier)
+        injectedEventTimes.add(event.eventTime)
+        
+        // Clean up old entries (keep only last 10)
+        if (injectedEventTimes.size > 10) {
+            val toRemove = injectedEventTimes.take(injectedEventTimes.size - 10)
+            injectedEventTimes.removeAll(toRemove.toSet())
+        }
+        
+        XposedBridge.log("$TAG: Marking event as injected: eventTime=${event.eventTime}")
+        
+        try {
+            // Try InputManager.getInstance()
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
+            if (inputManager != null) {
+                val injectMethod = inputManager.javaClass.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType
+                )
+                injectMethod.invoke(inputManager, event, 0) // 0 = INJECT_INPUT_EVENT_MODE_ASYNC
+                XposedBridge.log("$TAG: Injected key event via InputManager")
+                return
+            }
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: InputManager inject failed: ${t.message}")
+        }
+        
+        // Fallback: try InputManagerGlobal
+        try {
+            val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
+            val getInstance = globalCls.getMethod("getInstance")
+            val global = getInstance.invoke(null)
+            val injectMethod = globalCls.getMethod(
+                "injectInputEvent",
+                Class.forName("android.view.InputEvent"),
+                Int::class.javaPrimitiveType
+            )
+            injectMethod.invoke(global, event, 0)
+            XposedBridge.log("$TAG: Injected key event via InputManagerGlobal")
+            return
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: InputManagerGlobal inject failed: ${t.message}")
+        }
+        
+        XposedBridge.log("$TAG: Failed to inject key event - no method worked")
+    }
+    
+    /**
+     * Forward saved key events by injecting them.
+     * This replaces the old forwardParam() approach which didn't work reliably.
+     */
+    private fun forwardKeyEvents(keyCode: Int, context: Context) {
+        val downEvent = pendingDownEvents[keyCode]
+        val upEvent = pendingUpEvents[keyCode]
+        
+        XposedBridge.log("$TAG: forwardKeyEvents - downEvent=${downEvent?.keyCode}, upEvent=${upEvent?.keyCode}")
+        
+        if (downEvent != null) {
+            injectKeyEvent(downEvent, context)
+        }
+        
+        if (upEvent != null) {
+            injectKeyEvent(upEvent, context)
+        }
+        
+        pendingDownEvents.remove(keyCode)
+        pendingUpEvents.remove(keyCode)
+    }
+
+    // Policy flag used to mark injected events (to avoid infinite loop)
+    // Following Xposed Edge Pro's approach with 0x4000000
+    private const val INJECTED_EVENT_FLAG = 0x4000000
+    
+    /**
+     * Handle key event from interceptKeyBeforeDispatching hook.
      * Returns true if event should be consumed (not forwarded to system).
      */
-    fun handleKeyEvent(event: KeyEvent, context: Context, forwardEvent: () -> Unit): Boolean {
+    fun handleKeyEvent(event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
         val keyCode = event.keyCode
+        val eventTime = event.eventTime
+        
+        XposedBridge.log("$TAG: handleKeyEvent keyCode=$keyCode action=${event.action} eventTime=$eventTime injectedTimes=$injectedEventTimes keysEnabled=$keysEnabled keyEnabled=${keyEnabled[keyCode]}")
+        
+        // Skip events that we injected ourselves (to avoid infinite loop)
+        // Method 1: Check policyFlags (if injection method supports it)
+        if (policyFlags and INJECTED_EVENT_FLAG != 0) {
+            XposedBridge.log("$TAG: Skipping injected event via policyFlags for keyCode=$keyCode")
+            return false
+        }
+        
+        // Method 2: Check if eventTime matches one we injected
+        if (injectedEventTimes.contains(eventTime)) {
+            XposedBridge.log("$TAG: Skipping injected event via eventTime for keyCode=$keyCode (time=$eventTime)")
+            injectedEventTimes.remove(eventTime) // Clean up after recognition
+            return false
+        }
         
         // Check if keys feature is enabled
-        if (!keysEnabled) return false
+        if (!keysEnabled) {
+            XposedBridge.log("$TAG: Keys feature disabled, not handling")
+            return false
+        }
         
         // Check if this key is supported
-        if (!SUPPORTED_KEYS.containsKey(keyCode)) return false
+        if (!SUPPORTED_KEYS.containsKey(keyCode)) {
+            XposedBridge.log("$TAG: Key $keyCode not supported")
+            return false
+        }
         
         // Check if this specific key is enabled
-        if (keyEnabled[keyCode] != true) return false
+        if (keyEnabled[keyCode] != true) {
+            XposedBridge.log("$TAG: Key $keyCode not enabled")
+            return false
+        }
         
         // Check if key has any action configured - if not, don't intercept
-        if (!hasAnyAction(keyCode)) return false
+        if (!hasAnyAction(keyCode)) {
+            XposedBridge.log("$TAG: Key $keyCode has no action configured")
+            return false
+        }
 
         return when (event.action) {
-            KeyEvent.ACTION_DOWN -> handleKeyDown(keyCode, event, context, forwardEvent)
-            KeyEvent.ACTION_UP -> handleKeyUp(keyCode, event, context, forwardEvent)
+            KeyEvent.ACTION_DOWN -> handleKeyDown(keyCode, event, context, param)
+            KeyEvent.ACTION_UP -> handleKeyUp(keyCode, event, context, param)
             else -> false
         }
     }
@@ -165,7 +282,7 @@ object KeyManager {
      * - repeatCount == 0 means first press
      * - repeatCount > 0 means key is being held down
      */
-    private fun handleKeyDown(keyCode: Int, event: KeyEvent, context: Context, forwardEvent: () -> Unit): Boolean {
+    private fun handleKeyDown(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
         val repeatCount = event.repeatCount
         val currentState = keyStates[keyCode] ?: STATE_IDLE
         
@@ -178,7 +295,7 @@ object KeyManager {
             // If we're not tracking but this is the first event we see (missed repeat=0),
             // treat the first repeat as a new press
             if (currentState == STATE_IDLE) {
-                return startNewPress(keyCode, event, context)
+                return startNewPress(keyCode, event, context, param)
             }
             return false
         }
@@ -186,34 +303,32 @@ object KeyManager {
         // First press (repeatCount == 0)
         when (currentState) {
             STATE_IDLE -> {
-                return startNewPress(keyCode, event, context)
+                return startNewPress(keyCode, event, context, param)
             }
             STATE_WAITING_DOUBLE -> {
                 // Second press within double-tap window
                 cancelDoubleTapTimeout(keyCode)
                 
                 // Check if event times match double-tap timing
-                val firstUpEvent = pendingKeyDownEvents[keyCode]
+                val firstUpEvent = pendingUpEvents[keyCode]
                 val timeDiff = if (firstUpEvent != null) event.eventTime - firstUpEvent.eventTime else Long.MAX_VALUE
                 
                 if (timeDiff < doubleTapTimeout && hasAction(keyCode, MODE_DOUBLE_CLICK)) {
                     // Execute double-click action
                     keyStates[keyCode] = STATE_PRESSED
                     keyConsumed[keyCode] = true
-                    pendingKeyDownEvents.remove(keyCode)
+                    pendingDownEvents.remove(keyCode)
+                    pendingUpEvents.remove(keyCode)
                     
                     val action = getAction(keyCode, MODE_DOUBLE_CLICK)
                     XposedBridge.log("$TAG: Key $keyCode double-click -> $action")
                     executeAction(action, context)
                     return true
                 } else {
-                    // No double-click action or timing didn't match, execute pending single click if any
-                    if (hasAction(keyCode, MODE_CLICK)) {
-                        val action = getAction(keyCode, MODE_CLICK)
-                        executeAction(action, context)
-                    }
-                    pendingKeyDownEvents.remove(keyCode)
-                    return startNewPress(keyCode, event, context)
+                    // No double-click action or timing didn't match
+                    // Forward the pending events via injection and start new press
+                    forwardKeyEvents(keyCode, context)
+                    return startNewPress(keyCode, event, context, param)
                 }
             }
             STATE_PRESSED -> {
@@ -227,11 +342,12 @@ object KeyManager {
     /**
      * Start tracking a new key press.
      */
-    private fun startNewPress(keyCode: Int, event: KeyEvent, context: Context): Boolean {
+    private fun startNewPress(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
         keyStates[keyCode] = STATE_PRESSED
         // Use downTime for more accurate timing - this is the time the key was originally pressed
         keyDownTimes[keyCode] = event.downTime
-        pendingKeyDownEvents[keyCode] = KeyEvent(event) // Copy for potential forwarding
+        // Save param for potential forwarding (like Xposed Edge Pro's H)
+        pendingDownEvents[keyCode] = copyKeyEvent(event)
         keyConsumed[keyCode] = false
 
         // Start long-press timeout if long-press action exists
@@ -245,8 +361,9 @@ object KeyManager {
 
     /**
      * Handle KEY_UP event.
+     * Following Xposed Edge Pro's v() method logic.
      */
-    private fun handleKeyUp(keyCode: Int, event: KeyEvent, context: Context, forwardEvent: () -> Unit): Boolean {
+    private fun handleKeyUp(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
         val currentState = keyStates[keyCode] ?: STATE_IDLE
         
         if (currentState != STATE_PRESSED) {
@@ -262,51 +379,59 @@ object KeyManager {
         if (keyConsumed[keyCode] == true) {
             // Long press already executed
             keyStates[keyCode] = STATE_IDLE
-            pendingKeyDownEvents.remove(keyCode)
+            pendingDownEvents.remove(keyCode)
+            pendingUpEvents.remove(keyCode)
             return true
         }
 
         // Short press - check if we need to wait for double-tap
         if (pressDuration < longPressTimeout) {
+            // Check if double-click action exists (like Xposed Edge Pro's D(keyCode).z != 0)
             if (hasAction(keyCode, MODE_DOUBLE_CLICK)) {
-                // Wait for potential double-tap - store the UP event time for double-tap detection
+                // Wait for potential double-tap - save UP event param (like Xposed Edge Pro's I)
                 keyStates[keyCode] = STATE_WAITING_DOUBLE
-                // Store this event's info for double-tap timing
-                pendingKeyDownEvents[keyCode] = KeyEvent(event)
-                startDoubleTapTimeout(keyCode, context, forwardEvent)
+                pendingUpEvents[keyCode] = copyKeyEvent(event)
+                startDoubleTapTimeout(keyCode, context)
                 return true
-            } else if (hasAction(keyCode, MODE_CLICK)) {
+            }
+            
+            // No double-click action - check for click action (like Xposed Edge Pro's q(keyCode, 0).z != 0)
+            if (hasAction(keyCode, MODE_CLICK)) {
                 // Execute click immediately
                 keyStates[keyCode] = STATE_IDLE
-                pendingKeyDownEvents.remove(keyCode)
+                pendingDownEvents.remove(keyCode)
+                pendingUpEvents.remove(keyCode)
                 
                 val action = getAction(keyCode, MODE_CLICK)
                 XposedBridge.log("$TAG: Key $keyCode click -> $action")
                 executeAction(action, context)
                 return true
-            } else {
-                // No click or double-click action, forward the events
-                keyStates[keyCode] = STATE_IDLE
-                pendingKeyDownEvents.remove(keyCode)
-                forwardEvent()
-                return true
             }
+            
+            // No click or double-click action - forward the events via InputManager injection
+            XposedBridge.log("$TAG: Key $keyCode no click/double-click action -> injecting events")
+            pendingUpEvents[keyCode] = copyKeyEvent(event)
+            forwardKeyEvents(keyCode, context)
+            keyStates[keyCode] = STATE_IDLE
+            return true
         } else {
-            // Long press but no long-press action (timeout didn't consume)
-            // This means the key was held but long-press timeout fired and had no action
+            // Key was held past long-press threshold but long-press timeout didn't consume
+            // This means no long-press action was configured
             if (hasAction(keyCode, MODE_CLICK)) {
                 // Execute click on release
                 keyStates[keyCode] = STATE_IDLE
-                pendingKeyDownEvents.remove(keyCode)
+                pendingDownEvents.remove(keyCode)
+                pendingUpEvents.remove(keyCode)
                 
                 val action = getAction(keyCode, MODE_CLICK)
                 executeAction(action, context)
                 return true
             }
-            // Forward the events
+            // Forward the events via InputManager injection
+            XposedBridge.log("$TAG: Key $keyCode held but no long-press action -> injecting events")
+            pendingUpEvents[keyCode] = copyKeyEvent(event)
+            forwardKeyEvents(keyCode, context)
             keyStates[keyCode] = STATE_IDLE
-            pendingKeyDownEvents.remove(keyCode)
-            forwardEvent()
             return true
         }
     }
@@ -321,7 +446,7 @@ object KeyManager {
             synchronized(this) {
                 if (keyStates[keyCode] == STATE_PRESSED && keyConsumed[keyCode] != true) {
                     keyConsumed[keyCode] = true
-                    pendingKeyDownEvents.remove(keyCode)
+                    pendingDownEvents.remove(keyCode)
                     
                     val action = getAction(keyCode, MODE_LONG_PRESS)
                     XposedBridge.log("$TAG: Key $keyCode long-press -> $action")
@@ -343,8 +468,9 @@ object KeyManager {
 
     /**
      * Start double-tap timeout.
+     * Like Xposed Edge Pro's e() callback - when timeout fires, execute click or forward.
      */
-    private fun startDoubleTapTimeout(keyCode: Int, context: Context, forwardEvent: () -> Unit) {
+    private fun startDoubleTapTimeout(keyCode: Int, context: Context) {
         cancelDoubleTapTimeout(keyCode)
         
         val runnable = Runnable {
@@ -354,15 +480,16 @@ object KeyManager {
                     
                     if (hasAction(keyCode, MODE_CLICK)) {
                         // Double-tap timed out, execute single click
-                        pendingKeyDownEvents.remove(keyCode)
+                        pendingDownEvents.remove(keyCode)
+                        pendingUpEvents.remove(keyCode)
                         
                         val action = getAction(keyCode, MODE_CLICK)
                         XposedBridge.log("$TAG: Key $keyCode click (after double-tap timeout) -> $action")
                         executeAction(action, context)
                     } else {
-                        // No click action, forward original events
-                        pendingKeyDownEvents.remove(keyCode)
-                        forwardEvent()
+                        // No click action, forward original events via InputManager injection
+                        XposedBridge.log("$TAG: Key $keyCode double-tap timeout, no click action -> injecting events")
+                        forwardKeyEvents(keyCode, context)
                     }
                 }
             }
@@ -397,7 +524,8 @@ object KeyManager {
         }
         keyStates.clear()
         keyDownTimes.clear()
-        pendingKeyDownEvents.clear()
+        pendingDownEvents.clear()
+        pendingUpEvents.clear()
         keyConsumed.clear()
     }
 }

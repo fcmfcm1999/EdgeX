@@ -37,6 +37,14 @@ class MainActivity : AppCompatActivity() {
             contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
         }
 
+        // Keys Checkbox
+        val cbKeys = findViewById<android.widget.CheckBox>(R.id.checkbox_keys)
+        cbKeys.isChecked = prefs.getBoolean("keys_enabled", false)
+        cbKeys.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("keys_enabled", isChecked).apply()
+            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+        }
+
         findViewById<View>(R.id.item_gestures).setOnClickListener {
             // Only allow entering if allowed? Or always allow? 
             // User: "Only when enabled ... gestures take effect". This usually means background logic.

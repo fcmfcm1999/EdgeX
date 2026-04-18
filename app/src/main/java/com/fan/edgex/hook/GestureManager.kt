@@ -243,7 +243,7 @@ object GestureManager {
      * Called from system_server (filterInputEvent hook) for KeyEvents.
      * Delegates to KeyManager for state machine processing.
      */
-    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam): Boolean {
+    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
         // Lazily init system context and KeyManager
         if (systemContext == null) {
             systemContext = context
@@ -251,17 +251,7 @@ object GestureManager {
             KeyManager.init(context)
         }
 
-        // Forward event function - calls original filterInputEvent
-        val forwardEvent: () -> Unit = {
-            try {
-                // Let the original event through by not consuming it
-                // The param.result is already unset, so the event will pass through
-            } catch (t: Throwable) {
-                XposedBridge.log("$TAG: Error forwarding key event: ${t.message}")
-            }
-        }
-
-        return KeyManager.handleKeyEvent(event, context, forwardEvent)
+        return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }
 
     /**

@@ -11,20 +11,16 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SwitchCompat
 import com.fan.edgex.R
 
 class KeysActivity : AppCompatActivity() {
 
     companion object {
-        // Supported keys with their display names and KeyCodes
+        // Only Volume Up, Volume Down and Power keys
         val SUPPORTED_KEYS = listOf(
             Triple(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, R.drawable.ic_keyboard),
             Triple(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, R.drawable.ic_keyboard),
-            Triple(KeyEvent.KEYCODE_BACK, R.string.key_back, R.drawable.ic_arrow_back),
-            Triple(KeyEvent.KEYCODE_HOME, R.string.key_home, R.drawable.ic_keyboard),
-            Triple(KeyEvent.KEYCODE_MENU, R.string.key_menu, R.drawable.ic_keyboard),
-            Triple(KeyEvent.KEYCODE_APP_SWITCH, R.string.key_app_switch, R.drawable.ic_apps)
+            Triple(KeyEvent.KEYCODE_POWER, R.string.key_power, R.drawable.ic_keyboard)
         )
     }
 
@@ -42,9 +38,6 @@ class KeysActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
-        // Global Switch
-        setupGlobalSwitch()
-
         // Add Key Items
         val container = findViewById<LinearLayout>(R.id.keys_container)
         for ((keyCode, nameRes, iconRes) in SUPPORTED_KEYS) {
@@ -58,26 +51,6 @@ class KeysActivity : AppCompatActivity() {
         super.onResume()
         // Refresh UI to show new selections
         refreshAllKeyItems()
-    }
-
-    private fun setupGlobalSwitch() {
-        val switchView = findViewById<SwitchCompat>(R.id.switch_keys_enabled)
-        val container = findViewById<View>(R.id.global_switch_container)
-
-        // Load State
-        val isEnabled = prefs.getBoolean("keys_enabled", false)
-        switchView.isChecked = isEnabled
-
-        // Handle clicks on the whole container
-        container.setOnClickListener {
-            switchView.toggle()
-        }
-
-        // Save State
-        switchView.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("keys_enabled", isChecked).commit()
-            notifyConfigChange()
-        }
     }
 
     private fun createKeyItem(keyCode: Int, nameRes: Int, iconRes: Int): View {

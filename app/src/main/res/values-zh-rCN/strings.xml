@@ -147,8 +147,9 @@
     <string name="keys_global_switch_desc">拦截硬件按键以触发动作</string>
     <string name="key_enabled">启用此按键</string>
     <string name="key_not_configured">未配置</string>
-    <string name="key_volume_up">音量+</string>
-    <string name="key_volume_down">音量-</string>
+    <string name="key_volume_up">音量加</string>
+    <string name="key_volume_down">音量减</string>
+    <string name="key_power">电源键</string>
     <string name="key_back">返回键</string>
     <string name="key_home">主页键</string>
     <string name="key_menu">菜单键</string>
