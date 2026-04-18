@@ -72,6 +72,19 @@
     <string name="action_screenshot">Screenshot</string>
     <string name="action_universal_copy">Global Copy</string>
     <string name="action_app_shortcut">App Shortcut</string>
+    <string name="action_shell_command">Shell Command</string>
+
+    <!-- Shell Command Configuration -->
+    <string name="header_shell_command">Shell Command</string>
+    <string name="label_shell_command">Command</string>
+    <string name="hint_shell_command">Enter shell command…</string>
+    <string name="label_run_as_root">Run as root (su)</string>
+    <string name="desc_run_as_root">Execute command with superuser privileges</string>
+    <string name="btn_save">Save</string>
+    <string name="toast_shell_command_empty">Please enter a command</string>
+    <string name="toast_shell_command_saved">Command saved</string>
+    <string name="toast_shell_su_warning">No need to add \'su\' manually when \"Run as root\" is checked</string>
+    <string name="toast_shell_exec_failed">Command execution failed: %s</string>
 
     <!-- Dialog Buttons -->
     <string name="dialog_freeze">Freeze</string>

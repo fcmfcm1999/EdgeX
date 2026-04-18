@@ -27,7 +27,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
         ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
-        ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps)
+        ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps),
+        ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal)
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +55,12 @@ class ActionSelectionActivity : AppCompatActivity() {
             if (item.code == "app_shortcut") {
                 // Launch ShortcutSelectionActivity
                 val intent = Intent(this, ShortcutSelectionActivity::class.java)
+                intent.putExtra("pref_key", prefKey)
+                startActivity(intent)
+                finish()
+            } else if (item.code == "shell_command") {
+                // Launch ShellCommandActivity
+                val intent = Intent(this, ShellCommandActivity::class.java)
                 intent.putExtra("pref_key", prefKey)
                 startActivity(intent)
                 finish()

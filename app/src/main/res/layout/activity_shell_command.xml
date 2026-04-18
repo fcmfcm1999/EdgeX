@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/ui_background"
+    android:fitsSystemWindows="true"
+    tools:context=".ui.ShellCommandActivity">
+
+    <!-- Header (same style as other activities) -->
+    <LinearLayout
+        android:id="@+id/header_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="?attr/actionBarSize"
+        android:background="@color/ui_header_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <ImageView
+            android:id="@+id/btn_back"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="?selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/ic_arrow_back"
+            android:tint="@color/ui_header_text"
+            android:contentDescription="@string/content_desc_icon" />
+
+        <TextView
+            android:id="@+id/tv_subtitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/header_shell_command"
+            android:textSize="20sp"
+            android:textColor="@color/ui_header_text"
+            android:layout_marginStart="32dp" />
+
+    </LinearLayout>
+
+    <!-- Content -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Command Label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_shell_command"
+                android:textColor="@color/ui_text_secondary"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Command Input (MultiLine) -->
+            <EditText
+                android:id="@+id/edit_command"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="120dp"
+                android:gravity="top|start"
+                android:inputType="textMultiLine"
+                android:background="@drawable/bg_edit_text"
+                android:padding="12dp"
+                android:textColor="@color/ui_text_primary"
+                android:textColorHint="@color/ui_text_secondary"
+                android:hint="@string/hint_shell_command"
+                android:fontFamily="monospace"
+                android:textSize="14sp" />
+
+            <!-- Run as Root Checkbox -->
+            <CheckBox
+                android:id="@+id/check_run_as_root"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_run_as_root"
+                android:textColor="@color/ui_text_primary"
+                android:layout_marginTop="16dp"
+                android:buttonTint="@color/purple_500" />
+
+            <!-- Description -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/desc_run_as_root"
+                android:textColor="@color/ui_text_secondary"
+                android:textSize="12sp"
+                android:layout_marginStart="32dp"
+                android:layout_marginTop="4dp" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- Save Button -->
+    <Button
+        android:id="@+id/btn_save"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_save"
+        android:textColor="@android:color/white"
+        android:backgroundTint="@color/purple_500"
+        android:layout_margin="16dp" />
+
+</LinearLayout>

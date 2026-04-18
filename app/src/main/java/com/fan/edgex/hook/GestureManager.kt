@@ -602,17 +602,17 @@ object GestureManager {
      * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
      */
     private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
-        when (action) {
-            "back" -> {
+        when {
+            action == "back" -> {
                 try { Runtime.getRuntime().exec("input keyevent 4") } catch (e: Exception) {}
             }
-            "home" -> {
+            action == "home" -> {
                 try { Runtime.getRuntime().exec("input keyevent 3") } catch (e: Exception) {}
             }
-            "screenshot" -> {
+            action == "screenshot" -> {
                 performScreenshot(context)
             }
-            "universal_copy" -> {
+            action == "universal_copy" -> {
                 UniversalCopyManager.collectAllTexts(context) { result ->
                     when (result.status) {
                         UniversalCopyManager.CollectStatus.FOUND -> {
@@ -627,11 +627,87 @@ object GestureManager {
                     }
                 }
             }
+            action.startsWith("shell:") -> {
+                executeShellCommand(action, context)
+            }
             else -> {
                 // UI actions need SystemUI context -> send broadcast
                 sendActionToSystemUI(action, context)
             }
         }
+    }
+
+    /**
+     * Execute a shell command action.
+     * Since system_server cannot directly execute shell commands due to SELinux,
+     * we send it to SystemUI process for execution.
+     * Format: shell:{runAsRoot}:{command}
+     */
+    private fun executeShellCommand(action: String, context: Context) {
+        // Send to SystemUI for execution (system_server has SELinux restrictions)
+        sendActionToSystemUI(action, context)
+    }
+
+    /**
+     * Actually execute shell command (called in SystemUI process).
+     * Format: shell:{runAsRoot}:{command}
+     */
+    private fun doExecuteShellCommand(action: String, context: Context) {
+        Thread {
+            try {
+                val content = action.removePrefix("shell:")
+                val parts = content.split(":", limit = 2)
+                if (parts.size != 2) {
+                    showToast(context, getLocalizedString(context, "Invalid shell command format", "无效的命令格式"))
+                    return@Thread
+                }
+
+                val runAsRoot = parts[0] == "true"
+                val command = parts[1]
+
+                if (command.isBlank()) {
+                    showToast(context, getLocalizedString(context, "Empty command", "空命令"))
+                    return@Thread
+                }
+
+                XposedBridge.log("$TAG: Executing shell command (root=$runAsRoot): $command")
+
+                val shell = if (runAsRoot) "su" else "sh"
+                val process = Runtime.getRuntime().exec(shell)
+                val outputStream = process.outputStream
+
+                // Write command lines
+                val lines = command.split("\n")
+                for (line in lines) {
+                    outputStream.write((line + "\n").toByteArray())
+                    outputStream.flush()
+                }
+                outputStream.write("exit\n".toByteArray())
+                outputStream.flush()
+
+                val exitCode = process.waitFor()
+
+                if (exitCode != 0) {
+                    val errorStream = process.errorStream.bufferedReader().readText()
+                    XposedBridge.log("$TAG: Shell command failed (exit=$exitCode): $errorStream")
+                    showToast(context, getLocalizedString(context, 
+                        "Command failed: $errorStream", 
+                        "命令执行失败：$errorStream"))
+                } else {
+                    val output = process.inputStream.bufferedReader().readText()
+                    XposedBridge.log("$TAG: Shell command output: $output")
+                    if (output.isNotBlank()) {
+                        showToast(context, output.take(100))
+                    }
+                }
+            } catch (e: Exception) {
+                XposedBridge.log("$TAG: Shell command exception: ${e.message}")
+                e.printStackTrace()
+                showToast(context, getLocalizedString(context,
+                    "Command error: ${e.message}",
+                    "命令出错：${e.message}"))
+            }
+        }.start()
     }
 
     /**
@@ -664,6 +740,9 @@ object GestureManager {
                 Handler(Looper.getMainLooper()).post {
                     launchShortcut(ctx, action)
                 }
+            }
+            action.startsWith("shell:") -> {
+                doExecuteShellCommand(action, ctx)
             }
             action == "freezer_drawer" -> {
                 Handler(Looper.getMainLooper()).post {

@@ -59,6 +59,12 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
+        <activity
+            android:name=".ui.ShellCommandActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX"
+            android:windowSoftInputMode="adjustResize" />
+
         <provider
                 android:name=".config.ConfigProvider"
                 android:authorities="com.fan.edgex.provider"

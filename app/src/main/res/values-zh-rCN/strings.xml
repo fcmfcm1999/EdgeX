@@ -74,6 +74,19 @@
     <string name="action_screenshot">截屏</string>
     <string name="action_universal_copy">全局复制</string>
     <string name="action_app_shortcut">应用快捷方式</string>
+    <string name="action_shell_command">Shell 命令</string>
+
+    <!-- Shell 命令配置 -->
+    <string name="header_shell_command">Shell 命令</string>
+    <string name="label_shell_command">命令</string>
+    <string name="hint_shell_command">输入 Shell 命令…</string>
+    <string name="label_run_as_root">以 Root 身份运行 (su)</string>
+    <string name="desc_run_as_root">使用超级用户权限执行命令</string>
+    <string name="btn_save">保存</string>
+    <string name="toast_shell_command_empty">请输入命令</string>
+    <string name="toast_shell_command_saved">命令已保存</string>
+    <string name="toast_shell_su_warning">勾选"以 Root 身份运行"时无需手动添加 su</string>
+    <string name="toast_shell_exec_failed">命令执行失败：%s</string>
 
     <!-- 对话框按钮 -->
     <string name="dialog_freeze">冻结</string>
