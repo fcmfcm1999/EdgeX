@@ -23,4 +23,5 @@
     <color name="ui_icon_bg">@color/purple_500</color>
     <color name="ui_icon_tint">@color/white</color>
     <color name="ui_checkbox_tint">@color/purple_500</color>
+    <color name="ui_divider">#1F000000</color>
 </resources>

@@ -3,6 +3,7 @@ package com.fan.edgex.hook
 import android.os.Handler
 import android.os.Looper
 import android.view.InputEvent
+import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -40,16 +41,27 @@ class MainHook : IXposedHookLoadPackage {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
-            // 1) Hook filterInputEvent to intercept touch events
+            // 1) Hook filterInputEvent to intercept touch and key events
             val hook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val event = param.args[0] as InputEvent
-                    if (event is MotionEvent) {
-                        val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
-                            as android.content.Context
-                        val consumed = GestureManager.handleMotionEvent(event, context)
-                        if (consumed) {
-                            param.setResult(false)
+                    val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
+                        as android.content.Context
+                    
+                    when (event) {
+                        is MotionEvent -> {
+                            val consumed = GestureManager.handleMotionEvent(event, context)
+                            if (consumed) {
+                                param.setResult(false)
+                            }
+                        }
+                        is KeyEvent -> {
+                            XposedBridge.log("$TAG: KeyEvent received: keyCode=${event.keyCode}, action=${event.action}")
+                            val consumed = GestureManager.handleKeyEvent(event, context, param)
+                            if (consumed) {
+                                XposedBridge.log("$TAG: KeyEvent consumed")
+                                param.setResult(false)
+                            }
                         }
                     }
                 }

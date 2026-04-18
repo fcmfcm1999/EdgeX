@@ -135,4 +135,23 @@
     <string name="toast_refrozen_apps">Refrozen %d apps</string>
     <string name="toast_no_apps_to_freeze">No apps to freeze</string>
     <string name="toast_freeze_error">Freeze error: %s</string>
+
+    <!-- Keys Feature -->
+    <string name="menu_keys">Keys</string>
+    <string name="menu_keys_desc">Configure hardware key actions</string>
+    <string name="header_keys">Keys</string>
+    <string name="header_key_detail">Configure Key</string>
+    <string name="keys_global_switch">Enable Key Actions</string>
+    <string name="keys_global_switch_desc">Intercept hardware keys to trigger actions</string>
+    <string name="key_enabled">Enable this key</string>
+    <string name="key_not_configured">Not configured</string>
+    <string name="key_volume_up">Volume Up</string>
+    <string name="key_volume_down">Volume Down</string>
+    <string name="key_back">Back</string>
+    <string name="key_home">Home</string>
+    <string name="key_menu">Menu</string>
+    <string name="key_app_switch">App Switch</string>
+    <string name="key_mode_click">Click</string>
+    <string name="key_mode_double_click">Double Click</string>
+    <string name="key_mode_long_press">Long Press</string>
 </resources>

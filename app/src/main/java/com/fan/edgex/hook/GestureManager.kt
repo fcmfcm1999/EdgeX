@@ -240,6 +240,41 @@ object GestureManager {
     }
 
     /**
+     * Called from system_server (filterInputEvent hook) for KeyEvents.
+     * Delegates to KeyManager for state machine processing.
+     */
+    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam): Boolean {
+        // Lazily init system context and KeyManager
+        if (systemContext == null) {
+            systemContext = context
+            reloadConfigAsync()
+            KeyManager.init(context)
+        }
+
+        // Forward event function - calls original filterInputEvent
+        val forwardEvent: () -> Unit = {
+            try {
+                // Let the original event through by not consuming it
+                // The param.result is already unset, so the event will pass through
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: Error forwarding key event: ${t.message}")
+            }
+        }
+
+        return KeyManager.handleKeyEvent(event, context, forwardEvent)
+    }
+
+    /**
+     * Execute an action triggered by a key press (called from KeyManager).
+     */
+    fun executeKeyAction(action: String, context: Context) {
+        val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
+        handler.post {
+            performAction(action, context, 0f, 0f)
+        }
+    }
+
+    /**
      * Called from SystemUI process to initialize overlay windows and broadcast receiver.
      * Used for debug visualization and DrawerWindow.
      */
@@ -527,7 +562,7 @@ object GestureManager {
     }
 
     private fun loadConfigKeys() {
-        val keys = listOf(
+        val keys = mutableListOf(
             "gestures_enabled", "debug_matrix_enabled",
             "zone_enabled_left_top", "zone_enabled_left_mid", "zone_enabled_left_bottom",
             "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
@@ -536,13 +571,28 @@ object GestureManager {
             "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
             "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
             "right_mid_swipe_left", "right_mid_swipe_right", "right_mid_swipe_up", "right_mid_swipe_down",
-            "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down"
+            "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down",
+            // Keys config
+            "keys_enabled"
         )
+        
+        // Add key-specific configs for each supported key
+        for (keyCode in KeyManager.SUPPORTED_KEYS.keys) {
+            keys.add("key_enabled_$keyCode")
+            keys.add("key_${keyCode}_click")
+            keys.add("key_${keyCode}_double_click")
+            keys.add("key_${keyCode}_long_press")
+        }
 
         for (key in keys) {
-            val type = if (key.startsWith("zone_enabled") || key == "gestures_enabled" || key == "debug_matrix_enabled") "boolean" else "string"
+            val type = if (key.startsWith("zone_enabled") || key.startsWith("key_enabled") || 
+                          key == "gestures_enabled" || key == "debug_matrix_enabled" || 
+                          key == "keys_enabled") "boolean" else "string"
             configCache[key] = queryConfigProvider(key, type)
         }
+        
+        // Update KeyManager with new config
+        KeyManager.updateConfig(configCache)
     }
 
     private fun isGesturesEnabled(): Boolean {

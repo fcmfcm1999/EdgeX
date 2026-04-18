@@ -65,6 +65,11 @@
             android:theme="@style/Theme.EdgeX"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.KeysActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
         <provider
                 android:name=".config.ConfigProvider"
                 android:authorities="com.fan.edgex.provider"

@@ -44,6 +44,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, GesturesActivity::class.java))
         }
 
+        findViewById<View>(R.id.item_keys).setOnClickListener {
+            startActivity(android.content.Intent(this, KeysActivity::class.java))
+        }
+
         findViewById<View>(R.id.item_freezer).setOnClickListener {
             startActivity(android.content.Intent(this, FreezerActivity::class.java))
         }
