@@ -15,12 +15,18 @@ import com.fan.edgex.R
 
 class KeysActivity : AppCompatActivity() {
 
+    data class KeyConfig(
+        val keyCode: Int,
+        val nameRes: Int,
+        val iconRes: Int
+    )
+
     companion object {
         // Only Volume Up, Volume Down and Power keys
         val SUPPORTED_KEYS = listOf(
-            Triple(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, R.drawable.ic_keyboard),
-            Triple(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, R.drawable.ic_keyboard),
-            Triple(KeyEvent.KEYCODE_POWER, R.string.key_power, R.drawable.ic_keyboard)
+            KeyConfig(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, R.drawable.ic_volume_up),
+            KeyConfig(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, R.drawable.ic_volume_down),
+            KeyConfig(KeyEvent.KEYCODE_POWER, R.string.key_power, R.drawable.ic_power)
         )
     }
 
@@ -40,9 +46,9 @@ class KeysActivity : AppCompatActivity() {
 
         // Add Key Items
         val container = findViewById<LinearLayout>(R.id.keys_container)
-        for ((keyCode, nameRes, iconRes) in SUPPORTED_KEYS) {
-            val view = createKeyItem(keyCode, nameRes, iconRes)
-            keyViews[keyCode] = view
+        for (keyConfig in SUPPORTED_KEYS) {
+            val view = createKeyItem(keyConfig)
+            keyViews[keyConfig.keyCode] = view
             container.addView(view)
         }
     }
@@ -53,7 +59,11 @@ class KeysActivity : AppCompatActivity() {
         refreshAllKeyItems()
     }
 
-    private fun createKeyItem(keyCode: Int, nameRes: Int, iconRes: Int): View {
+    private fun createKeyItem(config: KeyConfig): View {
+        val keyCode = config.keyCode
+        val nameRes = config.nameRes
+        val iconRes = config.iconRes
+
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.item_key, null)
 
@@ -150,7 +160,8 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private fun refreshAllKeyItems() {
-        for ((keyCode, _, _) in SUPPORTED_KEYS) {
+        for (config in SUPPORTED_KEYS) {
+            val keyCode = config.keyCode
             keyViews[keyCode]?.let { view ->
                 val subtitle = view.findViewById<TextView>(R.id.subtitle)
                 val checkbox = view.findViewById<CheckBox>(R.id.checkbox)
@@ -169,7 +180,6 @@ class KeysActivity : AppCompatActivity() {
                 updateKeySubtitle(keyCode, subtitle)
 
                 // Refresh action subtitles
-                val keyName = getString(SUPPORTED_KEYS.find { it.first == keyCode }?.second ?: R.string.key_volume_up)
                 refreshAction(view.findViewById(R.id.action_click), keyCode, "click")
                 refreshAction(view.findViewById(R.id.action_double_click), keyCode, "double_click")
                 refreshAction(view.findViewById(R.id.action_long_press), keyCode, "long_press")
