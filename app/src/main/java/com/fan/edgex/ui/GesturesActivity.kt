@@ -20,32 +20,36 @@ class GesturesActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
-        // Initialize Zones
-        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", isLeft = true)
+        // Initialize Zones with specific icons
+        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
+        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
+        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
         
-        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", isLeft = false)
+        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
+        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
+        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
     }
 
     override fun onResume() {
         super.onResume()
         // Refresh UI to show new selections
-        // Re-run setup to refresh text. 
-        // NOTE: This is slightly inefficient but safe/easy for this scale.
-        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", isLeft = true)
-        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", isLeft = true)
-        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", isLeft = false)
-        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", isLeft = false)
+        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
+        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
+        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
+        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
+        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
+        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
     }
 
-    private fun setupZone(root: View, title: String, zoneKey: String, isLeft: Boolean) {
+    private fun setupZone(root: View, title: String, zoneKey: String, iconRes: Int) {
         // Set Title
         root.findViewById<TextView>(R.id.title).text = title
+        
+        // Set Icon
+        root.findViewById<ImageView>(R.id.zone_icon).setImageResource(iconRes)
+        
+        // Determine if left side based on zoneKey
+        val isLeft = zoneKey.startsWith("left")
         
         // Zone Enabled Checkbox
         val checkBox = root.findViewById<android.widget.CheckBox>(R.id.checkbox)

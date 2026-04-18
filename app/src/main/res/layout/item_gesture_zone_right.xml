@@ -21,10 +21,11 @@
             android:layout_height="40dp"
             android:background="@drawable/circle_background_teal">
             <ImageView
+                android:id="@+id/zone_icon"
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:layout_gravity="center"
-                android:src="@drawable/ic_edge_panel"
+                android:src="@drawable/ic_edge_right_mid"
                 android:tint="@color/ui_icon_tint" />
         </FrameLayout>
 
