@@ -652,12 +652,34 @@ object GestureManager {
      * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
      */
     private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
+        XposedBridge.log("$TAG: performAction called with action='$action'")
         when {
             action == "back" -> {
-                try { Runtime.getRuntime().exec("input keyevent 4") } catch (e: Exception) {}
+                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_BACK")
+                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
+                XposedBridge.log("$TAG: GLOBAL_ACTION_BACK result=$result")
             }
             action == "home" -> {
-                try { Runtime.getRuntime().exec("input keyevent 3") } catch (e: Exception) {}
+                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_HOME")
+                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_HOME)
+                XposedBridge.log("$TAG: GLOBAL_ACTION_HOME result=$result")
+            }
+            action == "recent" || action == "recents" -> {
+                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_RECENTS")
+                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
+                XposedBridge.log("$TAG: GLOBAL_ACTION_RECENTS result=$result")
+            }
+            action == "notifications" -> {
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_NOTIFICATIONS)
+            }
+            action == "quick_settings" -> {
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_QUICK_SETTINGS)
+            }
+            action == "power_dialog" -> {
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_POWER_DIALOG)
+            }
+            action == "lock_screen" -> {
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_LOCK_SCREEN)
             }
             action == "screenshot" -> {
                 performScreenshot(context)

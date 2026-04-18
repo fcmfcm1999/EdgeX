@@ -61,14 +61,11 @@ object KeyManager {
     // Track press times for timing calculations
     private val keyDownTimes = mutableMapOf<Int, Long>()
     
-    // Store pending key events for forwarding if no action
+    // Store pending key events for forwarding if no action, or for double-tap timing
     private val pendingKeyDownEvents = mutableMapOf<Int, KeyEvent>()
     
     // Track if we consumed the key (should not forward)
     private val keyConsumed = mutableMapOf<Int, Boolean>()
-    
-    // Count press depth (for handling repeated KEY_DOWN)
-    private val pressCount = mutableMapOf<Int, Int>()
 
     // Timeouts
     private var longPressTimeout = 500L
@@ -162,18 +159,31 @@ object KeyManager {
 
     /**
      * Handle KEY_DOWN event.
+     * 
+     * Key insight from Xposed Edge Pro:
+     * - Use repeatCount to detect if this is a new press or a repeat
+     * - repeatCount == 0 means first press
+     * - repeatCount > 0 means key is being held down
      */
     private fun handleKeyDown(keyCode: Int, event: KeyEvent, context: Context, forwardEvent: () -> Unit): Boolean {
-        val count = (pressCount[keyCode] ?: 0) + 1
-        pressCount[keyCode] = count
-        
-        // If already pressed (repeat), keep consuming
-        if (count > 1) {
-            return keyConsumed[keyCode] == true
-        }
-
+        val repeatCount = event.repeatCount
         val currentState = keyStates[keyCode] ?: STATE_IDLE
-
+        
+        // If this is a repeat event (key held down)
+        if (repeatCount > 0) {
+            // If we're already tracking, keep consuming
+            if (currentState == STATE_PRESSED) {
+                return true
+            }
+            // If we're not tracking but this is the first event we see (missed repeat=0),
+            // treat the first repeat as a new press
+            if (currentState == STATE_IDLE) {
+                return startNewPress(keyCode, event, context)
+            }
+            return false
+        }
+        
+        // First press (repeatCount == 0)
         when (currentState) {
             STATE_IDLE -> {
                 return startNewPress(keyCode, event, context)
@@ -182,25 +192,33 @@ object KeyManager {
                 // Second press within double-tap window
                 cancelDoubleTapTimeout(keyCode)
                 
-                if (hasAction(keyCode, MODE_DOUBLE_CLICK)) {
+                // Check if event times match double-tap timing
+                val firstUpEvent = pendingKeyDownEvents[keyCode]
+                val timeDiff = if (firstUpEvent != null) event.eventTime - firstUpEvent.eventTime else Long.MAX_VALUE
+                
+                if (timeDiff < doubleTapTimeout && hasAction(keyCode, MODE_DOUBLE_CLICK)) {
                     // Execute double-click action
                     keyStates[keyCode] = STATE_PRESSED
                     keyConsumed[keyCode] = true
+                    pendingKeyDownEvents.remove(keyCode)
                     
                     val action = getAction(keyCode, MODE_DOUBLE_CLICK)
                     XposedBridge.log("$TAG: Key $keyCode double-click -> $action")
                     executeAction(action, context)
                     return true
                 } else {
-                    // No double-click action, treat as new press
-                    // Forward the first pending click
-                    val pendingDown = pendingKeyDownEvents[keyCode]
-                    if (pendingDown != null) {
-                        forwardEvent()
-                        pendingKeyDownEvents.remove(keyCode)
+                    // No double-click action or timing didn't match, execute pending single click if any
+                    if (hasAction(keyCode, MODE_CLICK)) {
+                        val action = getAction(keyCode, MODE_CLICK)
+                        executeAction(action, context)
                     }
+                    pendingKeyDownEvents.remove(keyCode)
                     return startNewPress(keyCode, event, context)
                 }
+            }
+            STATE_PRESSED -> {
+                // Still in pressed state, probably a duplicate event
+                return true
             }
             else -> return keyConsumed[keyCode] == true
         }
@@ -211,7 +229,8 @@ object KeyManager {
      */
     private fun startNewPress(keyCode: Int, event: KeyEvent, context: Context): Boolean {
         keyStates[keyCode] = STATE_PRESSED
-        keyDownTimes[keyCode] = event.eventTime
+        // Use downTime for more accurate timing - this is the time the key was originally pressed
+        keyDownTimes[keyCode] = event.downTime
         pendingKeyDownEvents[keyCode] = KeyEvent(event) // Copy for potential forwarding
         keyConsumed[keyCode] = false
 
@@ -228,14 +247,6 @@ object KeyManager {
      * Handle KEY_UP event.
      */
     private fun handleKeyUp(keyCode: Int, event: KeyEvent, context: Context, forwardEvent: () -> Unit): Boolean {
-        val count = (pressCount[keyCode] ?: 1) - 1
-        pressCount[keyCode] = count
-        
-        // If still more keys pressed, keep consuming
-        if (count > 0) {
-            return keyConsumed[keyCode] == true
-        }
-
         val currentState = keyStates[keyCode] ?: STATE_IDLE
         
         if (currentState != STATE_PRESSED) {
@@ -258,8 +269,10 @@ object KeyManager {
         // Short press - check if we need to wait for double-tap
         if (pressDuration < longPressTimeout) {
             if (hasAction(keyCode, MODE_DOUBLE_CLICK)) {
-                // Wait for potential double-tap
+                // Wait for potential double-tap - store the UP event time for double-tap detection
                 keyStates[keyCode] = STATE_WAITING_DOUBLE
+                // Store this event's info for double-tap timing
+                pendingKeyDownEvents[keyCode] = KeyEvent(event)
                 startDoubleTapTimeout(keyCode, context, forwardEvent)
                 return true
             } else if (hasAction(keyCode, MODE_CLICK)) {
@@ -280,7 +293,17 @@ object KeyManager {
             }
         } else {
             // Long press but no long-press action (timeout didn't consume)
-            // Forward the key events
+            // This means the key was held but long-press timeout fired and had no action
+            if (hasAction(keyCode, MODE_CLICK)) {
+                // Execute click on release
+                keyStates[keyCode] = STATE_IDLE
+                pendingKeyDownEvents.remove(keyCode)
+                
+                val action = getAction(keyCode, MODE_CLICK)
+                executeAction(action, context)
+                return true
+            }
+            // Forward the events
             keyStates[keyCode] = STATE_IDLE
             pendingKeyDownEvents.remove(keyCode)
             forwardEvent()
@@ -376,6 +399,5 @@ object KeyManager {
         keyDownTimes.clear()
         pendingKeyDownEvents.clear()
         keyConsumed.clear()
-        pressCount.clear()
     }
 }

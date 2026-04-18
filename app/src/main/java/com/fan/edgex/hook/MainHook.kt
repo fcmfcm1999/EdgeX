@@ -41,7 +41,66 @@ class MainHook : IXposedHookLoadPackage {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
-            // 1) Hook filterInputEvent to intercept touch and key events
+            // Debug: list all filter-related methods
+            val methods = inputManagerService.declaredMethods
+            XposedBridge.log("$TAG: InputManagerService filter methods:")
+            methods.filter { it.name.contains("filter", ignoreCase = true) }
+                .forEach { XposedBridge.log("$TAG:   ${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})") }
+            
+            // Debug: also list inject-related methods
+            XposedBridge.log("$TAG: InputManagerService inject/dispatch methods:")
+            methods.filter { it.name.contains("inject", ignoreCase = true) || it.name.contains("dispatch", ignoreCase = true) }
+                .forEach { XposedBridge.log("$TAG:   ${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})") }
+            
+            // Debug: Hook filterPointerMotion to see if it's being called
+            try {
+                XposedHelpers.findAndHookMethod(
+                    inputManagerService, "filterPointerMotion",
+                    Float::class.javaPrimitiveType,
+                    Float::class.javaPrimitiveType,
+                    Float::class.javaPrimitiveType,
+                    Float::class.javaPrimitiveType,
+                    Int::class.javaPrimitiveType,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            XposedBridge.log("$TAG: filterPointerMotion called: x=${param.args[0]}, y=${param.args[1]}")
+                        }
+                    }
+                )
+                XposedBridge.log("$TAG: Hooked filterPointerMotion")
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: filterPointerMotion hook failed: ${t.message}")
+            }
+
+            // Hook interceptKeyBeforeDispatching for key event interception
+            // This is the primary method called by the input dispatcher for key events
+            try {
+                XposedHelpers.findAndHookMethod(
+                    inputManagerService, "interceptKeyBeforeDispatching",
+                    "android.os.IBinder",
+                    KeyEvent::class.java,
+                    Int::class.javaPrimitiveType,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val keyEvent = param.args[1] as KeyEvent
+                            
+                            // Process key through KeyManager
+                            val context = XposedHelpers.getObjectField(param.thisObject, "mContext") as android.content.Context
+                            val consumed = GestureManager.handleKeyEvent(keyEvent, context, param)
+                            if (consumed) {
+                                // Return non-zero to consume the key (prevent system handling)
+                                param.result = -1L
+                            }
+                        }
+                    }
+                )
+                XposedBridge.log("$TAG: Hooked interceptKeyBeforeDispatching")
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: interceptKeyBeforeDispatching hook failed: ${t.message}")
+            }
+
+            // 2) Hook filterInputEvent to intercept touch and key events
+            // This is called when InputFilter is enabled and receives all input events
             val hook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     val event = param.args[0] as InputEvent
@@ -56,10 +115,8 @@ class MainHook : IXposedHookLoadPackage {
                             }
                         }
                         is KeyEvent -> {
-                            XposedBridge.log("$TAG: KeyEvent received: keyCode=${event.keyCode}, action=${event.action}")
                             val consumed = GestureManager.handleKeyEvent(event, context, param)
                             if (consumed) {
-                                XposedBridge.log("$TAG: KeyEvent consumed")
                                 param.setResult(false)
                             }
                         }
@@ -134,6 +191,27 @@ class MainHook : IXposedHookLoadPackage {
      * Legacy:      InputManagerService.nativeSetInputFilterEnabled(long, boolean)
      */
     private fun enableInputFilter(inputManagerService: Class<*>, classLoader: ClassLoader) {
+        // Store mNative reference to enable filter after InputManagerService is instantiated
+        var mNativeInstance: Any? = null
+        var inputManagerServiceInstance: Any? = null
+
+        // Hook setInputFilter to see when filters are set
+        try {
+            XposedHelpers.findAndHookMethod(
+                inputManagerService, "setInputFilter",
+                "android.view.IInputFilter",
+                object : XC_MethodHook() {
+                    override fun beforeHookedMethod(param: MethodHookParam) {
+                        val filter = param.args[0]
+                        XposedBridge.log("$TAG: setInputFilter called with filter=${filter?.javaClass?.name ?: "null"}")
+                    }
+                }
+            )
+            XposedBridge.log("$TAG: Hooked setInputFilter")
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: Failed to hook setInputFilter: ${t.message}")
+        }
+
         // Android 16+: NativeInputManagerService$NativeImpl
         try {
             val nativeImplClass = XposedHelpers.findClass(
@@ -141,25 +219,39 @@ class MainHook : IXposedHookLoadPackage {
                 classLoader
             )
 
-            // Hook setInputFilterEnabled to always force true
+            // Hook setInputFilterEnabled to always force true when called
             XposedHelpers.findAndHookMethod(nativeImplClass, "setInputFilterEnabled",
                 Boolean::class.javaPrimitiveType,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        param.args[0] = true
+                        // We no longer need to force InputFilter enabled since we use
+                        // interceptKeyBeforeDispatching for keys and overlay for gestures
                     }
                 })
 
-            // Hook start() to initially enable InputFilter
-            XposedHelpers.findAndHookMethod(nativeImplClass, "start",
+            // Hook InputManagerService constructor to get mNative field reference
+            XposedHelpers.findAndHookConstructor(
+                inputManagerService,
+                android.content.Context::class.java,
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        try {
-                            XposedHelpers.callMethod(param.thisObject, "setInputFilterEnabled", true)
-                            XposedBridge.log("$TAG: InputFilter enabled via NativeImpl.start()")
-                        } catch (t: Throwable) {
-                            XposedBridge.log("$TAG: Failed to enable InputFilter: ${t.message}")
-                        }
+                        inputManagerServiceInstance = param.thisObject
+                        mNativeInstance = XposedHelpers.getObjectField(param.thisObject, "mNative")
+                        XposedBridge.log("$TAG: Got InputManagerService and mNative instances")
+                    }
+                })
+
+            // Also hook start() for any post-initialization needed
+            XposedHelpers.findAndHookMethod(inputManagerService, "start",
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        // Note: We previously tried to register a fake IInputFilter here,
+                        // but this caused all touch events to be blocked because the
+                        // Binder.onTransact hook interfered with system Binder calls.
+                        // 
+                        // Key interception works via interceptKeyBeforeDispatching hook.
+                        // Touch gestures work via the overlay window in SystemUI.
+                        
                         if (BuildConfig.ENABLE_AUTO_SYSTEMUI_RESTART) {
                             XposedBridge.log("$TAG: Auto SystemUI restart enabled for local development")
                             scheduleSystemUIRestart()
