@@ -41,6 +41,11 @@
     <string name="donate_alipay">Alipay 支付宝</string>
     <string name="donate_wechat">WeChat Pay 微信</string>
     <string name="donate_wechat_scan">Scan with WeChat to donate</string>
+    <string name="donate_crypto">Crypto 加密货币</string>
+    <string name="donate_crypto_title">Crypto Donation</string>
+    <string name="donate_crypto_eth">ETH (Ethereum)</string>
+    <string name="donate_crypto_sol">SOL (Solana)</string>
+    <string name="donate_crypto_copied">Address copied</string>
 
     <!-- Gesture Zone Titles -->
     <string name="zone_left_top">Top-Left</string>

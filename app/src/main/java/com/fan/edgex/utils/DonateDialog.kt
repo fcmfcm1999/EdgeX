@@ -1,6 +1,8 @@
 package com.fan.edgex.utils
 
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -13,6 +15,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import com.fan.edgex.R
 import java.net.URLEncoder
 
@@ -20,6 +23,10 @@ object DonateDialog {
 
     // Fill in your own Alipay payment QR URL here
     private const val ALIPAY_QR_URL = "https://qr.alipay.com/17o17940hsgauvnmins9h4c"
+    
+    // Crypto addresses
+    private const val ETH_ADDRESS = "0xf309912220eaba0e7ff7448ada60b509a7b82467"
+    private const val SOL_ADDRESS = "FANCYuPped3sb2YiHoJe56TRSGbC7MitpNKyHP5HmddK"
 
     fun show(context: Context) {
         val dp = { dp: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics).toInt() }
@@ -52,8 +59,8 @@ object DonateDialog {
             ).also { it.bottomMargin = dp(20f) })
         }
 
-        // Buttons row
-        val buttonRow = LinearLayout(context).apply {
+        // Buttons row 1 (Alipay + WeChat)
+        val buttonRow1 = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
@@ -64,18 +71,25 @@ object DonateDialog {
 
         // Alipay button
         val alipayBtn = makeButton(context, context.getString(R.string.donate_alipay), Color.parseColor("#1677FF"))
-        buttonRow.addView(alipayBtn, buttonParams)
+        buttonRow1.addView(alipayBtn, buttonParams)
 
         // WeChat button
         val wechatParams = LinearLayout.LayoutParams(0, dp(44f), 1f).also {
             it.marginStart = dp(8f)
         }
         val wechatBtn = makeButton(context, context.getString(R.string.donate_wechat), Color.parseColor("#07C160"))
-        buttonRow.addView(wechatBtn, wechatParams)
+        buttonRow1.addView(wechatBtn, wechatParams)
 
-        root.addView(buttonRow, LinearLayout.LayoutParams(
+        root.addView(buttonRow1, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = dp(8f) })
+
+        // Buttons row 2 (Crypto)
+        val cryptoBtn = makeButton(context, context.getString(R.string.donate_crypto), Color.parseColor("#F7931A"))
+        root.addView(cryptoBtn, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(44f)
         ).also { it.bottomMargin = dp(4f) })
 
         val shape = GradientDrawable().apply {
@@ -97,6 +111,10 @@ object DonateDialog {
         wechatBtn.setOnClickListener {
             dialog.dismiss()
             showWechatQr(context)
+        }
+        cryptoBtn.setOnClickListener {
+            dialog.dismiss()
+            showCryptoAddresses(context)
         }
 
         dialog.show()
@@ -181,5 +199,80 @@ object DonateDialog {
                 it.window?.setBackgroundDrawable(InsetDrawable(shape, dp(24f)))
                 it.show()
             }
+    }
+
+    private fun showCryptoAddresses(context: Context) {
+        val dp = { dp: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics).toInt() }
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24f), dp(20f), dp(24f), dp(20f))
+        }
+
+        // Title
+        TextView(context).apply {
+            text = context.getString(R.string.donate_crypto_title)
+            textSize = 18f
+            setTextColor(Color.BLACK)
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            container.addView(this, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.bottomMargin = dp(16f) })
+        }
+
+        // ETH address
+        addCryptoRow(context, container, context.getString(R.string.donate_crypto_eth), ETH_ADDRESS, dp)
+        
+        // SOL address
+        addCryptoRow(context, container, context.getString(R.string.donate_crypto_sol), SOL_ADDRESS, dp)
+
+        val shape = GradientDrawable().apply {
+            setColor(Color.parseColor("#F5F5F5"))
+            cornerRadius = dp(12f).toFloat()
+        }
+
+        AlertDialog.Builder(context)
+            .setView(container)
+            .create()
+            .also {
+                it.window?.setBackgroundDrawable(InsetDrawable(shape, dp(24f)))
+                it.show()
+            }
+    }
+
+    private fun addCryptoRow(context: Context, container: LinearLayout, label: String, address: String, dp: (Float) -> Int) {
+        // Label
+        TextView(context).apply {
+            text = label
+            textSize = 14f
+            setTextColor(Color.parseColor("#333333"))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            container.addView(this, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.bottomMargin = dp(4f) })
+        }
+
+        // Address (clickable to copy)
+        TextView(context).apply {
+            text = address
+            textSize = 12f
+            setTextColor(Color.parseColor("#666666"))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#EEEEEE"))
+                cornerRadius = dp(6f).toFloat()
+            }
+            setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
+            setOnClickListener {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Crypto Address", address))
+                Toast.makeText(context, context.getString(R.string.donate_crypto_copied), Toast.LENGTH_SHORT).show()
+            }
+            container.addView(this, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.bottomMargin = dp(12f) })
+        }
     }
 }

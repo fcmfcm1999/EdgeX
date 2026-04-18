@@ -43,6 +43,11 @@
     <string name="donate_alipay">支付宝</string>
     <string name="donate_wechat">微信支付</string>
     <string name="donate_wechat_scan">打开微信扫一扫捐赠</string>
+    <string name="donate_crypto">加密货币</string>
+    <string name="donate_crypto_title">加密货币捐赠</string>
+    <string name="donate_crypto_eth">ETH (以太坊)</string>
+    <string name="donate_crypto_sol">SOL (Solana)</string>
+    <string name="donate_crypto_copied">地址已复制</string>
 
     <!-- 手势区域名称 -->
     <string name="zone_left_top">左上</string>
