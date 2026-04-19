@@ -52,14 +52,26 @@ class ConfigProvider : ContentProvider() {
         val context = context ?: return null
         val key = values?.getAsString("key")
         val value = values?.getAsString("value")
-        
+        val type = values?.getAsString("type") ?: "string"
+
         if (key != null && value != null) {
-            context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .edit()
-                .putString(key, value)
-                .commit()
-            
-            context.contentResolver.notifyChange(CONTENT_URI, null) // Notify observers
+            val prefs = context.getSharedPreferences("config", Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            when (type) {
+                "boolean" -> editor.putBoolean(key, value.toBoolean())
+                "int" -> editor.putInt(key, value.toIntOrNull() ?: 0)
+                else -> editor.putString(key, value)
+            }
+            editor.commit()
+
+            // Notify observers for the specific key and the general config URI
+            try {
+                context.contentResolver.notifyChange(Uri.withAppendedPath(CONTENT_URI, key), null)
+            } catch (t: Throwable) { }
+            try {
+                context.contentResolver.notifyChange(CONTENT_URI, null)
+            } catch (t: Throwable) { }
+
             return Uri.withAppendedPath(CONTENT_URI, key)
         }
         return null
@@ -69,11 +81,14 @@ class ConfigProvider : ContentProvider() {
          val context = context ?: return 0
          val key = selection
          if (key != null) {
-              context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .edit()
-                .remove(key)
-                .apply()
-              context.contentResolver.notifyChange(CONTENT_URI, null)
+              val prefs = context.getSharedPreferences("config", Context.MODE_PRIVATE)
+              prefs.edit().remove(key).commit()
+              try {
+                  context.contentResolver.notifyChange(Uri.withAppendedPath(CONTENT_URI, key), null)
+              } catch (t: Throwable) { }
+              try {
+                  context.contentResolver.notifyChange(CONTENT_URI, null)
+              } catch (t: Throwable) { }
               return 1
          }
          return 0

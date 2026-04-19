@@ -147,6 +147,8 @@ object GestureManager {
             systemContext = context
             reloadConfigAsync()
             registerScreenStateReceiver(context)
+            // Register config observer so changes are applied immediately
+            registerConfigObserver(context)
         }
 
         // Safety guard: if mIsInSection has been true for too long without
@@ -328,6 +330,7 @@ object GestureManager {
             reloadConfigAsync()
             KeyManager.init(context)
             registerScreenStateReceiver(context)
+            registerConfigObserver(context)
         } else {
             reloadConfigAsync()
         }
@@ -631,6 +634,31 @@ object GestureManager {
     }
 
     // ======== Configuration ========
+
+    // Config observer (system_server) to receive immediate updates from ContentProvider
+    private var configObserverRegistered = false
+    private var configContentObserver: android.database.ContentObserver? = null
+
+    private fun registerConfigObserver(ctx: Context) {
+        if (configObserverRegistered) return
+        configObserverRegistered = true
+        val handler = Handler(Looper.getMainLooper())
+        val observer = object : android.database.ContentObserver(handler) {
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                XposedBridge.log("$TAG: Config change observed: $uri")
+                // Force reload
+                lastConfigLoad = 0
+                reloadConfigAsync()
+            }
+        }
+        try {
+            ctx.contentResolver.registerContentObserver(CONFIG_URI, true, observer)
+            configContentObserver = observer
+            XposedBridge.log("$TAG: Config ContentObserver registered in process")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: Failed to register config observer: ${e.message}")
+        }
+    }
 
     private val configCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var lastConfigLoad = 0L
