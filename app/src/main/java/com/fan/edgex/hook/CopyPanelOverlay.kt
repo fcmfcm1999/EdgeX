@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -81,7 +82,18 @@ object TextSelectionOverlay {
         val isChinese = context.resources.configuration.locales[0].language == "zh"
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        val root = FrameLayout(context)
+        val root = object : FrameLayout(context) {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                    dismiss()
+                    return true
+                }
+                return super.dispatchKeyEvent(event)
+            }
+        }.apply {
+            isFocusableInTouchMode = true
+            isFocusable = true
+        }
 
         // Custom view for drawing and selecting text blocks
         val blocksView = TextBlocksView(context, blocks, density,
