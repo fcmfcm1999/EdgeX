@@ -55,8 +55,48 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
+        // Setup Search
+        setupSearch()
         // Load Shortcuts
         loadShortcuts()
+    }
+
+    private fun setupSearch() {
+        val btnSearch = findViewById<ImageView>(R.id.btn_search)
+        val etSearch = findViewById<EditText>(R.id.et_search)
+        val tvTitle = findViewById<TextView>(R.id.tv_title)
+
+        btnSearch.setOnClickListener {
+            if (etSearch.visibility == View.GONE) {
+                tvTitle.visibility = View.GONE
+                etSearch.visibility = View.VISIBLE
+                etSearch.requestFocus()
+            } else {
+                if (etSearch.text.isEmpty()) {
+                    etSearch.visibility = View.GONE
+                    tvTitle.visibility = View.VISIBLE
+                } else {
+                    etSearch.text.clear()
+                }
+            }
+        }
+
+        etSearch.addTextChangedListener { text ->
+            filterShortcuts(text.toString())
+        }
+    }
+
+    private fun filterShortcuts(query: String) {
+        displayedShortcuts.clear()
+        if (query.isEmpty()) {
+            displayedShortcuts.addAll(allShortcuts)
+        } else {
+            val q = query.lowercase(Locale.getDefault())
+            displayedShortcuts.addAll(allShortcuts.filter {
+                it.label.lowercase().contains(q) || it.appLabel.lowercase().contains(q) || it.packageName.contains(q)
+            })
+        }
+        adapter.notifyDataSetChanged()
     }
 
     private fun loadShortcuts() {
