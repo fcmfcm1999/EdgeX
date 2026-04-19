@@ -67,6 +67,16 @@ object KeyManager {
     // We store (downTime, eventTime) pairs of events we injected
     private val injectedEventTimes = mutableSetOf<Long>()
 
+    // Volume key passthrough: after our action fires for a volume key,
+    // the system volume panel is already showing (handled earlier in pipeline).
+    // Subsequent volume presses should pass through for normal volume control.
+    private var volumePassthroughUntil = 0L
+    private const val VOLUME_PASSTHROUGH_DURATION = 3000L  // matches volume panel auto-hide
+
+    private fun isVolumeKey(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+    }
+
     // Timeouts
     private var longPressTimeout = 500L
     private var doubleTapTimeout = 300L
@@ -147,6 +157,14 @@ object KeyManager {
     private fun injectKeyEvent(event: KeyEvent, context: Context) {
         // Mark this event as injected by us (using eventTime as identifier)
         injectedEventTimes.add(event.eventTime)
+        
+        // Volume key passthrough: if we inject a volume key, it means we didn't consume it
+        // and it's falling back to the system behavior (bringing up the volume UI).
+        // We activate passthrough so subsequent presses control volume normally.
+        if (isVolumeKey(event.keyCode)) {
+            volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
+            XposedBridge.log("$TAG: Injected volume key — entering passthrough for ${VOLUME_PASSTHROUGH_DURATION}ms")
+        }
         
         // Clean up old entries (keep only last 10)
         if (injectedEventTimes.size > 10) {
@@ -267,6 +285,16 @@ object KeyManager {
             return false
         }
 
+        // Volume key passthrough: if volume panel is likely showing
+        // (we recently executed an action for a volume key), let
+        // subsequent volume presses pass through for normal volume control.
+        if (isVolumeKey(keyCode) && System.currentTimeMillis() < volumePassthroughUntil) {
+            // Extend the passthrough window on each press (matching volume panel behavior)
+            volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
+            XposedBridge.log("$TAG: Volume key $keyCode in passthrough window — letting through for volume control")
+            return false
+        }
+
         return when (event.action) {
             KeyEvent.ACTION_DOWN -> handleKeyDown(keyCode, event, context, param)
             KeyEvent.ACTION_UP -> handleKeyUp(keyCode, event, context, param)
@@ -322,7 +350,7 @@ object KeyManager {
                     
                     val action = getAction(keyCode, MODE_DOUBLE_CLICK)
                     XposedBridge.log("$TAG: Key $keyCode double-click -> $action")
-                    executeAction(action, context)
+                    executeAction(action, context, keyCode)
                     return true
                 } else {
                     // No double-click action or timing didn't match
@@ -404,7 +432,7 @@ object KeyManager {
                 
                 val action = getAction(keyCode, MODE_CLICK)
                 XposedBridge.log("$TAG: Key $keyCode click -> $action")
-                executeAction(action, context)
+                executeAction(action, context, keyCode)
                 return true
             }
             
@@ -416,19 +444,20 @@ object KeyManager {
             return true
         } else {
             // Key was held past long-press threshold but long-press timeout didn't consume
-            // This means no long-press action was configured
-            if (hasAction(keyCode, MODE_CLICK)) {
+            // If the DOWN event was already injected (because no long press action),
+            // we should NOT execute the click action on release to avoid stuck keys.
+            if (hasAction(keyCode, MODE_CLICK) && pendingDownEvents.containsKey(keyCode)) {
                 // Execute click on release
                 keyStates[keyCode] = STATE_IDLE
                 pendingDownEvents.remove(keyCode)
                 pendingUpEvents.remove(keyCode)
                 
                 val action = getAction(keyCode, MODE_CLICK)
-                executeAction(action, context)
+                executeAction(action, context, keyCode)
                 return true
             }
             // Forward the events via InputManager injection
-            XposedBridge.log("$TAG: Key $keyCode held but no long-press action -> injecting events")
+            XposedBridge.log("$TAG: Key $keyCode held but no long-press action -> injecting UP")
             pendingUpEvents[keyCode] = copyKeyEvent(event)
             forwardKeyEvents(keyCode, context)
             keyStates[keyCode] = STATE_IDLE
@@ -445,12 +474,22 @@ object KeyManager {
         val runnable = Runnable {
             synchronized(this) {
                 if (keyStates[keyCode] == STATE_PRESSED && keyConsumed[keyCode] != true) {
-                    keyConsumed[keyCode] = true
-                    pendingDownEvents.remove(keyCode)
-                    
-                    val action = getAction(keyCode, MODE_LONG_PRESS)
-                    XposedBridge.log("$TAG: Key $keyCode long-press -> $action")
-                    executeAction(action, context)
+                    if (hasAction(keyCode, MODE_LONG_PRESS)) {
+                        keyConsumed[keyCode] = true
+                        pendingDownEvents.remove(keyCode)
+                        
+                        val action = getAction(keyCode, MODE_LONG_PRESS)
+                        XposedBridge.log("$TAG: Key $keyCode long-press -> $action")
+                        executeAction(action, context, keyCode)
+                    } else {
+                        // User held the key, but no custom long-press config.
+                        // Forward the DOWN event now so system handles it natively (e.g. for volume auto-repeat).
+                        XposedBridge.log("$TAG: Key $keyCode held but no action -> injecting DOWN to system")
+                        val downEvent = pendingDownEvents.remove(keyCode)
+                        if (downEvent != null) {
+                            injectKeyEvent(downEvent, context)
+                        }
+                    }
                 }
             }
         }
@@ -485,7 +524,7 @@ object KeyManager {
                         
                         val action = getAction(keyCode, MODE_CLICK)
                         XposedBridge.log("$TAG: Key $keyCode click (after double-tap timeout) -> $action")
-                        executeAction(action, context)
+                        executeAction(action, context, keyCode)
                     } else {
                         // No click action, forward original events via InputManager injection
                         XposedBridge.log("$TAG: Key $keyCode double-tap timeout, no click action -> injecting events")
@@ -509,8 +548,9 @@ object KeyManager {
     /**
      * Execute action (delegate to GestureManager's action system).
      */
-    private fun executeAction(action: String, context: Context) {
+    private fun executeAction(action: String, context: Context, keyCode: Int = -1) {
         if (action.isEmpty() || action == "none") return
+
         GestureManager.executeKeyAction(action, context)
     }
 
@@ -529,5 +569,6 @@ object KeyManager {
         pendingUpEvents.clear()
         keyConsumed.clear()
         injectedEventTimes.clear()
+        volumePassthroughUntil = 0L
     }
 }
