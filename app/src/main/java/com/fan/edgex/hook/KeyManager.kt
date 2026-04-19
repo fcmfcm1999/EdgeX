@@ -515,7 +515,8 @@ object KeyManager {
     }
 
     /**
-     * Reset all state (e.g., on config change).
+     * Reset all state (e.g., on screen off or config change).
+     * Ensures no stale key tracking survives a lock/unlock cycle.
      */
     fun reset() {
         for (keyCode in SUPPORTED_KEYS.keys) {
@@ -527,5 +528,6 @@ object KeyManager {
         pendingDownEvents.clear()
         pendingUpEvents.clear()
         keyConsumed.clear()
+        injectedEventTimes.clear()
     }
 }

@@ -50,6 +50,13 @@ object GestureManager {
     private var mIsSwiping = false
     private var mIsInSection = false
     private var mActiveZone: String? = null
+    private var mGestureDownTime = 0L  // Timestamp when mIsInSection was set true
+    private const val GESTURE_TIMEOUT_MS = 5000L  // Safety timeout to auto-reset stale gesture state
+
+    // Whether we've registered the screen state broadcast receiver (system_server)
+    private var screenStateReceiverRegistered = false
+    // Whether we've registered the screen state broadcast receiver (SystemUI)
+    private var screenStateReceiverRegisteredUI = false
 
     private val TOUCH_SLOP = 24
     
@@ -74,15 +81,83 @@ object GestureManager {
     private val debugViews = mutableListOf<DebugOverlayView>()
 
     /**
+     * Reset all gesture detection state.
+     * Called on SCREEN_OFF to prevent stale state from blocking touches after unlock.
+     */
+    private fun resetGestureState() {
+        val wasInSection = mIsInSection
+        mIsInSection = false
+        mActiveZone = null
+        mIsSwiping = false
+        mDownX = 0f
+        mDownY = 0f
+        mTargetX = 0f
+        mTargetY = 0f
+        mGestureDownTime = 0L
+        if (wasInSection) {
+            XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale mIsInSection")
+        }
+    }
+
+    /**
+     * Register broadcast receiver for SCREEN_OFF/ON in system_server process.
+     * Resets gesture and key state when the screen turns off to prevent
+     * stale state from blocking touch after unlock.
+     */
+    private fun registerScreenStateReceiver(context: Context) {
+        if (screenStateReceiverRegistered) return
+        screenStateReceiverRegistered = true
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                when (intent.action) {
+                    Intent.ACTION_SCREEN_OFF -> {
+                        XposedBridge.log("$TAG: SCREEN_OFF — resetting gesture and key state")
+                        resetGestureState()
+                        KeyManager.reset()
+                    }
+                    Intent.ACTION_SCREEN_ON -> {
+                        XposedBridge.log("$TAG: SCREEN_ON — state is clean")
+                    }
+                }
+            }
+        }
+
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            }
+            context.registerReceiver(receiver, filter)
+            XposedBridge.log("$TAG: Screen state receiver registered in system_server")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: Failed to register screen state receiver: ${e.message}")
+            screenStateReceiverRegistered = false
+        }
+    }
+
+    /**
      * Called from system_server (filterInputEvent hook).
      * Handles MotionEvent at the input pipeline level and consumes touches
      * once a gesture starts from an enabled edge zone.
      */
     fun handleMotionEvent(event: MotionEvent, context: Context): Boolean {
-        // Lazily init system context
+        // Lazily init system context and register screen state receiver
         if (systemContext == null) {
             systemContext = context
             reloadConfigAsync()
+            registerScreenStateReceiver(context)
+        }
+
+        // Safety guard: if mIsInSection has been true for too long without
+        // receiving UP/CANCEL (e.g. screen was locked mid-gesture),
+        // auto-reset to prevent blocking touch events.
+        if (mIsInSection && mGestureDownTime > 0) {
+            val elapsed = System.currentTimeMillis() - mGestureDownTime
+            if (elapsed > GESTURE_TIMEOUT_MS) {
+                XposedBridge.log("$TAG: [Gesture] Safety timeout: mIsInSection stuck for ${elapsed}ms — resetting")
+                resetGestureState()
+            }
         }
 
         if (!isGesturesEnabled()) return false
@@ -128,6 +203,7 @@ object GestureManager {
 
                 XposedBridge.log("$TAG: [Gesture] DOWN zone=$zone x=${"%.1f".format(x)} y=${"%.1f".format(y)} pointers=$pointerCount")
                 mIsInSection = true
+                mGestureDownTime = System.currentTimeMillis()
                 mActiveZone = zone
                 mDownX = x
                 mDownY = y
@@ -197,6 +273,7 @@ object GestureManager {
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
+                mGestureDownTime = 0L
                 return true // consume
             }
 
@@ -205,6 +282,7 @@ object GestureManager {
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
+                mGestureDownTime = 0L
                 return true // consume
             }
 
@@ -244,11 +322,12 @@ object GestureManager {
      * Delegates to KeyManager for state machine processing.
      */
     fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
-        // Lazily init system context and KeyManager
+        // Lazily init system context, KeyManager, and screen state receiver
         if (systemContext == null) {
             systemContext = context
             reloadConfigAsync()
             KeyManager.init(context)
+            registerScreenStateReceiver(context)
         }
 
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
@@ -275,6 +354,9 @@ object GestureManager {
 
         // Register BroadcastReceiver to receive action commands from system_server
         registerActionReceiver(ctx)
+
+        // Register SCREEN_OFF receiver in SystemUI to auto-dismiss overlays
+        registerScreenStateReceiverUI(ctx)
 
         // Add debug overlay views (left + right edge)
         try {
@@ -315,6 +397,45 @@ object GestureManager {
             } catch (e2: Exception) {
                 XposedBridge.log("$TAG: Failed to register BroadcastReceiver: ${e2.message}")
             }
+        }
+    }
+
+    /**
+     * Register broadcast receiver for SCREEN_OFF in SystemUI process.
+     * Auto-dismisses overlay windows (DrawerWindow, TextSelectionOverlay)
+     * when the screen turns off, preventing them from blocking touch after unlock.
+     */
+    private fun registerScreenStateReceiverUI(ctx: Context) {
+        if (screenStateReceiverRegisteredUI) return
+        screenStateReceiverRegisteredUI = true
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                    XposedBridge.log("$TAG: SCREEN_OFF in SystemUI — dismissing overlays")
+                    Handler(Looper.getMainLooper()).post {
+                        try {
+                            TextSelectionOverlay.dismiss()
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to dismiss TextSelectionOverlay: ${t.message}")
+                        }
+                        try {
+                            DrawerManager.dismissDrawer()
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to dismiss DrawerWindow: ${t.message}")
+                        }
+                    }
+                }
+            }
+        }
+
+        try {
+            val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+            ctx.registerReceiver(receiver, filter)
+            XposedBridge.log("$TAG: Screen state receiver registered in SystemUI")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: Failed to register screen state receiver in SystemUI: ${e.message}")
+            screenStateReceiverRegisteredUI = false
         }
     }
 

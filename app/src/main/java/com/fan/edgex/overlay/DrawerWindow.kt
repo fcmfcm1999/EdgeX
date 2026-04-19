@@ -465,6 +465,13 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
 
     fun isShowing() = rootView != null
 
+    /**
+     * Force-dismiss the drawer from external callers (e.g. SCREEN_OFF handler).
+     */
+    fun forceDismiss() {
+        dismiss()
+    }
+
     private fun dismiss() {
         if (rootView != null) {
             try {
