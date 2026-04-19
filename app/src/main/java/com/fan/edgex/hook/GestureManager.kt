@@ -328,6 +328,8 @@ object GestureManager {
             reloadConfigAsync()
             KeyManager.init(context)
             registerScreenStateReceiver(context)
+        } else {
+            reloadConfigAsync()
         }
 
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)

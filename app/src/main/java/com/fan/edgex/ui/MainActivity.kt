@@ -1,12 +1,17 @@
 package com.fan.edgex.ui
 
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.utils.UpdateChecker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -29,6 +34,48 @@ class MainActivity : AppCompatActivity() {
         }
         
         val prefs = getSharedPreferences("config", MODE_PRIVATE)
+        
+        // Auto-populate freezer list if not yet initialized
+        if (!prefs.getBoolean("has_init_freezer_list", false)) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                val pm = packageManager
+                val rawApps = pm.getInstalledApplications(0)
+                val disabledNonSystemApps = rawApps.filter { info ->
+                    !info.enabled && (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0
+                }.map { it.packageName }
+                
+                android.util.Log.d("EdgeX", "Auto-init scan: found ${disabledNonSystemApps.size} apps: $disabledNonSystemApps")
+
+                if (disabledNonSystemApps.isNotEmpty()) {
+                    val currentList = prefs.getString("freezer_app_list", "") ?: ""
+                    val currentSet = if (currentList.isEmpty()) mutableSetOf<String>() else currentList.split(",").toMutableSet()
+                    
+                    var changed = false
+                    for (pkg in disabledNonSystemApps) {
+                        if (currentSet.add(pkg)) {
+                            changed = true
+                        }
+                    }
+                    
+                    if (changed) {
+                        android.util.Log.d("EdgeX", "Saving auto-init freezer list: ${currentSet.joinToString(",")}")
+                        prefs.edit()
+                            .putString("freezer_app_list", currentSet.joinToString(","))
+                            .putBoolean("has_init_freezer_list", true)
+                            .apply()
+                        
+                        withContext(Dispatchers.Main) {
+                            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+                        }
+                    } else {
+                        prefs.edit().putBoolean("has_init_freezer_list", true).apply()
+                    }
+                } else {
+                    prefs.edit().putBoolean("has_init_freezer_list", true).apply()
+                }
+            }
+        }
+
         val cbGestures = findViewById<android.widget.CheckBox>(R.id.checkbox_gestures)
         cbGestures.isChecked = prefs.getBoolean("gestures_enabled", true)
         cbGestures.setOnCheckedChangeListener { _, isChecked ->
