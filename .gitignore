@@ -20,3 +20,4 @@ buildSrc/build
 # Keystore files
 *.jks
 *.keystore
+.github/copilot-instructions.md
