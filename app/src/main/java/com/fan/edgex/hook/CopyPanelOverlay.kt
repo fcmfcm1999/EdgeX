@@ -173,8 +173,8 @@ object TextSelectionOverlay {
         // Copy button
         val copy = createToolbarButton(context, density,
             if (isChinese) "复制" else "Copy",
-            Color.parseColor("#4FC3F7"),
-            Color.BLACK
+            Color.parseColor("#009688"),
+            Color.WHITE
         ) {
             val selected = blocks.filter { it.selected }
             if (selected.isNotEmpty()) {
