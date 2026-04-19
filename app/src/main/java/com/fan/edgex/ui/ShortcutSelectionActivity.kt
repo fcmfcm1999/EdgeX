@@ -109,9 +109,6 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         adapter.notifyDataSetChanged()
     }
 
-        // Load Shortcuts
-        loadShortcuts()
-    }
 
     private fun loadShortcuts() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {

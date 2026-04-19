@@ -60,8 +60,7 @@ class FreezerActivity : AppCompatActivity() {
         adapter = AppListAdapter(displayedApps, 
             onClick = { app -> showAppDialog(app) },
             onCheckChanged = { app, isChecked -> 
-                app.isChecked = isChecked
-                updateFreezerList(app.info.packageName, isChecked)
+                toggleAppFreeze(app, isChecked)
             }
         )
         recyclerView.adapter = adapter
@@ -118,7 +117,7 @@ class FreezerActivity : AppCompatActivity() {
                     info = info,
                     label = info.loadLabel(pm).toString(),
                     isFrozen = !info.enabled,
-                    isChecked = freezerList.contains(info.packageName)
+                    isChecked = !info.enabled
                 )
             }.sortedBy { it.label.lowercase() }
 
@@ -131,6 +130,26 @@ class FreezerActivity : AppCompatActivity() {
         }
     }
     
+    private fun toggleAppFreeze(app: AppItem, freeze: Boolean) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val cmd = if (freeze) "pm disable ${app.info.packageName}" else "pm enable ${app.info.packageName}"
+            val success = runRootCommand(cmd)
+            
+            withContext(Dispatchers.Main) {
+                if (success) {
+                    val msgRes = if (freeze) R.string.toast_frozen else R.string.toast_unfrozen
+                    Toast.makeText(this@FreezerActivity, getString(msgRes, app.label), Toast.LENGTH_SHORT).show()
+                    updateFreezerList(app.info.packageName, freeze)
+                    loadApps() // Reload to refresh all labels/states
+                } else {
+                    val errorRes = if (freeze) R.string.toast_freeze_failed else R.string.toast_unfreeze_failed
+                    Toast.makeText(this@FreezerActivity, getString(errorRes), Toast.LENGTH_SHORT).show()
+                    adapter.notifyDataSetChanged() // Reset checkbox to previous state
+                }
+            }
+        }
+    }
+
     private fun updateFreezerList(packageName: String, add: Boolean) {
         if (add) {
             freezerList.add(packageName)
