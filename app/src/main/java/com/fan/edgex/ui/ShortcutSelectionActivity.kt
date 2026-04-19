@@ -9,13 +9,16 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import java.util.Locale
 
 class ShortcutSelectionActivity : AppCompatActivity() {
 
@@ -27,7 +30,8 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         val icon: android.graphics.drawable.Drawable?
     )
 
-    private val shortcuts = mutableListOf<ShortcutItem>()
+    private val allShortcuts = mutableListOf<ShortcutItem>()
+    private val displayedShortcuts = mutableListOf<ShortcutItem>()
     private lateinit var adapter: ShortcutAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +51,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         // RecyclerView
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        adapter = ShortcutAdapter(shortcuts) { item ->
+        adapter = ShortcutAdapter(displayedShortcuts) { item ->
             // Save Selection
             val actionCode = "app_shortcut:${item.packageName}:${item.shortcutId}"
             val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
@@ -60,6 +64,50 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             finish()
         }
         recyclerView.adapter = adapter
+
+        // Setup Search
+        setupSearch()
+    }
+
+    private fun setupSearch() {
+        val btnSearch = findViewById<ImageView>(R.id.btn_search)
+        val etSearch = findViewById<EditText>(R.id.et_search)
+        val tvTitle = findViewById<TextView>(R.id.tv_title)
+        
+        btnSearch.setOnClickListener {
+            if (etSearch.visibility == View.GONE) {
+                // Open Search
+                tvTitle.visibility = View.GONE
+                etSearch.visibility = View.VISIBLE
+                etSearch.requestFocus()
+            } else {
+                // Close/Clear
+                if (etSearch.text.isEmpty()) {
+                    etSearch.visibility = View.GONE
+                    tvTitle.visibility = View.VISIBLE
+                } else {
+                    etSearch.text.clear()
+                }
+            }
+        }
+
+        etSearch.addTextChangedListener { text ->
+             filterShortcuts(text.toString())
+        }
+    }
+
+    private fun filterShortcuts(query: String) {
+        displayedShortcuts.clear()
+        if (query.isEmpty()) {
+            displayedShortcuts.addAll(allShortcuts)
+        } else {
+            val q = query.lowercase(Locale.getDefault())
+            displayedShortcuts.addAll(allShortcuts.filter { 
+                it.label.lowercase().contains(q) || it.appLabel.lowercase().contains(q) || it.packageName.contains(q)
+            })
+        }
+        adapter.notifyDataSetChanged()
+    }
 
         // Load Shortcuts
         loadShortcuts()
@@ -127,12 +175,12 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                 tempList.sortWith(compareBy({ it.appLabel }, { it.label }))
                 
                 runOnUiThread {
-                    if (shortcuts.isEmpty()) {
+                    allShortcuts.clear()
+                    allShortcuts.addAll(tempList)
+                    if (allShortcuts.isEmpty()) {
                         loadShortcutsViaRoot()
                     } else {
-                        shortcuts.clear()
-                        shortcuts.addAll(tempList)
-                        adapter.notifyDataSetChanged()
+                        filterShortcuts(findViewById<EditText>(R.id.et_search).text.toString())
                     }
                 }
                 
@@ -242,10 +290,10 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             
             runOnUiThread {
                  if (rootShortcuts.isNotEmpty()) {
-                     shortcuts.clear()
-                     shortcuts.addAll(rootShortcuts)
-                     shortcuts.sortWith(compareBy({ it.appLabel }, { it.label }))
-                     adapter.notifyDataSetChanged()
+                     allShortcuts.clear()
+                     allShortcuts.addAll(rootShortcuts)
+                     allShortcuts.sortWith(compareBy({ it.appLabel }, { it.label }))
+                     filterShortcuts(findViewById<EditText>(R.id.et_search).text.toString())
                      Toast.makeText(this, getString(R.string.toast_shortcuts_loaded_via_root, rootShortcuts.size), Toast.LENGTH_SHORT).show()
                  } else {
                      Toast.makeText(this, getString(R.string.toast_no_shortcuts_found), Toast.LENGTH_SHORT).show()

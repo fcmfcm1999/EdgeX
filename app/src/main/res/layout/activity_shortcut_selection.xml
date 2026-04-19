@@ -28,15 +28,44 @@
             android:src="@drawable/ic_arrow_back"
             android:tint="@color/ui_header_text" />
 
+        <!-- Title Layout (Visible by default) -->
         <TextView
+            android:id="@+id/tv_title"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="?attr/actionBarSize"
             android:layout_marginStart="32dp"
             android:layout_weight="1"
+            android:gravity="center_vertical"
             android:text="@string/header_shortcut_selection"
             android:textColor="@color/ui_header_text"
             android:textSize="20sp"
             android:textStyle="normal" />
+
+        <!-- Search field (Hidden by default) -->
+        <EditText
+            android:id="@+id/et_search"
+            android:layout_width="0dp"
+            android:layout_height="?attr/actionBarSize"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:hint="@string/hint_search_apps"
+            android:gravity="center_vertical"
+            android:textColor="@color/ui_header_text"
+            android:textColorHint="#80FFFFFF"
+            android:maxLines="1"
+            android:inputType="text"
+            android:visibility="gone"/>
+
+        <ImageView
+            android:id="@+id/btn_search"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="?selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/ic_search"
+            android:tint="@color/ui_header_text" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
