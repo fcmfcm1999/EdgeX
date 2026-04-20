@@ -200,7 +200,7 @@ object UpdateChecker {
         for ((i, rawLine) in lines.withIndex()) {
             val line = rawLine.trimEnd()
             if (line.isBlank()) {
-                if (sb.isNotEmpty() && sb[sb.length - 1] != '\n') sb.append("\n")
+                if (sb.isNotEmpty() && !sb.endsWith("\n\n")) sb.append("\n")
                 continue
             }
 
