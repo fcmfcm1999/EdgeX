@@ -22,6 +22,6 @@ fun Context.getConfigString(key: String, default: String = ""): String =
 
 fun Context.getConfigBool(key: String, default: Boolean = false): Boolean =
     configPrefs().run {
-        getString(key, null)?.toBooleanStrictOrNull()
+        runCatching { getString(key, null) }.getOrNull()?.toBooleanStrictOrNull()
             ?: runCatching { getBoolean(key, default) }.getOrDefault(default)
     }
