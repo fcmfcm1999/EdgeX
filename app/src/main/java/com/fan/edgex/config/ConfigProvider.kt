@@ -35,7 +35,7 @@ class ConfigProvider : ContentProvider() {
         val prefs = context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
 
         val value: String = runCatching { prefs.getString(key, null) }.getOrNull()
-            ?: runCatching { prefs.getBoolean(key, false).toString() }.getOrDefault("")
+            ?: if (prefs.contains(key)) runCatching { prefs.getBoolean(key, false).toString() }.getOrDefault("") else ""
 
         val cursor = MatrixCursor(arrayOf("value"))
         cursor.addRow(arrayOf(value))
