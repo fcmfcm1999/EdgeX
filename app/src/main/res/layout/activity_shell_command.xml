@@ -8,13 +8,14 @@
     android:background="@color/ui_background"
     tools:context=".ui.ShellCommandActivity">
 
-    <!-- Header (same style as other activities) -->
+    <!-- Immersive Header -->
     <LinearLayout
         android:id="@+id/header_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="?attr/actionBarSize"
         android:background="@color/ui_header_background"
+        android:fitsSystemWindows="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="16dp"
@@ -33,28 +34,27 @@
 
         <TextView
             android:id="@+id/tv_subtitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_width="wrap_content"
+            android:layout_height="?attr/actionBarSize"
+            android:layout_marginStart="32dp"
+            android:gravity="center_vertical"
             android:text="@string/header_shell_command"
             android:textSize="20sp"
-            android:textColor="@color/ui_header_text"
-            android:layout_marginStart="32dp" />
+            android:textColor="@color/ui_header_text" />
 
     </LinearLayout>
 
     <!-- Content -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:paddingBottom="42dp">
 
             <!-- Command Label -->
             <TextView
@@ -101,18 +101,18 @@
                 android:layout_marginStart="32dp"
                 android:layout_marginTop="4dp" />
 
+            <!-- Save Button -->
+            <Button
+                android:id="@+id/btn_save"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_save"
+                android:textColor="@android:color/white"
+                android:backgroundTint="@color/purple_500"
+                android:layout_marginTop="24dp" />
+
         </LinearLayout>
 
     </ScrollView>
-
-    <!-- Save Button -->
-    <Button
-        android:id="@+id/btn_save"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/btn_save"
-        android:textColor="@android:color/white"
-        android:backgroundTint="@color/purple_500"
-        android:layout_margin="16dp" />
 
 </LinearLayout>
