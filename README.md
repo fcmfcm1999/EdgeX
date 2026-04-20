@@ -24,19 +24,12 @@ It is not a standalone app in the usual sense. The launcher icon is mainly used 
 
 ## Features
 
-- 6 configurable edge zones that can be enabled independently.
-- Common edge gestures such as tap, double tap, long press, and swipe.
-- Action mapping for back, home, recents, screenshot, shortcuts, and more.
-- Built-in `Freezer` and drawer support for managed apps.
-- Extra tools like debug matrix, Arc Drawer, and `Restart SystemUI`.
-
-## How It Works
-
-- Hooks `InputManagerService.filterInputEvent(...)` in the `android` process to intercept edge touch events.
-- Initializes overlay windows and UI-side actions inside `com.android.systemui`.
-- Synchronizes settings between the app and hooked processes through `ConfigProvider`.
-
-If the module does not work as expected, first verify LSPosed scope settings and make sure `SystemUI` has been restarted.
+- **Edge Gestures**: 6 customizable zones supporting tap, double-tap, long-press, and directional swipes.
+- **System Actions**: Quick triggers for Back, Home, Recents, Screenshots, Power Menu, and more.
+- **Universal Copy**: Effortlessly extract and copy text from any screen.
+- **App Freezer**: Freeze idle apps and launch them instantly from a dedicated drawer.
+- **Smart Shortcuts**: Rapid access to app shortcuts, QR code payments (Alipay/WeChat), and system tools.
+- **Shell Command**: Support customized shell command
 
 ## Requirements
 
@@ -93,12 +86,6 @@ Open the `EdgeX` app to:
 - Configure the 6 gesture zones in `Gestures`
 - Assign actions to each gesture event
 - Manage freezer app entries in `Freezer`
-
-### Advanced Options
-
-- `Debug Mode`: shows the green trigger area for debugging.
-- `Enable Arc Freezer`: enables the arc-style freezer drawer.
-- `Restart SystemUI`: refreshes overlays and related UI behavior more directly.
 
 ## License
 

@@ -22,3 +22,4 @@ buildSrc/build
 *.keystore
 .github/copilot-instructions.md
 CLAUDE.md
+todo.md
