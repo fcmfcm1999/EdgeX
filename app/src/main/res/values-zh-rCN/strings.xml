@@ -42,6 +42,7 @@
     <string name="donate_subtitle">帮我用上更好的AI模型</string>
     <string name="donate_alipay">支付宝</string>
     <string name="donate_wechat">微信支付</string>
+    <string name="donate_alipay_scan">打开支付宝扫一扫捐赠</string>
     <string name="donate_wechat_scan">打开微信扫一扫捐赠</string>
     <string name="donate_crypto">加密货币</string>
     <string name="donate_crypto_title">加密货币捐赠</string>
