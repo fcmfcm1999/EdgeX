@@ -38,6 +38,23 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Setup Signature for Release
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ ! -z "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/release.jks
+            echo "RELEASE_STORE_FILE=release.jks" >> local.properties
+            echo "RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD" >> local.properties
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> local.properties
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD" >> local.properties
+          else
+            echo "Secret KEYSTORE_BASE64 is missing, you must configure secrets in GitHub Repo Settings!"
+          fi
+
       - name: Build Release APK
         run: ./gradlew assembleRelease
         env:
