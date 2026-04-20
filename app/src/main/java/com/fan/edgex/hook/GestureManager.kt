@@ -664,24 +664,27 @@ object GestureManager {
     private val configCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private var lastConfigLoad = 0L
     private val CONFIG_CACHE_TTL = 2000L
+    private val configExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "EdgeX-Config").apply { isDaemon = true }
+    }
 
     private fun reloadConfigAsync() {
         if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
 
-        Thread {
+        configExecutor.execute {
             try {
                 loadConfigKeys()
                 lastConfigLoad = System.currentTimeMillis()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }.start()
+        }
     }
 
     private fun reloadConfigAsyncForUI() {
         if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
 
-        Thread {
+        configExecutor.execute {
             try {
                 loadConfigKeys()
                 lastConfigLoad = System.currentTimeMillis()
@@ -700,7 +703,7 @@ object GestureManager {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }.start()
+        }
     }
 
     private fun loadConfigKeys() {
