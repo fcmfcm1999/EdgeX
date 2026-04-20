@@ -278,11 +278,14 @@ class FreezerActivity : AppCompatActivity() {
             
             holder.checkbox.setOnCheckedChangeListener(null)
             holder.checkbox.isChecked = app.isChecked
-            
-            holder.checkbox.setOnCheckedChangeListener { _, isChecked ->
-                onCheckChanged(app, isChecked)
+
+            holder.checkbox.setOnCheckedChangeListener { buttonView, isChecked ->
+                if (buttonView.isPressed) onCheckChanged(app, isChecked)
             }
-            
+
+            // Checkbox click must not bubble up to itemView
+            holder.checkbox.setOnClickListener { }
+
             if (app.isFrozen) {
                 holder.frozen.visibility = View.VISIBLE
                 holder.name.alpha = 0.5f
@@ -290,7 +293,7 @@ class FreezerActivity : AppCompatActivity() {
                 holder.frozen.visibility = View.GONE
                 holder.name.alpha = 1.0f
             }
-            
+
             holder.itemView.setOnClickListener { onClick(app) }
         }
 
