@@ -21,3 +21,4 @@ buildSrc/build
 *.jks
 *.keystore
 .github/copilot-instructions.md
+CLAUDE.md
