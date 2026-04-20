@@ -34,7 +34,7 @@ class ConfigProvider : ContentProvider() {
         val key = uri.lastPathSegment ?: return null
         val prefs = context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
 
-        val value: String = prefs.getString(key, null)
+        val value: String = runCatching { prefs.getString(key, null) }.getOrNull()
             ?: runCatching { prefs.getBoolean(key, false).toString() }.getOrDefault("")
 
         val cursor = MatrixCursor(arrayOf("value"))

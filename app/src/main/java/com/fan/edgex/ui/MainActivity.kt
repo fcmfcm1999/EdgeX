@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val cbGestures = findViewById<android.widget.CheckBox>(R.id.checkbox_gestures)
-        cbGestures.isChecked = getConfigBool(AppConfig.GESTURES_ENABLED, true)
+        cbGestures.isChecked = getConfigBool(AppConfig.GESTURES_ENABLED)
         cbGestures.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.GESTURES_ENABLED, isChecked) }
 
         val cbKeys = findViewById<android.widget.CheckBox>(R.id.checkbox_keys)

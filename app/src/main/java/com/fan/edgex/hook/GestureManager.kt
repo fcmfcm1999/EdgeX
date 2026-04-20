@@ -612,17 +612,28 @@ object GestureManager {
             }
             try {
                 val params = layoutParams as WindowManager.LayoutParams
-                if (!hasEnabledZone) {
-                    params.height = 0
-                    visibility = GONE
-                } else {
-                    visibility = VISIBLE
-                    params.gravity = Gravity.TOP or edgeGravity
-                    params.y = minTop
-                    params.height = maxBottom - minTop
+                val isDebug = getConfig(AppConfig.DEBUG_MATRIX) == "true"
+                when {
+                    isDebug -> {
+                        visibility = VISIBLE
+                        params.gravity = Gravity.TOP or edgeGravity
+                        params.y = 0
+                        params.height = h
+                        windowOffsetY = 0
+                    }
+                    !hasEnabledZone -> {
+                        params.height = 0
+                        visibility = GONE
+                        windowOffsetY = 0
+                    }
+                    else -> {
+                        visibility = VISIBLE
+                        params.gravity = Gravity.TOP or edgeGravity
+                        params.y = minTop
+                        params.height = maxBottom - minTop
+                        windowOffsetY = minTop
+                    }
                 }
-
-                windowOffsetY = if (hasEnabledZone) minTop else 0
                 wm.updateViewLayout(this, params)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -731,7 +742,7 @@ object GestureManager {
     }
 
     private fun isGesturesEnabled(): Boolean =
-        getConfig(AppConfig.GESTURES_ENABLED, "true") != "false"
+        getConfig(AppConfig.GESTURES_ENABLED) == "true"
 
     private fun isZoneEnabled(zone: String): Boolean =
         getConfig(AppConfig.zoneEnabled(zone)) == "true"
