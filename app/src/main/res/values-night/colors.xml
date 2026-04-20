@@ -13,4 +13,6 @@
     <color name="ui_icon_bg">@color/purple_500</color>
     <color name="ui_icon_tint">@color/white</color>
     <color name="ui_checkbox_tint">@color/white</color>
+    <color name="ui_edit_background">#FF2C2C2C</color>
+    <color name="ui_edit_stroke">#FF404040</color>
 </resources>

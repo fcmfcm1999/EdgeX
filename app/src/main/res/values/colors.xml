@@ -24,4 +24,6 @@
     <color name="ui_icon_tint">@color/white</color>
     <color name="ui_checkbox_tint">@color/purple_500</color>
     <color name="ui_divider">#1F000000</color>
+    <color name="ui_edit_background">#F5F5F5</color>
+    <color name="ui_edit_stroke">#E0E0E0</color>
 </resources>
