@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.ViewConfiguration
+import com.fan.edgex.config.AppConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 
@@ -105,13 +106,13 @@ object KeyManager {
      * Update configuration from cache.
      */
     fun updateConfig(configCache: Map<String, String>) {
-        keysEnabled = configCache["keys_enabled"] == "true"
-        
+        keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+
         for (keyCode in SUPPORTED_KEYS.keys) {
-            keyEnabled[keyCode] = configCache["key_enabled_$keyCode"] == "true"
-            keyActions["${keyCode}_$MODE_CLICK"] = configCache["key_${keyCode}_click"] ?: ""
-            keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache["key_${keyCode}_double_click"] ?: ""
-            keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache["key_${keyCode}_long_press"] ?: ""
+            keyEnabled[keyCode] = configCache[AppConfig.keyEnabled(keyCode)] == "true"
+            keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
+            keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "double_click")] ?: ""
+            keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
         }
         
         XposedBridge.log("$TAG: KeyManager config updated - keysEnabled=$keysEnabled")

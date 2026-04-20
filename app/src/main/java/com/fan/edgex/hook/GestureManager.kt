@@ -19,6 +19,8 @@ import android.view.View
 
 import android.view.WindowManager
 import android.widget.Toast
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import kotlin.math.abs
@@ -35,8 +37,7 @@ object GestureManager {
     private var systemUIContext: Context? = null
     private var windowManager: WindowManager? = null
 
-    // Config URI
-    private val CONFIG_URI = Uri.parse("content://com.fan.edgex.provider/config")
+    private val CONFIG_URI = ConfigProvider.CONTENT_URI
 
     // Broadcast action for cross-process communication (system_server -> SystemUI)
     private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
@@ -524,7 +525,7 @@ object GestureManager {
             super.onDraw(canvas)
             canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
 
-            if (getConfig("debug_matrix_enabled", "boolean", "false") != "true") return
+            if (getConfig(AppConfig.DEBUG_MATRIX) != "true") return
             if (!isGesturesEnabled()) return
 
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -686,7 +687,7 @@ object GestureManager {
                 lastConfigLoad = System.currentTimeMillis()
 
                 Handler(Looper.getMainLooper()).post {
-                    val debug = getConfig("debug_matrix_enabled", "boolean") == "true"
+                    val debug = getConfig(AppConfig.DEBUG_MATRIX) == "true"
                     val color = if (debug) 0x3300FF00.toInt() else 0x00000000
 
                     debugViews.forEach {
@@ -703,70 +704,51 @@ object GestureManager {
     }
 
     private fun loadConfigKeys() {
-        val keys = mutableListOf(
-            "gestures_enabled", "debug_matrix_enabled",
-            "zone_enabled_left_top", "zone_enabled_left_mid", "zone_enabled_left_bottom",
-            "zone_enabled_right_top", "zone_enabled_right_mid", "zone_enabled_right_bottom",
-            "left_top_swipe_left", "left_top_swipe_right", "left_top_swipe_up", "left_top_swipe_down",
-            "left_mid_swipe_left", "left_mid_swipe_right", "left_mid_swipe_up", "left_mid_swipe_down",
-            "left_bottom_swipe_left", "left_bottom_swipe_right", "left_bottom_swipe_up", "left_bottom_swipe_down",
-            "right_top_swipe_left", "right_top_swipe_right", "right_top_swipe_up", "right_top_swipe_down",
-            "right_mid_swipe_left", "right_mid_swipe_right", "right_mid_swipe_up", "right_mid_swipe_down",
-            "right_bottom_swipe_left", "right_bottom_swipe_right", "right_bottom_swipe_up", "right_bottom_swipe_down",
-            // Keys config
-            "keys_enabled"
-        )
-        
-        // Add key-specific configs for each supported key
-        for (keyCode in KeyManager.SUPPORTED_KEYS.keys) {
-            keys.add("key_enabled_$keyCode")
-            keys.add("key_${keyCode}_click")
-            keys.add("key_${keyCode}_double_click")
-            keys.add("key_${keyCode}_long_press")
+        fun query(key: String) { configCache[key] = queryConfigProvider(key) }
+
+        query(AppConfig.GESTURES_ENABLED)
+        query(AppConfig.DEBUG_MATRIX)
+        query(AppConfig.KEYS_ENABLED)
+
+        for (zone in AppConfig.ZONES) {
+            query(AppConfig.zoneEnabled(zone))
+            for (gesture in AppConfig.GESTURES) {
+                query(AppConfig.gestureAction(zone, gesture))
+            }
         }
 
-        for (key in keys) {
-            val type = if (key.startsWith("zone_enabled") || key.startsWith("key_enabled") || 
-                          key == "gestures_enabled" || key == "debug_matrix_enabled" || 
-                          key == "keys_enabled") "boolean" else "string"
-            configCache[key] = queryConfigProvider(key, type)
+        for (keyCode in KeyManager.SUPPORTED_KEYS.keys) {
+            query(AppConfig.keyEnabled(keyCode))
+            for (trigger in AppConfig.KEY_TRIGGERS) {
+                query(AppConfig.keyAction(keyCode, trigger))
+            }
         }
-        
-        // Update KeyManager with new config
+
         KeyManager.updateConfig(configCache)
     }
 
-    private fun isGesturesEnabled(): Boolean {
-        return getConfig("gestures_enabled", "boolean", "true") != "false"
-    }
+    private fun isGesturesEnabled(): Boolean =
+        getConfig(AppConfig.GESTURES_ENABLED, "true") != "false"
 
-    private fun isZoneEnabled(zone: String): Boolean {
-        return getConfig("zone_enabled_$zone", "boolean", "false") == "true"
-    }
+    private fun isZoneEnabled(zone: String): Boolean =
+        getConfig(AppConfig.zoneEnabled(zone)) == "true"
 
-    private fun getConfig(key: String, type: String = "string", defValue: String = ""): String {
+    // NEVER call synchronously on the InputDispatcher thread — use cached value only.
+    private fun getConfig(key: String, defValue: String = ""): String {
         reloadConfigAsync()
-        // NEVER do sync IPC here — this runs on the InputDispatcher thread.
-        // Return cached value or default; async reload will populate cache.
         return configCache[key] ?: defValue
     }
 
-    private fun queryConfigProvider(key: String, type: String): String {
+    private fun queryConfigProvider(key: String): String {
         val ctx = systemContext ?: systemUIContext ?: return ""
         try {
-            val cursor: Cursor? = ctx.contentResolver.query(
-                CONFIG_URI,
-                null,
-                key,
-                arrayOf(""),
-                type
-            )
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    return it.getString(0)
-                }
+            ctx.contentResolver.query(
+                Uri.withAppendedPath(CONFIG_URI, key),
+                null, null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) return cursor.getString(0)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Expected on Binder-restricted threads; async reload will handle it
         }
         return ""
@@ -775,8 +757,8 @@ object GestureManager {
     // ======== Action Handling ========
 
     private fun triggerAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float) {
-        val configKey = "${zone}_${gestureType}"
-        val action = getConfig(configKey, "string")
+        val configKey = AppConfig.gestureAction(zone, gestureType)
+        val action = getConfig(configKey)
 
         XposedBridge.log("$TAG: [Gesture] triggerAction key=$configKey action='$action'")
 
@@ -1031,11 +1013,8 @@ object GestureManager {
             try {
                 val packageList = mutableListOf<String>()
                 val cursor: Cursor? = systemContext?.contentResolver?.query(
-                    CONFIG_URI,
-                    null,
-                    "freezer_app_list",
-                    arrayOf(""),
-                    "string"
+                    Uri.withAppendedPath(CONFIG_URI, AppConfig.FREEZER_APP_LIST),
+                    null, null, null, null
                 )
                 cursor?.use {
                     if (it.moveToFirst()) {

@@ -2,6 +2,8 @@ package com.fan.edgex.ui
 
 import android.content.Context
 import android.os.Bundle
+import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
@@ -35,9 +37,8 @@ class ShellCommandActivity : AppCompatActivity() {
         val prefKey = intent.getStringExtra("pref_key") ?: "unknown"
 
         // Load existing config if editing
-        val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-        val existingAction = prefs.getString(prefKey, "")
-        if (existingAction != null && existingAction.startsWith("shell:")) {
+        val existingAction = getConfigString(prefKey)
+        if (existingAction.startsWith("shell:")) {
             parseAndFillExisting(existingAction)
         }
 
@@ -69,18 +70,8 @@ class ShellCommandActivity : AppCompatActivity() {
         }
 
         val runAsRoot = checkRunAsRoot.isChecked
-        // Format: shell:{runAsRoot}:{command}
-        val actionCode = "shell:$runAsRoot:$command"
-
-        val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putString(prefKey, actionCode)
-            putString(prefKey + "_label", getString(R.string.action_shell_command))
-            apply()
-        }
-
-        // Notify Hook to refresh
-        contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+        putConfig(prefKey, "shell:$runAsRoot:$command")
+        putConfig("${prefKey}_label", getString(R.string.action_shell_command))
 
         Toast.makeText(this, getString(R.string.toast_shell_command_saved), Toast.LENGTH_SHORT).show()
         finish()

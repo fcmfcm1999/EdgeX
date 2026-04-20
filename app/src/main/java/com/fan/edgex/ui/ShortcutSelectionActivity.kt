@@ -3,6 +3,7 @@ package com.fan.edgex.ui
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ShortcutInfo
+import com.fan.edgex.config.putConfig
 import android.content.pm.ShortcutManager
 import android.os.Build
 import android.os.Bundle
@@ -48,15 +49,8 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         adapter = ShortcutAdapter(shortcuts) { item ->
-            // Save Selection
-            val actionCode = "app_shortcut:${item.packageName}:${item.shortcutId}"
-            val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-            prefs.edit().putString(prefKey, actionCode).apply()
-            prefs.edit().putString(prefKey + "_label", getString(R.string.label_shortcut_prefix, item.label)).apply()
-            
-            // Notify Hook
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-            
+            putConfig(prefKey, "app_shortcut:${item.packageName}:${item.shortcutId}")
+            putConfig("${prefKey}_label", getString(R.string.label_shortcut_prefix, item.label))
             finish()
         }
         recyclerView.adapter = adapter
