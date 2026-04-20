@@ -6,7 +6,6 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/ui_background"
-    android:fitsSystemWindows="true"
     tools:context=".ui.ShellCommandActivity">
 
     <!-- Header (same style as other activities) -->
