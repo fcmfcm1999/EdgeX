@@ -1070,14 +1070,21 @@ object GestureManager {
                     }
                 }
 
-                // Silent on success - no toast needed
-                if (count == 0) {
-                    handler.post { 
+                if (count > 0) {
+                    handler.post {
                         Toast.makeText(
-                            context, 
+                            context,
+                            ModuleRes.getString(R.string.toast_refrozen_apps, count),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } else {
+                    handler.post {
+                        Toast.makeText(
+                            context,
                             ModuleRes.getString(R.string.toast_no_apps_to_freeze),
                             Toast.LENGTH_SHORT
-                        ).show() 
+                        ).show()
                     }
                 }
 
