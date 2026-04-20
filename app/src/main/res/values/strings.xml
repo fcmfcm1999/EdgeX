@@ -67,7 +67,6 @@
     <string name="gesture_swipe_right">Swipe Right</string>
 
     <!-- Action Selection Items -->
-    <string name="action_default">Default</string>
     <string name="action_none">None</string>
     <string name="action_back">Back</string>
     <string name="action_home">Home</string>
@@ -99,6 +98,7 @@
 
     <!-- Labels and Hints -->
     <string name="hint_search_apps">Search apps…</string>
+    <string name="hint_search_shortcuts">Search shortcuts…</string>
     <string name="label_frozen">FROZEN</string>
     <string name="label_zone_event_subtitle">Zone / Event</string>
     <string name="label_empty_drawer">Nothing here</string>

@@ -19,7 +19,6 @@ class ActionSelectionActivity : AppCompatActivity() {
     data class ActionItem(val label: String, val code: String, val iconRes: Int)
 
     private val actions get() = listOf(
-        ActionItem(getString(R.string.action_default), "default", R.drawable.ic_action_dot),
         ActionItem(getString(R.string.action_none), "none", R.drawable.ic_action_dot),
         ActionItem(getString(R.string.action_back), "back", R.drawable.ic_arrow_back),
         ActionItem(getString(R.string.action_home), "home", R.drawable.ic_edge_panel),

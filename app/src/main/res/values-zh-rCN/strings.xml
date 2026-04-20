@@ -69,7 +69,6 @@
     <string name="gesture_swipe_right">右划</string>
 
     <!-- 动作选择列表 -->
-    <string name="action_default">默认</string>
     <string name="action_none">无</string>
     <string name="action_back">返回</string>
     <string name="action_home">主页</string>
@@ -101,6 +100,7 @@
 
     <!-- 标签与提示 -->
     <string name="hint_search_apps">搜索应用…</string>
+    <string name="hint_search_shortcuts">搜索快捷方式…</string>
     <string name="label_frozen">已冻结</string>
     <string name="label_zone_event_subtitle">区域 / 事件</string>
     <string name="label_empty_drawer">空空如也</string>
