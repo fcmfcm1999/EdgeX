@@ -94,7 +94,7 @@ class GesturesActivity : AppCompatActivity() {
         actionView.findViewById<TextView>(R.id.action_title).text = label
 
         val fullKey = AppConfig.gestureAction(zoneKey, actionKey)
-        val savedLabel = getConfigString("${fullKey}_label", getString(R.string.label_default_action))
+        val savedLabel = getConfigString("${fullKey}_label", getString(R.string.action_none))
         actionView.findViewById<TextView>(R.id.action_subtitle).text = savedLabel
 
         actionView.setOnClickListener {

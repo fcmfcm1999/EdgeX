@@ -101,7 +101,6 @@
     <string name="hint_search_apps">Search apps…</string>
     <string name="label_frozen">FROZEN</string>
     <string name="label_zone_event_subtitle">Zone / Event</string>
-    <string name="label_default_action">Default</string>
     <string name="label_empty_drawer">Nothing here</string>
     <string name="content_desc_icon">Icon</string>
 

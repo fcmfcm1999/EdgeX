@@ -103,7 +103,6 @@
     <string name="hint_search_apps">搜索应用…</string>
     <string name="label_frozen">已冻结</string>
     <string name="label_zone_event_subtitle">区域 / 事件</string>
-    <string name="label_default_action">默认</string>
     <string name="label_empty_drawer">空空如也</string>
     <string name="content_desc_icon">图标</string>
 

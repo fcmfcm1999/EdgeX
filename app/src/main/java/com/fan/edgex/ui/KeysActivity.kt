@@ -124,7 +124,7 @@ class KeysActivity : AppCompatActivity() {
         val prefKey = AppConfig.keyAction(keyCode, mode)
 
         // Load Saved Action Label
-        subtitleView.text = getConfigString("${prefKey}_label", getString(R.string.label_default_action))
+        subtitleView.text = getConfigString("${prefKey}_label", getString(R.string.action_none))
 
         // Set Click Listener
         actionView.setOnClickListener {
@@ -136,12 +136,12 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private fun updateKeySubtitle(keyCode: Int, subtitleView: TextView) {
-        val default = getString(R.string.label_default_action)
+        val noneLabel = getString(R.string.action_none)
         val labels = AppConfig.KEY_TRIGGERS.zip(
             listOf(getString(R.string.key_mode_click), getString(R.string.key_mode_double_click), getString(R.string.key_mode_long_press))
         ).mapNotNull { (trigger, name) ->
             val label = getConfigString("${AppConfig.keyAction(keyCode, trigger)}_label")
-            label.takeIf { it.isNotEmpty() && it != default }?.let { "$name: $it" }
+            label.takeIf { it.isNotEmpty() && it != noneLabel }?.let { "$name: $it" }
         }
         subtitleView.text = labels.joinToString(", ").ifEmpty { getString(R.string.key_not_configured) }
     }
@@ -175,6 +175,6 @@ class KeysActivity : AppCompatActivity() {
     private fun refreshAction(actionView: View, keyCode: Int, mode: String) {
         val prefKey = AppConfig.keyAction(keyCode, mode)
         actionView.findViewById<TextView>(R.id.action_subtitle).text =
-            getConfigString("${prefKey}_label", getString(R.string.label_default_action))
+            getConfigString("${prefKey}_label", getString(R.string.action_none))
     }
 }
