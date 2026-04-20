@@ -16,7 +16,7 @@
     <string name="menu_freezer_desc">管理冻结应用</string>
     <string name="menu_advanced">高级选项</string>
     <string name="menu_debug_matrix">调试模式</string>
-    <string name="menu_debug_matrix_desc">显示手势触发区域 (绿色矩阵)</string>
+    <string name="menu_debug_matrix_desc">显示手势触发区域</string>
     <string name="menu_arc_drawer">启用弧形冰箱</string>
     <string name="menu_arc_drawer_desc">在屏幕右侧以弧形显示应用列表</string>
     <string name="menu_restart_sysui">重启 SystemUI</string>
