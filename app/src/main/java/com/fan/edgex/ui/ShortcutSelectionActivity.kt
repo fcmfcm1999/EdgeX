@@ -18,6 +18,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import com.fan.edgex.config.putConfig
 import java.util.Locale
 
 class ShortcutSelectionActivity : AppCompatActivity() {
@@ -52,36 +53,29 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         adapter = ShortcutAdapter(displayedShortcuts) { item ->
-            // Save Selection
-            val actionCode = "app_shortcut:${item.packageName}:${item.shortcutId}"
-            val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-            prefs.edit().putString(prefKey, actionCode).apply()
-            prefs.edit().putString(prefKey + "_label", getString(R.string.label_shortcut_prefix, item.label)).apply()
-            
-            // Notify Hook
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-            
+            putConfig(prefKey, "app_shortcut:${item.packageName}:${item.shortcutId}")
+            putConfig("${prefKey}_label", getString(R.string.label_shortcut_prefix, item.label))
             finish()
         }
         recyclerView.adapter = adapter
 
         // Setup Search
         setupSearch()
+        // Load Shortcuts
+        loadShortcuts()
     }
 
     private fun setupSearch() {
         val btnSearch = findViewById<ImageView>(R.id.btn_search)
         val etSearch = findViewById<EditText>(R.id.et_search)
         val tvTitle = findViewById<TextView>(R.id.tv_title)
-        
+
         btnSearch.setOnClickListener {
             if (etSearch.visibility == View.GONE) {
-                // Open Search
                 tvTitle.visibility = View.GONE
                 etSearch.visibility = View.VISIBLE
                 etSearch.requestFocus()
             } else {
-                // Close/Clear
                 if (etSearch.text.isEmpty()) {
                     etSearch.visibility = View.GONE
                     tvTitle.visibility = View.VISIBLE
@@ -92,7 +86,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         }
 
         etSearch.addTextChangedListener { text ->
-             filterShortcuts(text.toString())
+            filterShortcuts(text.toString())
         }
     }
 
@@ -102,13 +96,12 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             displayedShortcuts.addAll(allShortcuts)
         } else {
             val q = query.lowercase(Locale.getDefault())
-            displayedShortcuts.addAll(allShortcuts.filter { 
+            displayedShortcuts.addAll(allShortcuts.filter {
                 it.label.lowercase().contains(q) || it.appLabel.lowercase().contains(q) || it.packageName.contains(q)
             })
         }
         adapter.notifyDataSetChanged()
     }
-
 
     private fun loadShortcuts() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
@@ -120,20 +113,18 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             try {
                 val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
                 val pm = packageManager
-                
-                // Get all launcher apps
+
                 val mainIntent = Intent(Intent.ACTION_MAIN, null)
                 mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
                 val apps = pm.queryIntentActivities(mainIntent, 0)
-                
+
                 val tempList = mutableListOf<ShortcutItem>()
-                
+
                 for (app in apps) {
                     val packageName = app.activityInfo.packageName
                     val appLabel = app.loadLabel(pm).toString()
-                    
+
                     try {
-                        // Query shortcuts for this app
                         val query = android.content.pm.LauncherApps.ShortcutQuery()
                         query.setQueryFlags(
                             android.content.pm.LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
@@ -141,16 +132,16 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                             android.content.pm.LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
                         )
                         query.setPackage(packageName)
-                        
+
                         val appShortcuts = launcherApps.getShortcuts(query, android.os.Process.myUserHandle()) ?: emptyList()
-                        
+
                         for (shortcut in appShortcuts) {
                             val icon = try {
                                 launcherApps.getShortcutIconDrawable(shortcut, 0)
                             } catch (e: Exception) {
                                 app.loadIcon(pm)
                             }
-                            
+
                             tempList.add(
                                 ShortcutItem(
                                     packageName = packageName,
@@ -164,13 +155,12 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                     } catch (e: SecurityException) {
                         // Likely not default launcher
                     } catch (e: Exception) {
-                       // Other validation errors
+                        // Other validation errors
                     }
                 }
-                
-                // Sort by app name, then shortcut name
+
                 tempList.sortWith(compareBy({ it.appLabel }, { it.label }))
-                
+
                 runOnUiThread {
                     allShortcuts.clear()
                     allShortcuts.addAll(tempList)
@@ -180,7 +170,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                         filterShortcuts(findViewById<EditText>(R.id.et_search).text.toString())
                     }
                 }
-                
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 loadShortcutsViaRoot()
@@ -194,8 +184,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             val rootShortcuts = mutableListOf<ShortcutItem>()
             try {
                 val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "dumpsys shortcut"))
-                
-                // Read Error Request
+
                 Thread {
                     val errReader = java.io.BufferedReader(java.io.InputStreamReader(process.errorStream))
                     var errLine: String?
@@ -203,98 +192,84 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                         android.util.Log.e("EdgeX_Dump", "STDERR: $errLine")
                     }
                 }.start()
-                
+
                 val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
-                
+
                 var line: String?
                 var currentPackage: String? = null
                 var currentId: String? = null
                 var currentLabel: String? = null
                 val pm = packageManager
-                
+
                 while (reader.readLine().also { line = it } != null) {
                     val l = line!!.trim()
-                    
-                    // Log output for debugging
-                    // android.util.Log.d("EdgeX_Dump", l)
-                    
-                    // Method 1: Header "Package: com.foo"
+
                     if (l.startsWith("Package:") && l.contains("uid=")) {
-                         val parts = l.split("\\s+".toRegex())
-                         if (parts.size >= 2) {
-                             currentPackage = parts[1]
-                         }
-                    } 
-                    
-                    // Method 2: ShortcutInfo line (Newer Android)
-                    // Example: ShortcutInfo {id=entrust, flags=...
+                        val parts = l.split("\\s+".toRegex())
+                        if (parts.size >= 2) {
+                            currentPackage = parts[1]
+                        }
+                    }
+
                     if (l.startsWith("ShortcutInfo") && l.contains("id=")) {
-                         // Extract ID
-                         val afterId = l.substringAfter("id=")
-                         // ID ends at comma or space
-                         currentId = afterId.substringBefore(",").substringBefore(" ").trim()
-                         currentLabel = null
-                         // Don't reset package yet, might relay on Header
+                        val afterId = l.substringAfter("id=")
+                        currentId = afterId.substringBefore(",").substringBefore(" ").trim()
+                        currentLabel = null
                     } else if (l.startsWith("id=")) {
-                         // Older Format
-                         currentId = l.substringAfter("id=").trim()
+                        currentId = l.substringAfter("id=").trim()
                     }
-                    
-                    // Extra Properties
+
                     if (l.startsWith("packageName=")) {
-                         currentPackage = l.substringAfter("packageName=").trim()
+                        currentPackage = l.substringAfter("packageName=").trim()
                     }
-                    
+
                     if (l.startsWith("shortLabel=")) {
-                         // Format: shortLabel=委托, resId=... or just shortLabel=Name
-                         val raw = l.substringAfter("shortLabel=")
-                         if (raw.contains(", resId=")) {
-                             currentLabel = raw.substringBefore(", resId=")
-                         } else {
-                             currentLabel = raw.substringBefore(",") // generic safety
-                         }
-                         currentLabel = currentLabel?.trim()
-                         
-                         // Commit if ready
-                         if (currentPackage != null && currentId != null && currentLabel != null) {
-                             android.util.Log.d("EdgeX_Dump", "Found: $currentPackage / $currentId / $currentLabel")
-                             try {
-                                 // Check duplicates?
-                                 val exists = rootShortcuts.any { it.packageName == currentPackage && it.shortcutId == currentId }
-                                 if (!exists) {
-                                     val appInfo = pm.getApplicationInfo(currentPackage!!, 0)
-                                     rootShortcuts.add(ShortcutItem(
-                                         packageName = currentPackage!!,
-                                         shortcutId = currentId!!,
-                                         label = currentLabel!!,
-                                         appLabel = appInfo.loadLabel(pm).toString(),
-                                         icon = appInfo.loadIcon(pm)
-                                     ))
-                                 }
-                                 currentId = null 
-                                 currentLabel = null
-                             } catch (e: Exception) {}
-                         }
+                        val raw = l.substringAfter("shortLabel=")
+                        if (raw.contains(", resId=")) {
+                            currentLabel = raw.substringBefore(", resId=")
+                        } else {
+                            currentLabel = raw.substringBefore(",")
+                        }
+                        currentLabel = currentLabel?.trim()
+
+                        if (currentPackage != null && currentId != null && currentLabel != null) {
+                            android.util.Log.d("EdgeX_Dump", "Found: $currentPackage / $currentId / $currentLabel")
+                            try {
+                                val exists = rootShortcuts.any { it.packageName == currentPackage && it.shortcutId == currentId }
+                                if (!exists) {
+                                    val appInfo = pm.getApplicationInfo(currentPackage!!, 0)
+                                    rootShortcuts.add(ShortcutItem(
+                                        packageName = currentPackage!!,
+                                        shortcutId = currentId!!,
+                                        label = currentLabel!!,
+                                        appLabel = appInfo.loadLabel(pm).toString(),
+                                        icon = appInfo.loadIcon(pm)
+                                    ))
+                                }
+                                currentId = null
+                                currentLabel = null
+                            } catch (e: Exception) {}
+                        }
                     }
                 }
                 reader.close()
                 process.waitFor()
-                
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 android.util.Log.e("EdgeX_Dump", "Error: ${e.message}")
             }
-            
+
             runOnUiThread {
-                 if (rootShortcuts.isNotEmpty()) {
-                     allShortcuts.clear()
-                     allShortcuts.addAll(rootShortcuts)
-                     allShortcuts.sortWith(compareBy({ it.appLabel }, { it.label }))
-                     filterShortcuts(findViewById<EditText>(R.id.et_search).text.toString())
-                     Toast.makeText(this, getString(R.string.toast_shortcuts_loaded_via_root, rootShortcuts.size), Toast.LENGTH_SHORT).show()
-                 } else {
-                     Toast.makeText(this, getString(R.string.toast_no_shortcuts_found), Toast.LENGTH_SHORT).show()
-                 }
+                if (rootShortcuts.isNotEmpty()) {
+                    allShortcuts.clear()
+                    allShortcuts.addAll(rootShortcuts)
+                    allShortcuts.sortWith(compareBy({ it.appLabel }, { it.label }))
+                    filterShortcuts(findViewById<EditText>(R.id.et_search).text.toString())
+                    Toast.makeText(this, getString(R.string.toast_shortcuts_loaded_via_root, rootShortcuts.size), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.toast_no_shortcuts_found), Toast.LENGTH_SHORT).show()
+                }
             }
         }.start()
     }

@@ -6,6 +6,10 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.getConfigBool
+import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 
 class GesturesActivity : AppCompatActivity() {
 
@@ -24,7 +28,7 @@ class GesturesActivity : AppCompatActivity() {
         setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
         setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
         setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
-        
+
         setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
         setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
         setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
@@ -42,41 +46,27 @@ class GesturesActivity : AppCompatActivity() {
     }
 
     private fun setupZone(root: View, title: String, zoneKey: String, iconRes: Int) {
-        // Set Title
         root.findViewById<TextView>(R.id.title).text = title
-        
-        // Set Icon
         root.findViewById<ImageView>(R.id.zone_icon).setImageResource(iconRes)
-        
-        // Determine if left side based on zoneKey
+
         val isLeft = zoneKey.startsWith("left")
-        
-        // Zone Enabled Checkbox
+
         val checkBox = root.findViewById<android.widget.CheckBox>(R.id.checkbox)
-        val prefs = getSharedPreferences("config", android.content.Context.MODE_PRIVATE)
-        val prefKey = "zone_enabled_$zoneKey"
-        
-        // Load State (Default false)
-        val isZoneEnabled = prefs.getBoolean(prefKey, false)
+        val enabledKey = AppConfig.zoneEnabled(zoneKey)
         checkBox.setOnCheckedChangeListener(null)
-        checkBox.isChecked = isZoneEnabled
-        
-        // Save State
+        checkBox.isChecked = getConfigBool(enabledKey)
+
         checkBox.setOnCheckedChangeListener { buttonView, isChecked ->
-            // Ignore programmatic state changes (e.g. orientation/layout restore)
             if (!buttonView.isPressed) return@setOnCheckedChangeListener
-            prefs.edit().putBoolean(prefKey, isChecked).commit()
-            // Notify Hook to refresh
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
+            putConfig(enabledKey, isChecked)
         }
 
-        // Expand/Collapse Logic (Only set once ideally, but resetting listener is harmless)
         val header = root.findViewById<View>(R.id.header)
         val body = root.findViewById<View>(R.id.body)
         val arrow = root.findViewById<ImageView>(R.id.arrow)
 
         if (!header.hasOnClickListeners()) {
-             header.setOnClickListener {
+            header.setOnClickListener {
                 if (body.visibility == View.VISIBLE) {
                     body.visibility = View.GONE
                     arrow.animate().rotation(0f).start()
@@ -87,40 +77,32 @@ class GesturesActivity : AppCompatActivity() {
             }
         }
 
-        // Setup Action Labels & Clicks
         setupAction(root.findViewById(R.id.action_click), getString(R.string.gesture_click), zoneKey, "click", title)
         setupAction(root.findViewById(R.id.action_double_click), getString(R.string.gesture_double_click), zoneKey, "double_click", title)
         setupAction(root.findViewById(R.id.action_long_press), getString(R.string.gesture_long_press), zoneKey, "long_press", title)
         setupAction(root.findViewById(R.id.action_swipe_up), getString(R.string.gesture_swipe_up), zoneKey, "swipe_up", title)
         setupAction(root.findViewById(R.id.action_swipe_down), getString(R.string.gesture_swipe_down), zoneKey, "swipe_down", title)
 
-        // Conditional Swipe
         if (isLeft) {
             setupAction(root.findViewById(R.id.action_swipe_right), getString(R.string.gesture_swipe_right), zoneKey, "swipe_right", title)
         } else {
-             setupAction(root.findViewById(R.id.action_swipe_left), getString(R.string.gesture_swipe_left), zoneKey, "swipe_left", title)
+            setupAction(root.findViewById(R.id.action_swipe_left), getString(R.string.gesture_swipe_left), zoneKey, "swipe_left", title)
         }
     }
 
     private fun setupAction(actionView: View, label: String, zoneKey: String, actionKey: String, zoneTitle: String) {
-        val titleView = actionView.findViewById<TextView>(R.id.action_title)
-        val subtitleView = actionView.findViewById<TextView>(R.id.action_subtitle)
-        
-        titleView.text = label
-        
-        val fullKey = "${zoneKey}_${actionKey}"
-        
-        // Load Saved Action Label
-        val prefs = getSharedPreferences("config", android.content.Context.MODE_PRIVATE)
-        val savedLabel = prefs.getString(fullKey + "_label", getString(R.string.label_default_action))
-        subtitleView.text = savedLabel
-        
-        // Set Click Listener
+        actionView.findViewById<TextView>(R.id.action_title).text = label
+
+        val fullKey = AppConfig.gestureAction(zoneKey, actionKey)
+        val savedLabel = getConfigString("${fullKey}_label", getString(R.string.label_default_action))
+        actionView.findViewById<TextView>(R.id.action_subtitle).text = savedLabel
+
         actionView.setOnClickListener {
-            val intent = android.content.Intent(this, ActionSelectionActivity::class.java)
-            intent.putExtra("title", "$zoneTitle / $label")
-            intent.putExtra("pref_key", fullKey)
-            startActivity(intent)
+            startActivity(
+                android.content.Intent(this, ActionSelectionActivity::class.java)
+                    .putExtra("title", "$zoneTitle / $label")
+                    .putExtra("pref_key", fullKey)
+            )
         }
     }
 }

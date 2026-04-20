@@ -12,6 +12,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.getConfigBool
+import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 
 class KeysActivity : AppCompatActivity() {
 
@@ -30,7 +34,6 @@ class KeysActivity : AppCompatActivity() {
         )
     }
 
-    private val prefs by lazy { getSharedPreferences("config", MODE_PRIVATE) }
     private val keyViews = mutableMapOf<Int, View>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,9 +83,8 @@ class KeysActivity : AppCompatActivity() {
         icon.setImageResource(iconRes)
 
         // Load State
-        val keyEnabled = prefs.getBoolean("key_enabled_$keyCode", false)
         checkbox.setOnCheckedChangeListener(null)
-        checkbox.isChecked = keyEnabled
+        checkbox.isChecked = getConfigBool(AppConfig.keyEnabled(keyCode))
 
         // Update Subtitle
         updateKeySubtitle(keyCode, subtitle)
@@ -90,8 +92,7 @@ class KeysActivity : AppCompatActivity() {
         // Checkbox Click
         checkbox.setOnCheckedChangeListener { buttonView, isChecked ->
             if (!buttonView.isPressed) return@setOnCheckedChangeListener
-            prefs.edit().putBoolean("key_enabled_$keyCode", isChecked).commit()
-            notifyConfigChange()
+            putConfig(AppConfig.keyEnabled(keyCode), isChecked)
         }
 
         // Expand/Collapse
@@ -120,11 +121,10 @@ class KeysActivity : AppCompatActivity() {
 
         titleView.text = label
 
-        val prefKey = "key_${keyCode}_$mode"
+        val prefKey = AppConfig.keyAction(keyCode, mode)
 
         // Load Saved Action Label
-        val savedLabel = prefs.getString("${prefKey}_label", getString(R.string.label_default_action))
-        subtitleView.text = savedLabel
+        subtitleView.text = getConfigString("${prefKey}_label", getString(R.string.label_default_action))
 
         // Set Click Listener
         actionView.setOnClickListener {
@@ -136,27 +136,14 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private fun updateKeySubtitle(keyCode: Int, subtitleView: TextView) {
-        val actions = mutableListOf<String>()
-        
-        val clickAction = prefs.getString("key_${keyCode}_click_label", null)
-        val doubleClickAction = prefs.getString("key_${keyCode}_double_click_label", null)
-        val longPressAction = prefs.getString("key_${keyCode}_long_press_label", null)
-
-        if (!clickAction.isNullOrEmpty() && clickAction != getString(R.string.label_default_action)) {
-            actions.add("${getString(R.string.key_mode_click)}: $clickAction")
+        val default = getString(R.string.label_default_action)
+        val labels = AppConfig.KEY_TRIGGERS.zip(
+            listOf(getString(R.string.key_mode_click), getString(R.string.key_mode_double_click), getString(R.string.key_mode_long_press))
+        ).mapNotNull { (trigger, name) ->
+            val label = getConfigString("${AppConfig.keyAction(keyCode, trigger)}_label")
+            label.takeIf { it.isNotEmpty() && it != default }?.let { "$name: $it" }
         }
-        if (!doubleClickAction.isNullOrEmpty() && doubleClickAction != getString(R.string.label_default_action)) {
-            actions.add("${getString(R.string.key_mode_double_click)}: $doubleClickAction")
-        }
-        if (!longPressAction.isNullOrEmpty() && longPressAction != getString(R.string.label_default_action)) {
-            actions.add("${getString(R.string.key_mode_long_press)}: $longPressAction")
-        }
-
-        subtitleView.text = if (actions.isEmpty()) {
-            getString(R.string.key_not_configured)
-        } else {
-            actions.joinToString(", ")
-        }
+        subtitleView.text = labels.joinToString(", ").ifEmpty { getString(R.string.key_not_configured) }
     }
 
     private fun refreshAllKeyItems() {
@@ -167,13 +154,11 @@ class KeysActivity : AppCompatActivity() {
                 val checkbox = view.findViewById<CheckBox>(R.id.checkbox)
                 
                 // Refresh checkbox state
-                val keyEnabled = prefs.getBoolean("key_enabled_$keyCode", false)
                 checkbox.setOnCheckedChangeListener(null)
-                checkbox.isChecked = keyEnabled
+                checkbox.isChecked = getConfigBool(AppConfig.keyEnabled(keyCode))
                 checkbox.setOnCheckedChangeListener { buttonView, isChecked ->
                     if (!buttonView.isPressed) return@setOnCheckedChangeListener
-                    prefs.edit().putBoolean("key_enabled_$keyCode", isChecked).commit()
-                    notifyConfigChange()
+                    putConfig(AppConfig.keyEnabled(keyCode), isChecked)
                 }
 
                 // Refresh subtitle
@@ -188,13 +173,8 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private fun refreshAction(actionView: View, keyCode: Int, mode: String) {
-        val subtitleView = actionView.findViewById<TextView>(R.id.action_subtitle)
-        val prefKey = "key_${keyCode}_$mode"
-        val savedLabel = prefs.getString("${prefKey}_label", getString(R.string.label_default_action))
-        subtitleView.text = savedLabel
-    }
-
-    private fun notifyConfigChange() {
-        contentResolver.notifyChange(Uri.parse("content://com.fan.edgex.provider/config"), null)
+        val prefKey = AppConfig.keyAction(keyCode, mode)
+        actionView.findViewById<TextView>(R.id.action_subtitle).text =
+            getConfigString("${prefKey}_label", getString(R.string.label_default_action))
     }
 }

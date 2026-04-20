@@ -18,6 +18,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.addTextChangedListener
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.configPrefs
+import com.fan.edgex.config.putConfig
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -102,8 +105,7 @@ class FreezerActivity : AppCompatActivity() {
     private fun loadApps() {
         lifecycleScope.launch(Dispatchers.IO) {
             // Load saved list
-            val prefs = getSharedPreferences("config", MODE_PRIVATE)
-            val savedString = prefs.getString("freezer_app_list", "") ?: ""
+            val savedString = configPrefs().getString(AppConfig.FREEZER_APP_LIST, "") ?: ""
             freezerList.clear()
             if (savedString.isNotEmpty()) {
                 freezerList.addAll(savedString.split(","))
@@ -157,15 +159,7 @@ class FreezerActivity : AppCompatActivity() {
             freezerList.remove(packageName)
         }
         
-        // Save to Prefs
-        val joined = freezerList.joinToString(",")
-        getSharedPreferences("config", MODE_PRIVATE)
-            .edit()
-            .putString("freezer_app_list", joined)
-            .apply()
-            
-        // Notify Provider
-        contentResolver.notifyChange(Uri.parse("content://com.fan.edgex.provider/config"), null)
+        putConfig(AppConfig.FREEZER_APP_LIST, freezerList.joinToString(","))
     }
 
     private fun filterApps(query: String) {

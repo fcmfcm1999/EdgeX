@@ -15,6 +15,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ConfigProvider
 import java.io.DataOutputStream
 
 class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
@@ -39,17 +41,11 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
 
         var useArcDrawer = false
         try {
-            val cursor = context.contentResolver.query(
-                android.net.Uri.parse("content://com.fan.edgex.provider/config"),
-                null,
-                "freezer_arc_drawer_enabled",
-                arrayOf("false"),
-                "boolean"
-            )
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    useArcDrawer = it.getString(0).toBoolean()
-                }
+            context.contentResolver.query(
+                ConfigProvider.uriForKey(AppConfig.FREEZER_ARC_DRAWER),
+                null, null, null, null
+            )?.use {
+                if (it.moveToFirst()) useArcDrawer = it.getString(0).toBoolean()
             }
         } catch (e: Exception) {
             de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read arc drawer config: ${e.message}")
@@ -94,14 +90,10 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         try {
             // 0. Load Persistent Freezer List from ConfigProvider
             try {
-                val cursor = context.contentResolver.query(
-                    android.net.Uri.parse("content://com.fan.edgex.provider/config"), 
-                    null, 
-                    "freezer_app_list", 
-                    null, 
-                    null
-                )
-                cursor?.use {
+                context.contentResolver.query(
+                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
+                    null, null, null, null
+                )?.use {
                     if (it.moveToFirst()) {
                         val listStr = it.getString(0)
                         if (!listStr.isNullOrEmpty()) {

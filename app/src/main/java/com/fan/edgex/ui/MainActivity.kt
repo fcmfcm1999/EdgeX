@@ -8,6 +8,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.config.configPrefs
+import com.fan.edgex.config.getConfigBool
+import com.fan.edgex.config.putConfig
 import com.fan.edgex.utils.UpdateChecker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,64 +38,42 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         
-        val prefs = getSharedPreferences("config", MODE_PRIVATE)
-        
+        val prefs = configPrefs()
+
         // Auto-populate freezer list if not yet initialized
-        if (!prefs.getBoolean("has_init_freezer_list", false)) {
+        if (!getConfigBool(AppConfig.HAS_INIT_FREEZER)) {
             lifecycleScope.launch(Dispatchers.IO) {
                 val pm = packageManager
                 val rawApps = pm.getInstalledApplications(0)
                 val disabledNonSystemApps = rawApps.filter { info ->
                     !info.enabled && (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0
                 }.map { it.packageName }
-                
+
                 android.util.Log.d("EdgeX", "Auto-init scan: found ${disabledNonSystemApps.size} apps: $disabledNonSystemApps")
 
-                if (disabledNonSystemApps.isNotEmpty()) {
-                    val currentList = prefs.getString("freezer_app_list", "") ?: ""
-                    val currentSet = if (currentList.isEmpty()) mutableSetOf<String>() else currentList.split(",").toMutableSet()
-                    
-                    var changed = false
-                    for (pkg in disabledNonSystemApps) {
-                        if (currentSet.add(pkg)) {
-                            changed = true
-                        }
-                    }
-                    
-                    if (changed) {
-                        android.util.Log.d("EdgeX", "Saving auto-init freezer list: ${currentSet.joinToString(",")}")
-                        prefs.edit()
-                            .putString("freezer_app_list", currentSet.joinToString(","))
-                            .putBoolean("has_init_freezer_list", true)
-                            .apply()
-                        
-                        withContext(Dispatchers.Main) {
-                            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-                        }
-                    } else {
-                        prefs.edit().putBoolean("has_init_freezer_list", true).apply()
+                val currentList = prefs.getString(AppConfig.FREEZER_APP_LIST, "") ?: ""
+                val currentSet = if (currentList.isEmpty()) mutableSetOf() else currentList.split(",").toMutableSet()
+                val changed = disabledNonSystemApps.any { currentSet.add(it) }
+
+                if (changed) {
+                    android.util.Log.d("EdgeX", "Saving auto-init freezer list: ${currentSet.joinToString(",")}")
+                    prefs.edit().putString(AppConfig.FREEZER_APP_LIST, currentSet.joinToString(",")).apply()
+                    withContext(Dispatchers.Main) {
+                        putConfig(AppConfig.HAS_INIT_FREEZER, true)
                     }
                 } else {
-                    prefs.edit().putBoolean("has_init_freezer_list", true).apply()
+                    putConfig(AppConfig.HAS_INIT_FREEZER, true)
                 }
             }
         }
 
         val cbGestures = findViewById<android.widget.CheckBox>(R.id.checkbox_gestures)
-        cbGestures.isChecked = prefs.getBoolean("gestures_enabled", true)
-        cbGestures.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("gestures_enabled", isChecked).apply()
-            // Notify Hook to refresh
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-        }
+        cbGestures.isChecked = getConfigBool(AppConfig.GESTURES_ENABLED)
+        cbGestures.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.GESTURES_ENABLED, isChecked) }
 
-        // Keys Checkbox
         val cbKeys = findViewById<android.widget.CheckBox>(R.id.checkbox_keys)
-        cbKeys.isChecked = prefs.getBoolean("keys_enabled", false)
-        cbKeys.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("keys_enabled", isChecked).apply()
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-        }
+        cbKeys.isChecked = getConfigBool(AppConfig.KEYS_ENABLED)
+        cbKeys.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.KEYS_ENABLED, isChecked) }
 
         findViewById<View>(R.id.item_gestures).setOnClickListener {
             // Only allow entering if allowed? Or always allow? 
@@ -122,35 +105,15 @@ class MainActivity : AppCompatActivity() {
         
         // 1. Debug Matrix
         val cbDebug = findViewById<android.widget.CheckBox>(R.id.checkbox_debug_matrix)
-        cbDebug.isChecked = prefs.getBoolean("debug_matrix_enabled", false)
-        
-        val onDebugToggle = { isChecked: Boolean ->
-            prefs.edit().putBoolean("debug_matrix_enabled", isChecked).apply()
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-            cbDebug.isChecked = isChecked
-        }
-        
-        cbDebug.setOnCheckedChangeListener { _, isChecked -> onDebugToggle(isChecked) }
-        
-        findViewById<View>(R.id.item_debug_matrix).setOnClickListener {
-            cbDebug.performClick()
-        }
+        cbDebug.isChecked = getConfigBool(AppConfig.DEBUG_MATRIX)
+        cbDebug.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.DEBUG_MATRIX, isChecked) }
+        findViewById<View>(R.id.item_debug_matrix).setOnClickListener { cbDebug.performClick() }
 
         // 1.5 Arc Drawer Toggle
         val cbArcDrawer = findViewById<android.widget.CheckBox>(R.id.checkbox_arc_drawer)
-        cbArcDrawer.isChecked = prefs.getBoolean("freezer_arc_drawer_enabled", false)
-
-        val onArcDrawerToggle = { isChecked: Boolean ->
-            prefs.edit().putBoolean("freezer_arc_drawer_enabled", isChecked).apply()
-            contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-            cbArcDrawer.isChecked = isChecked
-        }
-
-        cbArcDrawer.setOnCheckedChangeListener { _, isChecked -> onArcDrawerToggle(isChecked) }
-
-        findViewById<View>(R.id.item_arc_drawer).setOnClickListener {
-            cbArcDrawer.performClick()
-        }
+        cbArcDrawer.isChecked = getConfigBool(AppConfig.FREEZER_ARC_DRAWER)
+        cbArcDrawer.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.FREEZER_ARC_DRAWER, isChecked) }
+        findViewById<View>(R.id.item_arc_drawer).setOnClickListener { cbArcDrawer.performClick() }
 
         // 2. Restart SystemUI
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {

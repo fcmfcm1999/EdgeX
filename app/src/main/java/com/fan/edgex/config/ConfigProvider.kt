@@ -12,76 +12,76 @@ class ConfigProvider : ContentProvider() {
 
     companion object {
         const val AUTHORITY = "com.fan.edgex.provider"
-        val CONTENT_URI: Uri = "content://$AUTHORITY/config".toUri()
+        val CONTENT_URI: Uri = "content://$AUTHORITY".toUri()
+
+        fun uriForKey(key: String): Uri = Uri.withAppendedPath(CONTENT_URI, key)
     }
 
-    override fun onCreate(): Boolean {
-        return true
-    }
+    override fun onCreate(): Boolean = true
 
+    // URI: content://com.fan.edgex.provider/{key}
+    // Returns a single-row cursor with column "value".
+    // Values are stored as strings; booleans written via ConfigStore are already "true"/"false".
+    // Legacy fallback: if no string is found, try reading as a native boolean (migration path).
     override fun query(
         uri: Uri,
         projection: Array<out String>?,
-        selection: String?, // KEY
-        selectionArgs: Array<out String>?, // Default Value
-        sortOrder: String? // TYPE (string, boolean, int)
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?
     ): Cursor? {
         val context = context ?: return null
-        val prefs = context.getSharedPreferences("config", Context.MODE_PRIVATE)
-        val key = selection ?: return null
-        val defValue = selectionArgs?.firstOrNull() ?: ""
-        val type = sortOrder ?: "string"
-        
+        val key = uri.lastPathSegment ?: return null
+        val prefs = context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
+
+        val value: String = runCatching { prefs.getString(key, null) }.getOrNull()
+            ?: runCatching { prefs.getBoolean(key, false).toString() }.getOrDefault("")
+
         val cursor = MatrixCursor(arrayOf("value"))
-        
-        val value = when(type) {
-            "boolean" -> prefs.getBoolean(key, defValue.toBoolean()).toString()
-            "int" -> prefs.getInt(key, defValue.toIntOrNull() ?: 0).toString()
-            else -> prefs.getString(key, defValue)
-        }
-        
-        android.util.Log.d("EdgeX", "ConfigProvider.query - key: $key, type: $type, value: $value")
-        
         cursor.addRow(arrayOf(value))
         return cursor
     }
 
-    override fun getType(uri: Uri): String? = "vnd.android.cursor.item/vnd.com.fan.edge.config"
+    override fun getType(uri: Uri): String = "vnd.android.cursor.item/vnd.com.fan.edgex.config"
 
+    // ContentValues must contain "value" (String). Key comes from the URI path.
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
         val context = context ?: return null
-        val key = values?.getAsString("key")
-        val value = values?.getAsString("value")
-        
-        if (key != null && value != null) {
-            context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .edit()
-                .putString(key, value)
-                .commit()
-            
-            context.contentResolver.notifyChange(CONTENT_URI, null) // Notify observers
-            return Uri.withAppendedPath(CONTENT_URI, key)
-        }
-        return null
-    }
+        val key = uri.lastPathSegment ?: return null
+        val value = values?.getAsString("value") ?: return null
 
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
-         val context = context ?: return 0
-         val key = selection
-         if (key != null) {
-              context.getSharedPreferences("config", Context.MODE_PRIVATE)
-                .edit()
-                .remove(key)
-                .apply()
-              context.contentResolver.notifyChange(CONTENT_URI, null)
-              return 1
-         }
-         return 0
+        context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(key, value).commit()
+
+        notifyObservers(context, key)
+        return uriForKey(key)
     }
 
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?): Int {
-        // Treat update same as insert for this simple KV store
-        val uriRes = insert(uri, values)
-        return if (uriRes != null) 1 else 0
+        val context = context ?: return 0
+        val key = uri.lastPathSegment ?: return 0
+        val value = values?.getAsString("value") ?: return 0
+
+        context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(key, value).commit()
+
+        notifyObservers(context, key)
+        return 1
+    }
+
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int {
+        val context = context ?: return 0
+        val key = uri.lastPathSegment ?: return 0
+
+        context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().remove(key).commit()
+
+        notifyObservers(context, key)
+        return 1
+    }
+
+    private fun notifyObservers(context: Context, key: String) {
+        try { context.contentResolver.notifyChange(uriForKey(key), null) } catch (_: Throwable) {}
+        try { context.contentResolver.notifyChange(CONTENT_URI, null) } catch (_: Throwable) {}
     }
 }

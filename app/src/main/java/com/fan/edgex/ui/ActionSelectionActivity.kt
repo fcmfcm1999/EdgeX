@@ -1,6 +1,5 @@
 package com.fan.edgex.ui
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -12,6 +11,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.putConfig
 
 class ActionSelectionActivity : AppCompatActivity() {
 
@@ -45,40 +46,33 @@ class ActionSelectionActivity : AppCompatActivity() {
         // Get Args
         val title = intent.getStringExtra("title") ?: "Action"
         val prefKey = intent.getStringExtra("pref_key") ?: "unknown"
-        
+
         findViewById<TextView>(R.id.tv_subtitle).text = title
 
         // List
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = ActionAdapter(actions) { item ->
-            if (item.code == "app_shortcut") {
-                // Launch ShortcutSelectionActivity
-                val intent = Intent(this, ShortcutSelectionActivity::class.java)
-                intent.putExtra("pref_key", prefKey)
-                startActivity(intent)
-                finish()
-            } else if (item.code == "shell_command") {
-                // Launch ShellCommandActivity
-                val intent = Intent(this, ShellCommandActivity::class.java)
-                intent.putExtra("pref_key", prefKey)
-                startActivity(intent)
-                finish()
-            } else {
-                // Save Selection
-                val prefs = getSharedPreferences("config", Context.MODE_PRIVATE)
-                prefs.edit().putString(prefKey, item.code).apply() // Valid Code: "freezer_drawer" etc
-                // Saving "Label" for simple display updating in previous screen.
-                prefs.edit().putString(prefKey + "_label", item.label).apply()
-                
-                // Notify Hook to refresh (CRITICAL for instant update)
-                contentResolver.notifyChange(android.net.Uri.parse("content://com.fan.edgex.provider/config"), null)
-                
-                finish()
+            when (item.code) {
+                "app_shortcut" -> {
+                    startActivity(Intent(this, ShortcutSelectionActivity::class.java)
+                        .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                "shell_command" -> {
+                    startActivity(Intent(this, ShellCommandActivity::class.java)
+                        .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                else -> {
+                    putConfig(prefKey, item.code)
+                    putConfig("${prefKey}_label", item.label)
+                    finish()
+                }
             }
         }
     }
-    
+
     inner class ActionAdapter(val items: List<ActionItem>, val onClick: (ActionItem) -> Unit) : RecyclerView.Adapter<ActionAdapter.ViewHolder>() {
         inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
             val icon: ImageView = v.findViewById(R.id.icon)
