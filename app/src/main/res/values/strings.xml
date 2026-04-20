@@ -134,6 +134,20 @@
     <string name="toast_refrozen_apps">Refrozen %d apps</string>
     <string name="toast_no_apps_to_freeze">No apps to freeze</string>
     <string name="toast_freeze_error">Freeze error: %s</string>
+    <string name="toast_no_text_found">No text found</string>
+    <string name="toast_copy_unavailable">Global copy unavailable</string>
+    <string name="toast_empty_command">Empty command</string>
+    <string name="toast_shell_invalid_format">Invalid shell command format</string>
+    <string name="toast_command_failed">Command failed: %s</string>
+    <string name="toast_command_error">Command error: %s</string>
+
+    <!-- Universal Copy Overlay -->
+    <string name="copy_tap_to_select">Tap to select</string>
+    <string name="copy_select_all">All</string>
+    <string name="copy_deselect">Deselect</string>
+    <string name="copy_copy">Copy</string>
+    <string name="copy_copied_count">%d copied</string>
+    <string name="copy_selected_count">%d selected</string>
 
     <!-- Keys Feature -->
     <string name="menu_keys">Keys</string>

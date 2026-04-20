@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
+import java.lang.ref.WeakReference
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -18,6 +19,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.fan.edgex.R
 import de.robv.android.xposed.XposedBridge
 
 /**
@@ -31,12 +33,12 @@ object TextSelectionOverlay {
     private const val AUTO_DISMISS_MS = 30000L
 
     private val handler = Handler(Looper.getMainLooper())
-    private var currentOverlay: View? = null
+    private var currentOverlay: WeakReference<View>? = null
     private var dismissRunnable: Runnable? = null
 
-    private var hintView: TextView? = null
-    private var copyButton: TextView? = null
-    private var selectAllButton: TextView? = null
+    private var hintView: WeakReference<TextView>? = null
+    private var copyButton: WeakReference<TextView>? = null
+    private var selectAllButton: WeakReference<TextView>? = null
 
     private class SelectableBlock(
         val text: String,
@@ -65,7 +67,7 @@ object TextSelectionOverlay {
         hintView = null
         copyButton = null
         selectAllButton = null
-        val overlay = currentOverlay ?: return
+        val overlay = currentOverlay?.get() ?: return
         try {
             val wm = overlay.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             wm.removeViewImmediate(overlay)
@@ -79,7 +81,6 @@ object TextSelectionOverlay {
     private fun addOverlay(context: Context, blocks: List<SelectableBlock>) {
         val density = context.resources.displayMetrics.density
         val dp = { value: Int -> (value * density + 0.5f).toInt() }
-        val isChinese = context.resources.configuration.locales[0].language == "zh"
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         val root = object : FrameLayout(context) {
@@ -98,7 +99,7 @@ object TextSelectionOverlay {
         // Custom view for drawing and selecting text blocks
         val blocksView = TextBlocksView(context, blocks, density,
             onEmptyTap = { dismiss() },
-            onSelectionChanged = { updateToolbarState(blocks, isChinese) }
+            onSelectionChanged = { updateToolbarState(blocks) }
         )
         root.addView(blocksView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -106,7 +107,7 @@ object TextSelectionOverlay {
         ))
 
         // Bottom toolbar
-        val toolbar = createToolbar(context, blocks, density, isChinese)
+        val toolbar = createToolbar(context, blocks, density)
         val toolbarParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
@@ -127,7 +128,7 @@ object TextSelectionOverlay {
         )
 
         wm.addView(root, windowParams)
-        currentOverlay = root
+        currentOverlay = WeakReference(root)
 
         val runnable = Runnable { dismiss() }
         dismissRunnable = runnable
@@ -137,8 +138,7 @@ object TextSelectionOverlay {
     private fun createToolbar(
         context: Context,
         blocks: List<SelectableBlock>,
-        density: Float,
-        isChinese: Boolean
+        density: Float
     ): LinearLayout {
         val dp = { value: Int -> (value * density + 0.5f).toInt() }
 
@@ -157,34 +157,34 @@ object TextSelectionOverlay {
 
         // Hint / selected count
         val hint = TextView(context).apply {
-            text = if (isChinese) "点按文字选择" else "Tap to select"
+            text = ModuleRes.getString(R.string.copy_tap_to_select)
             setTextColor(Color.parseColor("#AAAAAA"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         }
-        hintView = hint
+        hintView = WeakReference(hint)
         toolbar.addView(hint, LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
         ).apply { marginEnd = dp(12) })
 
         // Select All button
         val selectAll = createToolbarButton(context, density,
-            if (isChinese) "全选" else "All",
+            ModuleRes.getString(R.string.copy_select_all),
             Color.parseColor("#3A3A3A"),
             Color.parseColor("#CCCCCC")
         ) {
             val allSelected = blocks.all { it.selected }
             blocks.forEach { it.selected = !allSelected }
-            (currentOverlay as? ViewGroup)?.getChildAt(0)?.invalidate()
-            updateToolbarState(blocks, isChinese)
+            (currentOverlay?.get() as? ViewGroup)?.getChildAt(0)?.invalidate()
+            updateToolbarState(blocks)
         }
-        selectAllButton = selectAll
+        selectAllButton = WeakReference(selectAll)
         toolbar.addView(selectAll, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)
         ).apply { marginEnd = dp(6) })
 
         // Copy button
         val copy = createToolbarButton(context, density,
-            if (isChinese) "复制" else "Copy",
+            ModuleRes.getString(R.string.copy_copy),
             Color.parseColor("#009688"),
             Color.WHITE
         ) {
@@ -192,14 +192,14 @@ object TextSelectionOverlay {
             if (selected.isNotEmpty()) {
                 val text = selected.joinToString("\n") { it.text }
                 copyToClipboard(context, text)
-                val msg = if (isChinese) "已复制 ${selected.size} 项" else "${selected.size} copied"
+                val msg = ModuleRes.getString(R.string.copy_copied_count, selected.size)
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 dismiss()
             }
         }
         copy.alpha = 0.4f
         copy.isEnabled = false
-        copyButton = copy
+        copyButton = WeakReference(copy)
         toolbar.addView(copy, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)
         ).apply { marginEnd = dp(6) })
@@ -240,21 +240,21 @@ object TextSelectionOverlay {
         }
     }
 
-    private fun updateToolbarState(blocks: List<SelectableBlock>, isChinese: Boolean) {
+    private fun updateToolbarState(blocks: List<SelectableBlock>) {
         val count = blocks.count { it.selected }
-        hintView?.text = if (count > 0) {
-            if (isChinese) "已选 $count 项" else "$count selected"
+        hintView?.get()?.text = if (count > 0) {
+            ModuleRes.getString(R.string.copy_selected_count, count)
         } else {
-            if (isChinese) "点按文字选择" else "Tap to select"
+            ModuleRes.getString(R.string.copy_tap_to_select)
         }
-        copyButton?.apply {
+        copyButton?.get()?.apply {
             alpha = if (count > 0) 1f else 0.4f
             isEnabled = count > 0
         }
-        selectAllButton?.text = if (blocks.all { it.selected }) {
-            if (isChinese) "取消全选" else "Deselect"
+        selectAllButton?.get()?.text = if (blocks.all { it.selected }) {
+            ModuleRes.getString(R.string.copy_deselect)
         } else {
-            if (isChinese) "全选" else "All"
+            ModuleRes.getString(R.string.copy_select_all)
         }
     }
 

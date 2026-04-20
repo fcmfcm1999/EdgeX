@@ -17,6 +17,7 @@ import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.hook.ModuleRes
 import java.io.DataOutputStream
 
 class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
@@ -27,15 +28,6 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     // Taps to the left of this X coordinate dismiss the drawer.
     private var contentLeftBound = 0
     
-    // Simple bilingual support for SystemUI process (can't access app resources)
-    private val isChinese: Boolean by lazy {
-        context.resources.configuration.locales[0].language == "zh"
-    }
-    
-    private fun getLocalizedString(en: String, zh: String): String {
-        return if (isChinese) zh else en
-    }
-
     fun show() {
         if (rootView != null) return // Already showing
 
@@ -204,7 +196,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             
             if (displayApps.isEmpty()) {
                 val emptyMsg = TextView(context).apply {
-                    text = getLocalizedString("Nothing here", "空空如也")
+                    text = ModuleRes.getString(R.string.label_empty_drawer)
                     textSize = 16f
                     setPadding(40, 40, 40, 40)
                     setTextColor(Color.DKGRAY)
@@ -318,7 +310,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
 
         if (displayApps.isEmpty()) {
             val emptyMsg = TextView(context).apply {
-                text = getLocalizedString("Nothing here", "空空如也")
+                text = ModuleRes.getString(R.string.label_empty_drawer)
                 textSize = 16f
                 setPadding(40, 40, 40, 40)
                 setTextColor(Color.DKGRAY)
@@ -411,7 +403,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                handler.post {
                     android.widget.Toast.makeText(
                         context, 
-                        getLocalizedString("Failed to unfreeze", "解冻失败"), 
+                        ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
                }
@@ -439,7 +431,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                     } else {
                         android.widget.Toast.makeText(
                             context, 
-                            getLocalizedString("Launch timed out, please open manually", "启动超时，请手动打开"), 
+                            ModuleRes.getString(R.string.toast_launch_timeout),
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -447,7 +439,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             } catch (e: Exception) {
                  android.widget.Toast.makeText(
                      context, 
-                     getLocalizedString("Launch error: ${e.message}", "启动错误：${e.message}"), 
+                     ModuleRes.getString(R.string.toast_launch_error, e.message),
                      android.widget.Toast.LENGTH_SHORT
                  ).show()
             }

@@ -136,6 +136,20 @@
     <string name="toast_refrozen_apps">已重新冻结 %d 个应用</string>
     <string name="toast_no_apps_to_freeze">没有需要冻结的应用</string>
     <string name="toast_freeze_error">冻结出错: %s</string>
+    <string name="toast_no_text_found">未找到可复制文本</string>
+    <string name="toast_copy_unavailable">全局复制不可用</string>
+    <string name="toast_empty_command">空命令</string>
+    <string name="toast_shell_invalid_format">无效的命令格式</string>
+    <string name="toast_command_failed">命令执行失败：%s</string>
+    <string name="toast_command_error">命令出错：%s</string>
+
+    <!-- 全局复制悬浮层 -->
+    <string name="copy_tap_to_select">点按文字选择</string>
+    <string name="copy_select_all">全选</string>
+    <string name="copy_deselect">取消全选</string>
+    <string name="copy_copy">复制</string>
+    <string name="copy_copied_count">已复制 %d 项</string>
+    <string name="copy_selected_count">已选 %d 项</string>
 
     <!-- 按键功能 -->
     <string name="menu_keys">按键</string>

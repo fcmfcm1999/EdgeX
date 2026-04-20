@@ -19,6 +19,7 @@ import android.view.View
 
 import android.view.WindowManager
 import android.widget.Toast
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.overlay.DrawerManager
@@ -61,19 +62,6 @@ object GestureManager {
 
     private val TOUCH_SLOP = 24
     
-    // Simple bilingual support for SystemUI process (can't access app resources)
-    private fun isChinese(context: Context): Boolean {
-        return try {
-            val locales = context.resources.configuration.locales
-            locales.size() > 0 && locales[0].language == "zh"
-        } catch (t: Throwable) {
-            false
-        }
-    }
-    
-    private fun getLocalizedString(context: Context, en: String, zh: String): String {
-        return if (isChinese(context)) zh else en
-    }
     private val SWIPE_THRESHOLD = 50
 
     private var mHandler: Handler? = null
@@ -828,10 +816,10 @@ object GestureManager {
                             TextSelectionOverlay.show(context, result.blocks)
                         }
                         UniversalCopyManager.CollectStatus.NO_TEXT -> {
-                            showToast(context, getLocalizedString(context, "No text found", "未找到可复制文本"))
+                            showToast(context, ModuleRes.getString(R.string.toast_no_text_found))
                         }
                         UniversalCopyManager.CollectStatus.UNAVAILABLE -> {
-                            showToast(context, getLocalizedString(context, "Global copy unavailable", "全局复制不可用"))
+                            showToast(context, ModuleRes.getString(R.string.toast_copy_unavailable))
                         }
                     }
                 }
@@ -867,7 +855,7 @@ object GestureManager {
                 val content = action.removePrefix("shell:")
                 val parts = content.split(":", limit = 2)
                 if (parts.size != 2) {
-                    showToast(context, getLocalizedString(context, "Invalid shell command format", "无效的命令格式"))
+                    showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
                     return@Thread
                 }
 
@@ -875,7 +863,7 @@ object GestureManager {
                 val command = parts[1]
 
                 if (command.isBlank()) {
-                    showToast(context, getLocalizedString(context, "Empty command", "空命令"))
+                    showToast(context, ModuleRes.getString(R.string.toast_empty_command))
                     return@Thread
                 }
 
@@ -899,9 +887,7 @@ object GestureManager {
                 if (exitCode != 0) {
                     val errorStream = process.errorStream.bufferedReader().readText()
                     XposedBridge.log("$TAG: Shell command failed (exit=$exitCode): $errorStream")
-                    showToast(context, getLocalizedString(context, 
-                        "Command failed: $errorStream", 
-                        "命令执行失败：$errorStream"))
+                    showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorStream))
                 } else {
                     val output = process.inputStream.bufferedReader().readText()
                     XposedBridge.log("$TAG: Shell command output: $output")
@@ -912,9 +898,7 @@ object GestureManager {
             } catch (e: Exception) {
                 XposedBridge.log("$TAG: Shell command exception: ${e.message}")
                 e.printStackTrace()
-                showToast(context, getLocalizedString(context,
-                    "Command error: ${e.message}",
-                    "命令出错：${e.message}"))
+                showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
             }
         }.start()
     }
@@ -963,7 +947,7 @@ object GestureManager {
             }
             else -> {
                 Handler(Looper.getMainLooper()).post {
-                    showToast(ctx, getLocalizedString(ctx, "Unknown action: $action", "未知操作：$action"))
+                    showToast(ctx, ModuleRes.getString(R.string.toast_unknown_action, action))
                 }
             }
         }
@@ -982,7 +966,7 @@ object GestureManager {
         try {
             val parts = action.split(":")
             if (parts.size != 3) {
-                showToast(context, getLocalizedString(context, "Shortcut format error", "快捷方式格式错误"))
+                showToast(context, ModuleRes.getString(R.string.toast_shortcut_format_error))
                 return
             }
 
@@ -1006,18 +990,18 @@ object GestureManager {
                             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             context.startActivity(intent)
                         } else {
-                            showToast(context, getLocalizedString(context, "Cannot launch shortcut", "无法启动快捷方式"))
+                            showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
                         }
                     } catch (e2: Exception) {
-                        showToast(context, getLocalizedString(context, "Launch failed", "启动失败"))
+                        showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
                     }
                 }
             } else {
-                showToast(context, getLocalizedString(context, "Requires Android 7.1 or higher", "需要 Android 7.1 或更高版本"))
+                showToast(context, ModuleRes.getString(R.string.toast_requires_android_71))
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            showToast(context, getLocalizedString(context, "Shortcut launch failed: ${e.message}", "快捷方式启动失败：${e.message}"))
+            showToast(context, ModuleRes.getString(R.string.toast_shortcut_launch_failed, e.message))
         }
     }
 
@@ -1046,7 +1030,7 @@ object GestureManager {
                         handler.post { 
                             Toast.makeText(
                                 context, 
-                                getLocalizedString(context, "Freezer list is empty", "冰箱列表为空"), 
+                                ModuleRes.getString(R.string.toast_freezer_list_empty),
                                 Toast.LENGTH_SHORT
                             ).show() 
                         }
@@ -1091,7 +1075,7 @@ object GestureManager {
                     handler.post { 
                         Toast.makeText(
                             context, 
-                            getLocalizedString(context, "No apps to freeze", "没有应用需要冷冻"), 
+                            ModuleRes.getString(R.string.toast_no_apps_to_freeze),
                             Toast.LENGTH_SHORT
                         ).show() 
                     }
@@ -1102,7 +1086,7 @@ object GestureManager {
                 handler.post { 
                     Toast.makeText(
                         context, 
-                        getLocalizedString(context, "Freeze error: ${e.message}", "冷冻错误：${e.message}"), 
+                        ModuleRes.getString(R.string.toast_freeze_error, e.message),
                         Toast.LENGTH_SHORT
                     ).show() 
                 }

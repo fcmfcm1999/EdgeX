@@ -7,13 +7,18 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
 import de.robv.android.xposed.IXposedHookLoadPackage
+import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.lang.reflect.Method
 
-class MainHook : IXposedHookLoadPackage {
+class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
+
+    override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
+        ModuleRes.init(startupParam.modulePath)
+    }
 
     companion object {
         private const val TAG = "EdgeX"
