@@ -27,6 +27,11 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
         ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
+        ActionItem(getString(R.string.action_kill_app), "kill_app", R.drawable.ic_kill_app),
+        ActionItem(getString(R.string.action_brightness_up), "brightness_up", R.drawable.ic_brightness_up),
+        ActionItem(getString(R.string.action_brightness_down), "brightness_down", R.drawable.ic_brightness_down),
+        ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
+        ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps),
         ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal)
     )

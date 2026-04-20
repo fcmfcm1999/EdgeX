@@ -76,6 +76,11 @@
     <string name="action_refreeze">Refreeze</string>
     <string name="action_screenshot">Screenshot</string>
     <string name="action_universal_copy">Global Copy</string>
+    <string name="action_kill_app">Kill Foreground App</string>
+    <string name="action_brightness_up">Brightness Up</string>
+    <string name="action_brightness_down">Brightness Down</string>
+    <string name="action_volume_up">Volume Up</string>
+    <string name="action_volume_down">Volume Down</string>
     <string name="action_app_shortcut">App Shortcut</string>
     <string name="action_shell_command">Shell Command</string>
 

@@ -24,6 +24,7 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -806,6 +807,15 @@ object GestureManager {
             action == "lock_screen" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_LOCK_SCREEN)
             }
+            action == "kill_app" -> {
+                killForegroundApp(context)
+            }
+            action == "brightness_up" || action == "brightness_down" -> {
+                adjustBrightness(context, action == "brightness_up")
+            }
+            action == "volume_up" || action == "volume_down" -> {
+                adjustVolume(context, action == "volume_up")
+            }
             action == "screenshot" -> {
                 performScreenshot(context)
             }
@@ -831,6 +841,48 @@ object GestureManager {
                 // UI actions need SystemUI context -> send broadcast
                 sendActionToSystemUI(action, context)
             }
+        }
+    }
+
+    private fun killForegroundApp(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            val tasks = am.getRunningTasks(1)
+            if (tasks.isNullOrEmpty()) return
+            val pkg = tasks[0].topActivity?.packageName ?: return
+            if (pkg == "com.fan.edgex" || pkg == context.packageName) return
+            XposedHelpers.callMethod(am, "forceStopPackage", pkg)
+            XposedBridge.log("$TAG: Killed foreground app: $pkg")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: killForegroundApp failed: ${e.message}")
+        }
+    }
+
+    private fun adjustBrightness(context: Context, up: Boolean) {
+        try {
+            val displayManager = context.getSystemService("display") as android.hardware.display.DisplayManager
+            val getBrightness = android.hardware.display.DisplayManager::class.java
+                .getMethod("getBrightness", Int::class.java)
+            val setBrightness = android.hardware.display.DisplayManager::class.java
+                .getMethod("setBrightness", Int::class.java, Float::class.java)
+            val current = getBrightness.invoke(displayManager, 0) as Float
+            val step = 1.0f / 16f
+            val newVal = if (up) minOf(1.0f, current + step) else maxOf(0.0f, current - step)
+            setBrightness.invoke(displayManager, 0, newVal)
+            XposedBridge.log("$TAG: Brightness $current -> $newVal")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: adjustBrightness failed: ${e.message}")
+        }
+    }
+
+    private fun adjustVolume(context: Context, up: Boolean) {
+        try {
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val direction = if (up) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
+            am.adjustVolume(direction, android.media.AudioManager.FLAG_SHOW_UI)
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: adjustVolume failed: ${e.message}")
         }
     }
 
