@@ -23,6 +23,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.overlay.DrawerManager
+import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import kotlin.math.abs
@@ -1020,30 +1021,29 @@ object GestureManager {
 
                 XposedBridge.log("$TAG: Executing shell command (root=$runAsRoot): $command")
 
-                val shell = if (runAsRoot) "su" else "sh"
-                val process = Runtime.getRuntime().exec(shell)
-                val outputStream = process.outputStream
-
-                // Write command lines
-                val lines = command.split("\n")
-                for (line in lines) {
-                    outputStream.write((line + "\n").toByteArray())
-                    outputStream.flush()
-                }
-                outputStream.write("exit\n".toByteArray())
-                outputStream.flush()
-
-                val exitCode = process.waitFor()
-
-                if (exitCode != 0) {
-                    val errorStream = process.errorStream.bufferedReader().readText()
-                    XposedBridge.log("$TAG: Shell command failed (exit=$exitCode): $errorStream")
-                    showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorStream))
+                if (runAsRoot) {
+                    val result = Shell.cmd(command).exec()
+                    if (!result.isSuccess) {
+                        val errorMsg = result.err.joinToString("\n")
+                        XposedBridge.log("$TAG: Shell command failed: $errorMsg")
+                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
+                    } else {
+                        val output = result.out.joinToString("\n")
+                        XposedBridge.log("$TAG: Shell command output: $output")
+                        if (output.isNotBlank()) showToast(context, output.take(100))
+                    }
                 } else {
-                    val output = process.inputStream.bufferedReader().readText()
-                    XposedBridge.log("$TAG: Shell command output: $output")
-                    if (output.isNotBlank()) {
-                        showToast(context, output.take(100))
+                    val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+                    p.outputStream.close()
+                    val exitCode = p.waitFor()
+                    if (exitCode != 0) {
+                        val errorMsg = p.errorStream.bufferedReader().readText()
+                        XposedBridge.log("$TAG: Shell command failed (exit=$exitCode): $errorMsg")
+                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
+                    } else {
+                        val output = p.inputStream.bufferedReader().readText()
+                        XposedBridge.log("$TAG: Shell command output: $output")
+                        if (output.isNotBlank()) showToast(context, output.take(100))
                     }
                 }
             } catch (e: Exception) {
