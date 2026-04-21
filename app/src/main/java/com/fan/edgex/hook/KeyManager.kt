@@ -115,7 +115,6 @@ object KeyManager {
             keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
         }
         
-        XposedBridge.log("$TAG: KeyManager config updated - keysEnabled=$keysEnabled")
     }
 
     /**
