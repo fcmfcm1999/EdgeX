@@ -211,6 +211,9 @@ object GestureManager {
                 }
 
                 XposedBridge.log("$TAG: [Gesture] DOWN zone=$zone x=${"%.1f".format(x)} y=${"%.1f".format(y)} pointers=$pointerCount")
+                // Cancel any pending single-click from a previous gesture
+                mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
+                mPendingClickRunnable = null
                 mIsInSection = true
                 mGestureDownTime = System.currentTimeMillis()
                 mActiveZone = zone
