@@ -34,12 +34,9 @@ object KeyManager {
 
     // Supported keys (keyCode -> config index)
     val SUPPORTED_KEYS = mapOf(
-        KeyEvent.KEYCODE_BACK to 0,
-        KeyEvent.KEYCODE_HOME to 1,
-        KeyEvent.KEYCODE_APP_SWITCH to 2,
-        KeyEvent.KEYCODE_MENU to 3,
-        KeyEvent.KEYCODE_VOLUME_UP to 4,
-        KeyEvent.KEYCODE_VOLUME_DOWN to 5
+        KeyEvent.KEYCODE_VOLUME_UP to 0,
+        KeyEvent.KEYCODE_VOLUME_DOWN to 1,
+        KeyEvent.KEYCODE_POWER to 2
     )
 
     // State machine states
@@ -269,19 +266,16 @@ object KeyManager {
         
         // Check if this key is supported
         if (!SUPPORTED_KEYS.containsKey(keyCode)) {
-            XposedBridge.log("$TAG: Key $keyCode not supported")
             return false
         }
         
         // Check if this specific key is enabled
         if (keyEnabled[keyCode] != true) {
-            XposedBridge.log("$TAG: Key $keyCode not enabled")
             return false
         }
         
         // Check if key has any action configured - if not, don't intercept
         if (!hasAnyAction(keyCode)) {
-            XposedBridge.log("$TAG: Key $keyCode has no action configured")
             return false
         }
 
