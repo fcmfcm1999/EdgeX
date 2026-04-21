@@ -146,7 +146,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
                                 ShortcutItem(
                                     packageName = packageName,
                                     shortcutId = shortcut.id,
-                                    label = shortcut.shortLabel?.toString() ?: shortcut.longLabel?.toString() ?: "Unknown",
+                                    label = shortcut.shortLabel?.toString() ?: shortcut.longLabel?.toString() ?: getString(R.string.key_not_configured),
                                     appLabel = appLabel,
                                     icon = icon
                                 )

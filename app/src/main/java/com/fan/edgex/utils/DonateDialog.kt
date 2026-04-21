@@ -283,7 +283,7 @@ object DonateDialog {
             setPadding(dp(12f), dp(10f), dp(12f), dp(10f))
             setOnClickListener {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("Crypto Address", address))
+                clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.label_crypto_address), address))
                 Toast.makeText(context, context.getString(R.string.donate_crypto_copied), Toast.LENGTH_SHORT).show()
             }
             container.addView(this, LinearLayout.LayoutParams(

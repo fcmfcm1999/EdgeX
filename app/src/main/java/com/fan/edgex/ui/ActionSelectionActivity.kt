@@ -27,6 +27,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
         ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
+        ActionItem(getString(R.string.action_lock_screen), "lock_screen", R.drawable.ic_power),
         ActionItem(getString(R.string.action_kill_app), "kill_app", R.drawable.ic_kill_app),
         ActionItem(getString(R.string.action_brightness_up), "brightness_up", R.drawable.ic_brightness_up),
         ActionItem(getString(R.string.action_brightness_down), "brightness_down", R.drawable.ic_brightness_down),
@@ -48,7 +49,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
         // Get Args
-        val title = intent.getStringExtra("title") ?: "Action"
+        val title = intent.getStringExtra("title") ?: getString(R.string.header_action_selection)
         val prefKey = intent.getStringExtra("pref_key") ?: "unknown"
 
         findViewById<TextView>(R.id.tv_subtitle).text = title

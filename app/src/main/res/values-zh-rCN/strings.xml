@@ -49,6 +49,7 @@
     <string name="donate_crypto_eth">ETH (以太坊)</string>
     <string name="donate_crypto_sol">SOL (Solana)</string>
     <string name="donate_crypto_copied">地址已复制</string>
+    <string name="label_crypto_address">加密货币地址</string>
 
     <!-- 手势区域名称 -->
     <string name="zone_left_top">左上</string>
@@ -78,6 +79,12 @@
     <string name="action_refreeze">重新冻结</string>
     <string name="action_screenshot">截屏</string>
     <string name="action_universal_copy">全局复制</string>
+    <string name="action_lock_screen">锁定屏幕</string>
+    <string name="action_kill_app">结束当前应用</string>
+    <string name="action_brightness_up">增加亮度</string>
+    <string name="action_brightness_down">降低亮度</string>
+    <string name="action_volume_up">增加音量</string>
+    <string name="action_volume_down">降低音量</string>
     <string name="action_app_shortcut">应用快捷方式</string>
     <string name="action_shell_command">Shell 命令</string>
 
