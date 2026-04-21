@@ -12,11 +12,6 @@ val localProperties = Properties().apply {
     }
 }
 
-val enableAutoSystemUiRestart = providers
-    .gradleProperty("edgex.enableAutoSystemUiRestart")
-    .orElse(localProperties.getProperty("edgex.enableAutoSystemUiRestart") ?: "false")
-    .get()
-    .toBoolean()
 
 android {
     namespace = Configs.namespace
@@ -34,11 +29,6 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: Configs.versionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField(
-            "boolean",
-            "ENABLE_AUTO_SYSTEMUI_RESTART",
-            enableAutoSystemUiRestart.toString()
-        )
     }
 
     signingConfigs {

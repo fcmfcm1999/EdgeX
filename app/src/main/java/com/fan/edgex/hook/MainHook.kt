@@ -327,11 +327,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                                 XposedBridge.log("$TAG: InputFilter already set by ${existingFilter.javaClass.name}, skipping fake filter")
                             }
                         }
-
-                        if (BuildConfig.ENABLE_AUTO_SYSTEMUI_RESTART) {
-                            XposedBridge.log("$TAG: Auto SystemUI restart enabled for local development")
-                            scheduleSystemUIRestart()
-                        }
                     }
                 })
 
@@ -431,32 +426,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             XposedBridge.log("$TAG: registerFakeInputFilter failed: ${e.message}")
             e.printStackTrace()
         }
-    }
-
-    /**
-     * Local-development workaround for environments where SystemUI injection
-     * is missing after boot. Disabled by default and only enabled via build flag.
-     */
-    private fun scheduleSystemUIRestart() {
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                val activityThread = Class.forName("android.app.ActivityThread")
-                val currentApp = activityThread.getMethod("currentApplication").invoke(null)
-                if (currentApp != null) {
-                    val ctx = currentApp as android.content.Context
-                    val activityManager = ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE)
-                        as android.app.ActivityManager
-                    val processes = activityManager.runningAppProcesses
-                    val systemUIProcess = processes?.find { it.processName == "com.android.systemui" }
-                    if (systemUIProcess != null) {
-                        XposedBridge.log("$TAG: Restarting SystemUI (PID ${systemUIProcess.pid}) for local development")
-                        android.os.Process.killProcess(systemUIProcess.pid)
-                    }
-                }
-            } catch (t: Throwable) {
-                XposedBridge.log("$TAG: SystemUI restart failed: ${t.message}")
-            }
-        }, 15000)
     }
 
     /**
