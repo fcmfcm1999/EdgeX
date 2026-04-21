@@ -1,6 +1,11 @@
 <resources>
     <string name="app_name">EdgeX</string>
 
+    <!-- Gesture Sensitivity -->
+    <string name="sensitivity_settings">Sensitivity</string>
+    <string name="edge_threshold_label">Edge zone width</string>
+    <string name="swipe_threshold_label">Swipe distance</string>
+
     <!-- Screen Headers -->
     <string name="header_main">EdgeX</string>
     <string name="header_gestures">Gestures</string>

@@ -170,6 +170,12 @@ object GestureManager {
 
         if (!isGesturesEnabled()) return false
 
+        // Skip gestures when keyguard (lockscreen) is showing to avoid intercepting unlock swipes
+        try {
+            val km = context.getSystemService(android.app.KeyguardManager::class.java)
+            if (km?.isKeyguardLocked == true) return false
+        } catch (_: Exception) {}
+
         val action = event.actionMasked
         val x = event.rawX
         val y = event.rawY
@@ -184,9 +190,12 @@ object GestureManager {
                 val screenHeight = realSize.y
                 
                 val density = context.resources.displayMetrics.density
-                // Narrow strip (8dp) to avoid conflicting with Android gesture navigation zone (~32dp)
-                val edgeThreshold = 8 * density
-                mSwipeThreshold = 60 * density
+                val edgeThresholdDp = getConfig(AppConfig.EDGE_THRESHOLD_DP).toIntOrNull()
+                    ?: AppConfig.DEFAULT_EDGE_THRESHOLD_DP
+                val swipeThresholdDp = getConfig(AppConfig.SWIPE_THRESHOLD_DP).toIntOrNull()
+                    ?: AppConfig.DEFAULT_SWIPE_THRESHOLD_DP
+                val edgeThreshold = edgeThresholdDp * density
+                mSwipeThreshold = swipeThresholdDp * density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
@@ -802,6 +811,8 @@ object GestureManager {
         query(AppConfig.GESTURES_ENABLED)
         query(AppConfig.DEBUG_MATRIX)
         query(AppConfig.KEYS_ENABLED)
+        query(AppConfig.EDGE_THRESHOLD_DP)
+        query(AppConfig.SWIPE_THRESHOLD_DP)
 
         for (zone in AppConfig.ZONES) {
             query(AppConfig.zoneEnabled(zone))
