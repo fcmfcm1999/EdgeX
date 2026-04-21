@@ -54,6 +54,11 @@ object GestureManager {
     private var mIsInSection = false
     private var mActiveZone: String? = null
     private var mGestureDownTime = 0L  // Timestamp when mIsInSection was set true
+
+    // Continuous adjustment state for brightness/volume swipe actions
+    private var mContinuousAction: String? = null  // set once swipe direction is known
+    private var mLastAdjustY = 0f                  // last Y position where we triggered an adjustment
+    private const val CONTINUOUS_STEP_PX = 30      // pixels of Y travel per one adjustment step
     private const val GESTURE_TIMEOUT_MS = 5000L  // Safety timeout to auto-reset stale gesture state
 
     // Whether we've registered the screen state broadcast receiver (system_server)
@@ -84,6 +89,8 @@ object GestureManager {
         mTargetX = 0f
         mTargetY = 0f
         mGestureDownTime = 0L
+        mContinuousAction = null
+        mLastAdjustY = 0f
         if (wasInSection) {
             XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale mIsInSection")
         }
@@ -224,6 +231,41 @@ object GestureManager {
                     if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
                         mIsSwiping = true
                         XposedBridge.log("$TAG: [Gesture] SWIPING started zone=$mActiveZone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)}")
+
+                        // Determine swipe direction and check if the configured action is continuous
+                        if (abs(dy) >= abs(dx) && mActiveZone != null) {
+                            val gestureType = if (dy < 0) "swipe_up" else "swipe_down"
+                            val configKey = AppConfig.gestureAction(mActiveZone!!, gestureType)
+                            val action = getConfig(configKey)
+                            if (action == "brightness_up" || action == "brightness_down" ||
+                                action == "volume_up" || action == "volume_down") {
+                                mContinuousAction = action
+                                mLastAdjustY = y
+                            }
+                        }
+                    }
+                } else {
+                    // Continuous adjustment: fire once per CONTINUOUS_STEP_PX of vertical travel
+                    val contAction = mContinuousAction
+                    if (contAction != null) {
+                        val delta = mLastAdjustY - y  // positive = finger moved up
+                        if (abs(delta) >= CONTINUOUS_STEP_PX) {
+                            val steps = (abs(delta) / CONTINUOUS_STEP_PX).toInt()
+                            val up = delta > 0
+                            val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
+                            val ctx = context
+                            repeat(steps) {
+                                handler.post {
+                                    when {
+                                        contAction == "brightness_up" || contAction == "brightness_down" ->
+                                            adjustBrightness(ctx, up)
+                                        contAction == "volume_up" || contAction == "volume_down" ->
+                                            adjustVolume(ctx, up)
+                                    }
+                                }
+                            }
+                            mLastAdjustY -= steps * CONTINUOUS_STEP_PX * (if (delta > 0) 1 else -1)
+                        }
                     }
                 }
                 return true // consume while tracking
@@ -255,7 +297,7 @@ object GestureManager {
 
                     XposedBridge.log("$TAG: [Gesture] UP zone=$zone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)} => gestureType=$gestureType pointers=$pointerCount")
 
-                    if (gestureType != null) {
+                    if (gestureType != null && mContinuousAction == null) {
                         triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
                 } else {
@@ -266,6 +308,8 @@ object GestureManager {
                 mActiveZone = null
                 mIsSwiping = false
                 mGestureDownTime = 0L
+                mContinuousAction = null
+                mLastAdjustY = 0f
                 return true // consume
             }
 
@@ -275,6 +319,8 @@ object GestureManager {
                 mActiveZone = null
                 mIsSwiping = false
                 mGestureDownTime = 0L
+                mContinuousAction = null
+                mLastAdjustY = 0f
                 return true // consume
             }
 
@@ -851,7 +897,7 @@ object GestureManager {
             val tasks = am.getRunningTasks(1)
             if (tasks.isNullOrEmpty()) return
             val pkg = tasks[0].topActivity?.packageName ?: return
-            if (pkg == "com.fan.edgex" || pkg == context.packageName) return
+            if (pkg == context.packageName) return
             XposedHelpers.callMethod(am, "forceStopPackage", pkg)
             XposedBridge.log("$TAG: Killed foreground app: $pkg")
         } catch (e: Exception) {
