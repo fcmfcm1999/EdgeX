@@ -241,15 +241,23 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
         var mNativeInstance: Any? = null
         var inputManagerServiceInstance: Any? = null
 
-        // Hook setInputFilter to see when filters are set
+        // Hook setInputFilter: when a real filter is set (e.g. accessibility service),
+        // our fake filter is not needed. When the real filter is removed (set to null),
+        // re-register our fake filter so filterInputEvent keeps firing.
         try {
             XposedHelpers.findAndHookMethod(
                 inputManagerService, "setInputFilter",
                 "android.view.IInputFilter",
                 object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
+                    override fun afterHookedMethod(param: MethodHookParam) {
                         val filter = param.args[0]
+                        val ims = param.thisObject
                         XposedBridge.log("$TAG: setInputFilter called with filter=${filter?.javaClass?.name ?: "null"}")
+                        if (filter == null) {
+                            // Real filter removed — re-register ours to keep the path alive
+                            XposedBridge.log("$TAG: Real InputFilter removed, re-registering fake filter")
+                            registerFakeInputFilter(ims, inputManagerService.classLoader)
+                        }
                     }
                 }
             )
@@ -265,13 +273,12 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 classLoader
             )
 
-            // Hook setInputFilterEnabled to always force true when called
+            // Force InputFilter always enabled — prevents accessibility/system from disabling it
             XposedHelpers.findAndHookMethod(nativeImplClass, "setInputFilterEnabled",
                 Boolean::class.javaPrimitiveType,
                 object : XC_MethodHook() {
                     override fun beforeHookedMethod(param: MethodHookParam) {
-                        // We no longer need to force InputFilter enabled since we use
-                        // interceptKeyBeforeDispatching for keys and overlay for gestures
+                        param.args[0] = true
                     }
                 })
 
@@ -287,17 +294,40 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     }
                 })
 
-            // Also hook start() for any post-initialization needed
+            // Hook start() to enable InputFilter after native layer is ready
             XposedHelpers.findAndHookMethod(inputManagerService, "start",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        // Note: We previously tried to register a fake IInputFilter here,
-                        // but this caused all touch events to be blocked because the
-                        // Binder.onTransact hook interfered with system Binder calls.
-                        // 
-                        // Key interception works via interceptKeyBeforeDispatching hook.
-                        // Touch gestures work via the overlay window in SystemUI.
-                        
+                        try {
+                            val native = mNativeInstance
+                            if (native != null) {
+                                XposedHelpers.callMethod(native, "setInputFilterEnabled", true)
+                                XposedBridge.log("$TAG: InputFilter enabled via mNative.setInputFilterEnabled(true)")
+                            } else {
+                                XposedBridge.log("$TAG: mNative is null at start(), cannot enable InputFilter")
+                            }
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to enable InputFilter in start(): ${t.message}")
+                        }
+
+                        // Register a fake IInputFilter only if no filter is already active.
+                        // On physical devices, accessibility services register their own
+                        // IInputFilter which already activates the filterInputEvent path.
+                        // On AVD (no accessibility services), no filter is ever registered,
+                        // so filterInputEvent is never called without this.
+                        val ims = inputManagerServiceInstance
+                        if (ims != null) {
+                            val existingFilter = try {
+                                XposedHelpers.getObjectField(ims, "mInputFilter")
+                            } catch (_: Throwable) { null }
+                            if (existingFilter == null) {
+                                XposedBridge.log("$TAG: No existing InputFilter, registering fake filter")
+                                registerFakeInputFilter(ims, classLoader)
+                            } else {
+                                XposedBridge.log("$TAG: InputFilter already set by ${existingFilter.javaClass.name}, skipping fake filter")
+                            }
+                        }
+
                         if (BuildConfig.ENABLE_AUTO_SYSTEMUI_RESTART) {
                             XposedBridge.log("$TAG: Auto SystemUI restart enabled for local development")
                             scheduleSystemUIRestart()
@@ -342,6 +372,64 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             XposedBridge.log("$TAG: Hooked legacy nativeSetInputFilterEnabled for InputFilter control")
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: All InputFilter enable approaches failed: ${t.message}")
+        }
+    }
+
+    /**
+     * Register a fake IInputFilter so the native InputDispatcher activates the Java
+     * filterInputEvent path. Without a registered IInputFilter, filterInputEvent is
+     * never called even when InputFilterEnabled=true (happens on AVD with no
+     * accessibility services active).
+     *
+     * The filter immediately forwards every event via IInputFilterHost.sendInputEvent
+     * to avoid blocking dispatch. Our InputManagerService.filterInputEvent hook
+     * observes each event for gesture detection before this forwarding happens.
+     */
+    private fun registerFakeInputFilter(imsInstance: Any, classLoader: ClassLoader) {
+        try {
+            val iInputFilterClass = XposedHelpers.findClass("android.view.IInputFilter", classLoader)
+            val iInputFilterHostClass = XposedHelpers.findClass("android.view.IInputFilterHost", classLoader)
+            val sendInputEvent = iInputFilterHostClass.getMethod(
+                "sendInputEvent",
+                android.view.InputEvent::class.java,
+                Int::class.javaPrimitiveType
+            )
+
+            var hostRef: Any? = null
+
+            val filterProxy = java.lang.reflect.Proxy.newProxyInstance(
+                classLoader,
+                arrayOf(iInputFilterClass),
+                java.lang.reflect.InvocationHandler { _, method, args ->
+                    when (method.name) {
+                        "install" -> {
+                            hostRef = args?.get(0)
+                            XposedBridge.log("$TAG: IInputFilter.install() called, host acquired")
+                        }
+                        "filterInputEvent" -> {
+                            val host = hostRef
+                            val event = args?.get(0) as? android.view.InputEvent
+                            val policyFlags = args?.get(1) as? Int ?: 0
+                            if (host != null && event != null) {
+                                try {
+                                    sendInputEvent.invoke(host, event, policyFlags)
+                                } catch (e: Exception) {
+                                    XposedBridge.log("$TAG: sendInputEvent failed: ${e.message}")
+                                }
+                            }
+                        }
+                        "asBinder" -> android.os.Binder()
+                        else -> null
+                    }
+                    null
+                }
+            )
+
+            XposedHelpers.callMethod(imsInstance, "setInputFilter", filterProxy)
+            XposedBridge.log("$TAG: Registered fake IInputFilter to activate filterInputEvent path")
+        } catch (e: Exception) {
+            XposedBridge.log("$TAG: registerFakeInputFilter failed: ${e.message}")
+            e.printStackTrace()
         }
     }
 
