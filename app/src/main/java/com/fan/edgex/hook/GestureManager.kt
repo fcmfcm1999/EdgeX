@@ -61,6 +61,12 @@ object GestureManager {
     private const val CONTINUOUS_STEP_PX = 30      // pixels of Y travel per one adjustment step
     private const val GESTURE_TIMEOUT_MS = 5000L  // Safety timeout to auto-reset stale gesture state
 
+    // Double-tap detection state
+    private var mLastTapUpTime = 0L
+    private var mLastTapZone: String? = null
+    private var mPendingClickRunnable: Runnable? = null
+    private const val DOUBLE_TAP_TIMEOUT_MS = 300L
+
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
     // Whether we've registered the screen state broadcast receiver (SystemUI)
@@ -91,6 +97,10 @@ object GestureManager {
         mGestureDownTime = 0L
         mContinuousAction = null
         mLastAdjustY = 0f
+        mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
+        mPendingClickRunnable = null
+        mLastTapUpTime = 0L
+        mLastTapZone = null
         if (wasInSection) {
             XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale mIsInSection")
         }
@@ -300,8 +310,39 @@ object GestureManager {
                     if (gestureType != null && mContinuousAction == null) {
                         triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
+                } else if (zone != null) {
+                    // Not swiping — tap: detect click vs double_click
+                    val now = System.currentTimeMillis()
+                    val timeSinceLast = now - mLastTapUpTime
+                    val capturedX = mTargetX
+                    val capturedY = mTargetY
+                    if (timeSinceLast < DOUBLE_TAP_TIMEOUT_MS && mLastTapZone == zone) {
+                        // Double-click: cancel pending single-click and fire double_click
+                        mPendingClickRunnable?.let {
+                            (mHandler ?: Handler(Looper.getMainLooper()).also { h -> mHandler = h }).removeCallbacks(it)
+                        }
+                        mPendingClickRunnable = null
+                        mLastTapUpTime = 0L
+                        mLastTapZone = null
+                        XposedBridge.log("$TAG: [Gesture] UP zone=$zone — double_click detected")
+                        triggerAction(zone, "double_click", context, capturedX, capturedY)
+                    } else {
+                        // Potential single click — wait for a possible second tap
+                        mLastTapUpTime = now
+                        mLastTapZone = zone
+                        val capturedContext = context
+                        val r = Runnable {
+                            mPendingClickRunnable = null
+                            XposedBridge.log("$TAG: [Gesture] click confirmed zone=$zone")
+                            triggerAction(zone, "click", capturedContext, capturedX, capturedY)
+                        }
+                        mPendingClickRunnable = r
+                        val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
+                        handler.postDelayed(r, DOUBLE_TAP_TIMEOUT_MS)
+                        XposedBridge.log("$TAG: [Gesture] UP zone=$zone — tap, waiting for double_click window")
+                    }
                 } else {
-                    XposedBridge.log("$TAG: [Gesture] UP zone=$zone mIsSwiping=$mIsSwiping — no gesture triggered")
+                    XposedBridge.log("$TAG: [Gesture] UP zone=null mIsSwiping=$mIsSwiping — no gesture triggered")
                 }
 
                 mIsInSection = false
