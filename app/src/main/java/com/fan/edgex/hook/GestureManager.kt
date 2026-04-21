@@ -73,8 +73,7 @@ object GestureManager {
     private var screenStateReceiverRegisteredUI = false
 
     private val TOUCH_SLOP = 24
-    
-    private val SWIPE_THRESHOLD = 50
+    private var mSwipeThreshold = 0f  // set in ACTION_DOWN based on screen density
 
     private var mHandler: Handler? = null
 
@@ -185,8 +184,9 @@ object GestureManager {
                 val screenHeight = realSize.y
                 
                 val density = context.resources.displayMetrics.density
-                
-                val edgeThreshold = 12 * density
+                // Narrow strip (8dp) to avoid conflicting with Android gesture navigation zone (~32dp)
+                val edgeThreshold = 8 * density
+                mSwipeThreshold = 60 * density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
@@ -299,11 +299,11 @@ object GestureManager {
                     var gestureType: String? = null
 
                     if (abs(dx) > abs(dy)) {
-                        if (abs(dx) > SWIPE_THRESHOLD) {
+                        if (abs(dx) > mSwipeThreshold) {
                             gestureType = if (dx < 0) "swipe_left" else "swipe_right"
                         }
                     } else {
-                        if (abs(dy) > SWIPE_THRESHOLD) {
+                        if (abs(dy) > mSwipeThreshold) {
                             gestureType = if (dy < 0) "swipe_up" else "swipe_down"
                         }
                     }
