@@ -190,12 +190,8 @@ object GestureManager {
                 val screenHeight = realSize.y
                 
                 val density = context.resources.displayMetrics.density
-                val edgeThresholdDp = getConfig(AppConfig.EDGE_THRESHOLD_DP).toIntOrNull()
-                    ?: AppConfig.DEFAULT_EDGE_THRESHOLD_DP
-                val swipeThresholdDp = getConfig(AppConfig.SWIPE_THRESHOLD_DP).toIntOrNull()
-                    ?: AppConfig.DEFAULT_SWIPE_THRESHOLD_DP
-                val edgeThreshold = edgeThresholdDp * density
-                mSwipeThreshold = swipeThresholdDp * density
+                val edgeThreshold = 8 * density
+                mSwipeThreshold = 60 * density
                 val isInLeftEdge = x < edgeThreshold
                 val isInRightEdge = x > (screenWidth - edgeThreshold)
 
@@ -820,8 +816,6 @@ object GestureManager {
         query(AppConfig.GESTURES_ENABLED)
         query(AppConfig.DEBUG_MATRIX)
         query(AppConfig.KEYS_ENABLED)
-        query(AppConfig.EDGE_THRESHOLD_DP)
-        query(AppConfig.SWIPE_THRESHOLD_DP)
 
         for (zone in AppConfig.ZONES) {
             query(AppConfig.zoneEnabled(zone))

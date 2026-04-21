@@ -6,7 +6,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
-import android.widget.SeekBar
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
@@ -26,7 +25,6 @@ class GesturesActivity : AppCompatActivity() {
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
         // Initialize Zones with specific icons
-        setupSensitivity()
         setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
         setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
         setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
@@ -45,43 +43,6 @@ class GesturesActivity : AppCompatActivity() {
         setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
         setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
         setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
-    }
-
-    private fun setupSensitivity() {
-        val edgeSeekbar = findViewById<SeekBar>(R.id.seekbar_edge_threshold)
-        val edgeValue = findViewById<TextView>(R.id.tv_edge_threshold_value)
-        val swipeSeekbar = findViewById<SeekBar>(R.id.seekbar_swipe_threshold)
-        val swipeValue = findViewById<TextView>(R.id.tv_swipe_threshold_value)
-
-        val edgeDp = getConfigString(AppConfig.EDGE_THRESHOLD_DP)
-            .toIntOrNull() ?: AppConfig.DEFAULT_EDGE_THRESHOLD_DP
-        val swipeDp = getConfigString(AppConfig.SWIPE_THRESHOLD_DP)
-            .toIntOrNull() ?: AppConfig.DEFAULT_SWIPE_THRESHOLD_DP
-
-        edgeSeekbar.progress = edgeDp
-        edgeValue.text = "${edgeDp}dp"
-        swipeSeekbar.progress = swipeDp
-        swipeValue.text = "${swipeDp}dp"
-
-        edgeSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                edgeValue.text = "${progress}dp"
-            }
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {
-                putConfig(AppConfig.EDGE_THRESHOLD_DP, sb.progress.toString())
-            }
-        })
-
-        swipeSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                swipeValue.text = "${progress}dp"
-            }
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {
-                putConfig(AppConfig.SWIPE_THRESHOLD_DP, sb.progress.toString())
-            }
-        })
     }
 
     private fun setupZone(root: View, title: String, zoneKey: String, iconRes: Int) {

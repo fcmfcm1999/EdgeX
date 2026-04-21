@@ -11,11 +11,6 @@ object AppConfig {
     const val FREEZER_APP_LIST = "freezer_app_list"
     const val HAS_INIT_FREEZER = "has_init_freezer_list"
 
-    const val EDGE_THRESHOLD_DP = "edge_threshold_dp"
-    const val SWIPE_THRESHOLD_DP = "swipe_threshold_dp"
-    const val DEFAULT_EDGE_THRESHOLD_DP = 8
-    const val DEFAULT_SWIPE_THRESHOLD_DP = 60
-
     val ZONES = listOf("left_top", "left_mid", "left_bottom", "right_top", "right_mid", "right_bottom")
     val GESTURES = listOf("click", "double_click", "long_press", "swipe_up", "swipe_down", "swipe_left", "swipe_right")
     val KEY_TRIGGERS = listOf("click", "double_click", "long_press")
