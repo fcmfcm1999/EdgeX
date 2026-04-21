@@ -160,16 +160,10 @@ object KeyManager {
         // We activate passthrough so subsequent presses control volume normally.
         if (isVolumeKey(event.keyCode)) {
             volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
-            XposedBridge.log("$TAG: Injected volume key — entering passthrough for ${VOLUME_PASSTHROUGH_DURATION}ms")
+            XposedBridge.log("$TAG: KeyManager power/volume activity — entering passthrough for ${VOLUME_PASSTHROUGH_DURATION}ms")
         }
         
         // Clean up old entries (keep only last 10)
-        if (injectedEventTimes.size > 10) {
-            val toRemove = injectedEventTimes.take(injectedEventTimes.size - 10)
-            injectedEventTimes.removeAll(toRemove.toSet())
-        }
-        
-        XposedBridge.log("$TAG: Marking event as injected: eventTime=${event.eventTime}")
         
         try {
             // Try InputManager.getInstance()
@@ -216,7 +210,6 @@ object KeyManager {
         val downEvent = pendingDownEvents[keyCode]
         val upEvent = pendingUpEvents[keyCode]
         
-        XposedBridge.log("$TAG: forwardKeyEvents - downEvent=${downEvent?.keyCode}, upEvent=${upEvent?.keyCode}")
         
         if (downEvent != null) {
             injectKeyEvent(downEvent, context)
@@ -242,7 +235,6 @@ object KeyManager {
         val keyCode = event.keyCode
         val eventTime = event.eventTime
         
-        XposedBridge.log("$TAG: handleKeyEvent keyCode=$keyCode action=${event.action} eventTime=$eventTime injectedTimes=$injectedEventTimes keysEnabled=$keysEnabled keyEnabled=${keyEnabled[keyCode]}")
         
         // Skip events that we injected ourselves (to avoid infinite loop)
         // Method 1: Check policyFlags (if injection method supports it)

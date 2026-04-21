@@ -222,7 +222,6 @@ object GestureManager {
                     return false
                 }
 
-                XposedBridge.log("$TAG: [Gesture] DOWN zone=$zone x=${"%.1f".format(x)} y=${"%.1f".format(y)} pointers=$pointerCount")
                 // Cancel any pending single-click from a previous gesture
                 mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
                 mPendingClickRunnable = null
@@ -238,7 +237,6 @@ object GestureManager {
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
-                XposedBridge.log("$TAG: [Gesture] POINTER_DOWN pointers=$pointerCount mIsInSection=$mIsInSection — cancelling gesture")
                 // Extra finger added: cancel the gesture to avoid direction confusion
                 mIsInSection = false
                 mActiveZone = null
@@ -255,7 +253,6 @@ object GestureManager {
                     val dy = y - mDownY
                     if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
                         mIsSwiping = true
-                        XposedBridge.log("$TAG: [Gesture] SWIPING started zone=$mActiveZone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)}")
 
                         // Determine swipe direction and check if the configured action is continuous
                         if (abs(dy) >= abs(dx) && mActiveZone != null) {
@@ -320,8 +317,6 @@ object GestureManager {
                         }
                     }
 
-                    XposedBridge.log("$TAG: [Gesture] UP zone=$zone dx=${"%.1f".format(dx)} dy=${"%.1f".format(dy)} => gestureType=$gestureType pointers=$pointerCount")
-
                     if (gestureType != null && mContinuousAction == null) {
                         triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
@@ -333,8 +328,7 @@ object GestureManager {
                         .let { it.isNotEmpty() && it != "none" }
 
                     if (!hasDoubleClickAction) {
-                        // No double_click configured: fire click immediately, no delay needed
-                        XposedBridge.log("$TAG: [Gesture] UP zone=$zone — immediate click (no double_click configured)")
+                        // No double_click configured: fire click immediately
                         triggerAction(zone, "click", context, capturedX, capturedY)
                     } else {
                         val now = System.currentTimeMillis()
@@ -347,7 +341,6 @@ object GestureManager {
                             mPendingClickRunnable = null
                             mLastTapUpTime = 0L
                             mLastTapZone = null
-                            XposedBridge.log("$TAG: [Gesture] UP zone=$zone — double_click detected")
                             triggerAction(zone, "double_click", context, capturedX, capturedY)
                         } else {
                             // Has double_click configured: wait 300ms to distinguish from double-tap
@@ -356,17 +349,13 @@ object GestureManager {
                             val capturedContext = context
                             val r = Runnable {
                                 mPendingClickRunnable = null
-                                XposedBridge.log("$TAG: [Gesture] click confirmed zone=$zone")
                                 triggerAction(zone, "click", capturedContext, capturedX, capturedY)
                             }
                             mPendingClickRunnable = r
                             val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
                             handler.postDelayed(r, DOUBLE_TAP_TIMEOUT_MS)
-                            XposedBridge.log("$TAG: [Gesture] UP zone=$zone — tap, waiting for double_click window")
                         }
                     }
-                } else {
-                    XposedBridge.log("$TAG: [Gesture] UP zone=null mIsSwiping=$mIsSwiping — no gesture triggered")
                 }
 
                 mIsInSection = false
@@ -379,7 +368,6 @@ object GestureManager {
             }
 
             MotionEvent.ACTION_CANCEL -> {
-                XposedBridge.log("$TAG: [Gesture] CANCEL zone=$mActiveZone")
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
