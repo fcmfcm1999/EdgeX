@@ -425,8 +425,6 @@ object GestureManager {
             KeyManager.init(context)
             registerScreenStateReceiver(context)
             registerConfigObserver(context)
-        } else {
-            reloadConfigAsync()
         }
 
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
@@ -840,11 +838,8 @@ object GestureManager {
     private fun isZoneEnabled(zone: String): Boolean =
         getConfig(AppConfig.zoneEnabled(zone)) == "true"
 
-    // NEVER call synchronously on the InputDispatcher thread — use cached value only.
-    private fun getConfig(key: String, defValue: String = ""): String {
-        reloadConfigAsync()
-        return configCache[key] ?: defValue
-    }
+    private fun getConfig(key: String, defValue: String = ""): String =
+        configCache[key] ?: defValue
 
     private fun queryConfigProvider(key: String): String {
         val ctx = systemContext ?: systemUIContext ?: return ""
