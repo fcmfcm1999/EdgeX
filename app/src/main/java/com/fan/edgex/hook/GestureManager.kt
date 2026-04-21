@@ -55,6 +55,9 @@ object GestureManager {
     private var mIsInSection = false
     private var mActiveZone: String? = null
     private var mGestureDownTime = 0L  // Timestamp when mIsInSection was set true
+    // For left-edge zones: DOWN is not consumed so the system back gesture can proceed.
+    // Once we determine it's NOT a back swipe (rightward), we switch to consuming events.
+    private var mLeftEdgeConsuming = false
 
     // Continuous adjustment state for brightness/volume swipe actions
     private var mContinuousAction: String? = null  // set once swipe direction is known
@@ -97,6 +100,7 @@ object GestureManager {
         mGestureDownTime = 0L
         mContinuousAction = null
         mLastAdjustY = 0f
+        mLeftEdgeConsuming = false
         mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
         mPendingClickRunnable = null
         mLastTapUpTime = 0L
@@ -233,7 +237,17 @@ object GestureManager {
                 mTargetX = x
                 mTargetY = y
                 mIsSwiping = false
-                return true // consume: prevent app from seeing edge touch
+                // For left-edge zones, don't consume DOWN so the system back gesture handler
+                // still sees the event and can recognise a rightward (inward) swipe as back.
+                // mLeftEdgeConsuming starts false; we switch to true only once the direction
+                // is clearly NOT a back swipe.
+                return if (isInLeftEdge) {
+                    mLeftEdgeConsuming = false
+                    false
+                } else {
+                    mLeftEdgeConsuming = true
+                    true // consume: prevent app from seeing right-edge touch
+                }
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
@@ -253,6 +267,18 @@ object GestureManager {
                     val dy = y - mDownY
                     if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
                         mIsSwiping = true
+
+                        // For left-edge zones: if the first significant movement is rightward
+                        // (dx > 0, abs(dx) > abs(dy)), this is the system back gesture direction.
+                        // Stop tracking and let the system handle it.
+                        if (!mLeftEdgeConsuming && mActiveZone?.startsWith("left") == true) {
+                            if (dx > 0 && abs(dx) > abs(dy)) {
+                                resetGestureState()
+                                return false
+                            }
+                            // It's a tap, upward, or downward swipe — take ownership from here.
+                            mLeftEdgeConsuming = true
+                        }
 
                         // Determine swipe direction and check if the configured action is continuous
                         if (abs(dy) >= abs(dx) && mActiveZone != null) {
@@ -290,7 +316,7 @@ object GestureManager {
                         }
                     }
                 }
-                return true // consume while tracking
+                return mLeftEdgeConsuming // only consume once we've ruled out back gesture
             }
 
             MotionEvent.ACTION_UP -> {
@@ -321,7 +347,9 @@ object GestureManager {
                         triggerAction(zone, gestureType, context, mTargetX, mTargetY)
                     }
                 } else if (zone != null) {
-                    // Not swiping — tap: detect click vs double_click
+                    // Not swiping — tap: take ownership now (for left-edge where DOWN wasn't consumed)
+                    mLeftEdgeConsuming = true
+                    // detect click vs double_click
                     val capturedX = mTargetX
                     val capturedY = mTargetY
                     val hasDoubleClickAction = getConfig(AppConfig.gestureAction(zone, "double_click"))
@@ -358,13 +386,15 @@ object GestureManager {
                     }
                 }
 
+                val wasConsuming = mLeftEdgeConsuming
                 mIsInSection = false
                 mActiveZone = null
                 mIsSwiping = false
                 mGestureDownTime = 0L
                 mContinuousAction = null
                 mLastAdjustY = 0f
-                return true // consume
+                mLeftEdgeConsuming = false
+                return wasConsuming
             }
 
             MotionEvent.ACTION_CANCEL -> {
@@ -374,7 +404,8 @@ object GestureManager {
                 mGestureDownTime = 0L
                 mContinuousAction = null
                 mLastAdjustY = 0f
-                return true // consume
+                mLeftEdgeConsuming = false
+                return false
             }
 
             else -> {
