@@ -126,6 +126,11 @@ object GestureManager {
                     Intent.ACTION_SCREEN_ON -> {
                         XposedBridge.log("$TAG: SCREEN_ON — state is clean")
                     }
+                    Intent.ACTION_USER_UNLOCKED -> {
+                        XposedBridge.log("$TAG: USER_UNLOCKED — reloading config post-FBE")
+                        lastConfigLoad = 0
+                        reloadConfigAsync()
+                    }
                 }
             }
         }
@@ -134,6 +139,7 @@ object GestureManager {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_UNLOCKED)
             }
             context.registerReceiver(receiver, filter)
             XposedBridge.log("$TAG: Screen state receiver registered in system_server")
