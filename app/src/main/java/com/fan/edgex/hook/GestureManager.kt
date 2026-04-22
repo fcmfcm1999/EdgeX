@@ -237,16 +237,19 @@ object GestureManager {
                 mTargetX = x
                 mTargetY = y
                 mIsSwiping = false
-                // For left-edge zones, don't consume DOWN so the system back gesture handler
-                // still sees the event and can recognise a rightward (inward) swipe as back.
-                // mLeftEdgeConsuming starts false; we switch to true only once the direction
-                // is clearly NOT a back swipe.
-                return if (isInLeftEdge) {
+                // If the inward swipe (system back direction) has no action configured, don't
+                // consume DOWN so the system back gesture can still recognise a back swipe.
+                // mLeftEdgeConsuming starts false; we switch to true once direction is NOT inward.
+                // If inward swipe IS configured, consume immediately (we'll handle it ourselves).
+                val inwardGesture = if (isInLeftEdge) "swipe_right" else "swipe_left"
+                val hasInwardAction = getConfig(AppConfig.gestureAction(zone, inwardGesture))
+                    .let { it.isNotEmpty() && it != "none" }
+                return if (!hasInwardAction) {
                     mLeftEdgeConsuming = false
                     false
                 } else {
                     mLeftEdgeConsuming = true
-                    true // consume: prevent app from seeing right-edge touch
+                    true
                 }
             }
 
@@ -268,15 +271,18 @@ object GestureManager {
                     if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
                         mIsSwiping = true
 
-                        // For left-edge zones: if the first significant movement is rightward
-                        // (dx > 0, abs(dx) > abs(dy)), this is the system back gesture direction.
-                        // Stop tracking and let the system handle it.
-                        if (!mLeftEdgeConsuming && mActiveZone?.startsWith("left") == true) {
-                            if (dx > 0 && abs(dx) > abs(dy)) {
+                        // If inward swipe had no action, check if this first movement is inward
+                        // (system back gesture direction). If so, reset and let the system handle it.
+                        if (!mLeftEdgeConsuming && mActiveZone != null) {
+                            val isInward = if (mActiveZone!!.startsWith("left"))
+                                dx > 0 && abs(dx) > abs(dy)
+                            else
+                                dx < 0 && abs(dx) > abs(dy)
+                            if (isInward) {
                                 resetGestureState()
                                 return false
                             }
-                            // It's a tap, upward, or downward swipe — take ownership from here.
+                            // Not inward — take ownership from here.
                             mLeftEdgeConsuming = true
                         }
 
