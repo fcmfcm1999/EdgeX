@@ -68,10 +68,11 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             // Always transparent - drawer content has its own background
             setBackgroundColor(Color.TRANSPARENT)
 
-            // Focusable for key events (back key), but NOT focusableInTouchMode
-            // to avoid consuming the first touch for focus acquisition.
+            // Focusable for key events (back key).
+            // We set isFocusableInTouchMode = true to prevent Android from 
+            // swallowing the first touch event during touch mode transition.
             isFocusable = true
-            isFocusableInTouchMode = false
+            isFocusableInTouchMode = true
         }
 
         // --- Content Loading ---
