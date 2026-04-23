@@ -40,6 +40,8 @@ object TextSelectionOverlay {
     private var copyButton: WeakReference<TextView>? = null
     private var selectAllButton: WeakReference<TextView>? = null
 
+    fun isShowing(): Boolean = currentOverlay?.get() != null
+
     private class SelectableBlock(
         val text: String,
         val bounds: Rect,

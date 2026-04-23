@@ -17,6 +17,7 @@ internal class EdgeGestureDetector(
         fun resolveAction(zone: String, gestureType: String): String
         fun dispatchAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float)
         fun performContinuousAdjustment(action: String, context: Context, up: Boolean)
+        fun isGlobalCopyModeActive(): Boolean
         fun log(message: String)
     }
 
@@ -90,6 +91,14 @@ internal class EdgeGestureDetector(
     }
 
     private fun handleDown(event: MotionEvent, context: Context): Boolean {
+        if (callbacks.isGlobalCopyModeActive()) {
+            if (activeSession != null) {
+                callbacks.log("Global copy mode active on DOWN — clearing stale gesture session")
+                reset()
+            }
+            return false
+        }
+
         val zoneMatch = resolveEdgeZone(context, event.rawX, event.rawY) ?: run {
             if (activeSession != null) {
                 callbacks.log("DOWN outside edge while sessionActive=true — resetting state")

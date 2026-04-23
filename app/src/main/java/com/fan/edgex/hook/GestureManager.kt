@@ -95,6 +95,9 @@ object GestureManager {
                     }
                 }
 
+                override fun isGlobalCopyModeActive(): Boolean =
+                    TextSelectionOverlay.isShowing()
+
                 override fun log(message: String) {
                     gestureLog(message)
                 }
