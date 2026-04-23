@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.addTextChangedListener
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.putConfig
 import androidx.lifecycle.lifecycleScope
@@ -48,6 +49,7 @@ class FreezerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_freezer)
+        FreezerBootstrap.ensureMigrated(this)
 
         // Header Insets
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
@@ -216,7 +218,8 @@ class FreezerActivity : AppCompatActivity() {
         btnFreeze.setOnClickListener {
             if (runRootCommand("pm disable ${app.info.packageName}")) {
                 Toast.makeText(this, getString(R.string.toast_frozen, app.label), Toast.LENGTH_SHORT).show()
-                refreshApp(app)
+                updateFreezerList(app.info.packageName, true)
+                refreshApp()
                 dialog.dismiss()
             } else {
                 Toast.makeText(this, getString(R.string.toast_freeze_failed), Toast.LENGTH_SHORT).show()
@@ -226,7 +229,8 @@ class FreezerActivity : AppCompatActivity() {
         btnUnfreeze.setOnClickListener {
              if (runRootCommand("pm enable ${app.info.packageName}")) {
                 Toast.makeText(this, getString(R.string.toast_unfrozen, app.label), Toast.LENGTH_SHORT).show()
-                refreshApp(app)
+                updateFreezerList(app.info.packageName, false)
+                refreshApp()
                 dialog.dismiss()
             } else {
                 Toast.makeText(this, getString(R.string.toast_unfreeze_failed), Toast.LENGTH_SHORT).show()
@@ -237,7 +241,7 @@ class FreezerActivity : AppCompatActivity() {
         dialog.show()
     }
     
-    private fun refreshApp(app: AppItem) {
+    private fun refreshApp() {
         loadApps()
     }
 

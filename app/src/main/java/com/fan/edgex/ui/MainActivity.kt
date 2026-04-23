@@ -1,22 +1,16 @@
 package com.fan.edgex.ui
 
-import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
-import com.fan.edgex.config.configPrefs
+import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.utils.UpdateChecker
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
@@ -38,34 +32,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         
-        val prefs = configPrefs()
-
-        // Auto-populate freezer list if not yet initialized
-        if (!getConfigBool(AppConfig.HAS_INIT_FREEZER)) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                val pm = packageManager
-                val rawApps = pm.getInstalledApplications(0)
-                val disabledNonSystemApps = rawApps.filter { info ->
-                    !info.enabled && (info.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-                }.map { it.packageName }
-
-                android.util.Log.d("EdgeX", "Auto-init scan: found ${disabledNonSystemApps.size} apps: $disabledNonSystemApps")
-
-                val currentList = prefs.getString(AppConfig.FREEZER_APP_LIST, "") ?: ""
-                val currentSet = if (currentList.isEmpty()) mutableSetOf() else currentList.split(",").toMutableSet()
-                val changed = disabledNonSystemApps.any { currentSet.add(it) }
-
-                if (changed) {
-                    android.util.Log.d("EdgeX", "Saving auto-init freezer list: ${currentSet.joinToString(",")}")
-                    prefs.edit().putString(AppConfig.FREEZER_APP_LIST, currentSet.joinToString(",")).apply()
-                    withContext(Dispatchers.Main) {
-                        putConfig(AppConfig.HAS_INIT_FREEZER, true)
-                    }
-                } else {
-                    putConfig(AppConfig.HAS_INIT_FREEZER, true)
-                }
-            }
-        }
+        FreezerBootstrap.ensureMigrated(this)
 
         val cbGestures = findViewById<android.widget.CheckBox>(R.id.checkbox_gestures)
         cbGestures.isChecked = getConfigBool(AppConfig.GESTURES_ENABLED)

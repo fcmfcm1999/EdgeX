@@ -11,10 +11,26 @@ fun Context.configPrefs(): SharedPreferences =
 
 fun Context.putConfig(key: String, value: String) {
     configPrefs().edit().putString(key, value).apply()
-    contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
+    notifyConfigChanged(listOf(key))
 }
 
 fun Context.putConfig(key: String, value: Boolean) = putConfig(key, value.toString())
+
+fun Context.putConfigsSync(vararg entries: Pair<String, String>): Boolean {
+    if (entries.isEmpty()) return true
+
+    val committed = configPrefs().edit().apply {
+        entries.forEach { (key, value) ->
+            putString(key, value)
+        }
+    }.commit()
+
+    if (committed) {
+        notifyConfigChanged(entries.map { it.first }.distinct())
+    }
+
+    return committed
+}
 
 // Reads for UI. Includes a legacy fallback for values previously stored as native booleans.
 fun Context.getConfigString(key: String, default: String = ""): String =
@@ -25,3 +41,10 @@ fun Context.getConfigBool(key: String, default: Boolean = false): Boolean =
         runCatching { getString(key, null) }.getOrNull()?.toBooleanStrictOrNull()
             ?: runCatching { getBoolean(key, default) }.getOrDefault(default)
     }
+
+private fun Context.notifyConfigChanged(keys: Collection<String>) {
+    keys.forEach { key ->
+        contentResolver.notifyChange(ConfigProvider.uriForKey(key), null)
+    }
+    contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
+}

@@ -309,8 +309,9 @@ internal class GestureActionDispatcher(
         val handler = Handler(Looper.getMainLooper())
         Thread {
             try {
-                val packageList = mutableListOf<String>()
-                val cursor: Cursor? = systemContextProvider()?.contentResolver?.query(
+                val pm = context.packageManager
+                val packageSet = linkedSetOf<String>()
+                val cursor: Cursor? = configResolver(context).query(
                     Uri.withAppendedPath(configUri, AppConfig.FREEZER_APP_LIST),
                     null,
                     null,
@@ -321,30 +322,28 @@ internal class GestureActionDispatcher(
                     if (it.moveToFirst()) {
                         val listStr = it.getString(0)
                         if (!listStr.isNullOrEmpty()) {
-                            packageList.addAll(listStr.split(","))
+                            packageSet.addAll(
+                                listStr.split(",")
+                                    .map { pkg -> pkg.trim() }
+                                    .filter { pkg -> pkg.isNotEmpty() },
+                            )
                         }
                     }
                 }
 
-                if (packageList.isEmpty()) {
-                    val historySet = DrawerManager.frozenAppsHistory
-                    if (historySet.isEmpty()) {
-                        handler.post {
-                            Toast.makeText(
-                                context,
-                                ModuleRes.getString(R.string.toast_freezer_list_empty),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                        return@Thread
+                if (packageSet.isEmpty()) {
+                    handler.post {
+                        Toast.makeText(
+                            context,
+                            ModuleRes.getString(R.string.toast_freezer_list_empty),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     }
-                    packageList.addAll(historySet)
+                    return@Thread
                 }
 
-                val pm = context.packageManager
                 var count = 0
-                for (pkg in packageList) {
-                    if (pkg.isBlank()) continue
+                for (pkg in packageSet) {
                     try {
                         val info = pm.getApplicationInfo(pkg, 0)
                         if (info.enabled) {
@@ -397,6 +396,11 @@ internal class GestureActionDispatcher(
             }
         }.start()
     }
+
+    private fun configResolver(context: Context) =
+        systemContextProvider()?.contentResolver
+            ?: systemUiContextProvider()?.contentResolver
+            ?: context.contentResolver
 
     private fun performScreenshot(context: Context) {
         val now = SystemClock.uptimeMillis()

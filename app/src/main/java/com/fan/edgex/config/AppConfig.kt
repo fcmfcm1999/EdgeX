@@ -9,7 +9,7 @@ object AppConfig {
     const val DEBUG_MATRIX = "debug_matrix_enabled"
     const val FREEZER_ARC_DRAWER = "freezer_arc_drawer_enabled"
     const val FREEZER_APP_LIST = "freezer_app_list"
-    const val HAS_INIT_FREEZER = "has_init_freezer_list"
+    const val HAS_MIGRATED_FREEZER_LIST = "has_migrated_freezer_list"
 
     val ZONES = listOf("left_top", "left_mid", "left_bottom", "right_top", "right_mid", "right_bottom")
     val GESTURES = listOf("click", "double_click", "long_press", "swipe_up", "swipe_down", "swipe_left", "swipe_right")

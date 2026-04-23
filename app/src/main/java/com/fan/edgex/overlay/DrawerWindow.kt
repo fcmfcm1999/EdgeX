@@ -81,6 +81,8 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         val displayApps = mutableListOf<android.content.pm.ResolveInfo>()
 
         try {
+            val configuredPackages = linkedSetOf<String>()
+
             // 0. Load Persistent Freezer List from ConfigProvider
             try {
                 context.contentResolver.query(
@@ -90,9 +92,11 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                     if (it.moveToFirst()) {
                         val listStr = it.getString(0)
                         if (!listStr.isNullOrEmpty()) {
-                            // Add to session history
-                            val packages = listStr.split(",")
-                            DrawerManager.frozenAppsHistory.addAll(packages)
+                            configuredPackages.addAll(
+                                listStr.split(",")
+                                    .map { pkg -> pkg.trim() }
+                                    .filter { pkg -> pkg.isNotEmpty() },
+                            )
                         }
                     }
                 }
@@ -103,27 +107,16 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             // Find all launcher activities
             val mainIntent = Intent(Intent.ACTION_MAIN, null)
             mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-            
-            // Get everything allowed
+
             val allActivities = pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
-            
-            // 1. Update History with currently frozen apps (Auto-discovery)
+
             for (resolveInfo in allActivities) {
                 val appInfo = resolveInfo.activityInfo.applicationInfo
-                 if (!appInfo.enabled) {
-                     DrawerManager.frozenAppsHistory.add(appInfo.packageName)
-                 }
+                if (configuredPackages.contains(appInfo.packageName)) {
+                    displayApps.add(resolveInfo)
+                }
             }
 
-            // 2. Display Apps from History (Union of Persistent + Auto-detected)
-            for (resolveInfo in allActivities) {
-                 val appInfo = resolveInfo.activityInfo.applicationInfo
-                 // Only show if it is in our Freezer History
-                 if (DrawerManager.frozenAppsHistory.contains(appInfo.packageName)) {
-                     displayApps.add(resolveInfo)
-                 }
-            }
-            
             // Sort by Name (Stable)
             displayApps.sortWith(Comparator { o1, o2 ->
                 val label1 = o1.loadLabel(pm).toString()
