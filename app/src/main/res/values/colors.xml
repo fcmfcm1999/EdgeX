@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Brand Colors -->
-    <color name="purple_200">#FF80CBC4</color>
-    <color name="purple_500">#FF009688</color>
-    <color name="purple_700">#FF00796B</color>
-    <color name="teal_200">#FF80CBC4</color>
-    <color name="teal_700">#FF00796B</color>
+    <color name="purple_200">#FF326D32</color>
+    <color name="purple_500">#FF326D32</color>
+    <color name="purple_700">#FF285828</color>
+    <color name="teal_200">#FF326D32</color>
+    <color name="teal_700">#FF285828</color>
     
     <!-- Core Colors -->
     <color name="black">#FF000000</color>
