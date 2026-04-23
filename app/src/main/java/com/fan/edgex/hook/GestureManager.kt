@@ -337,6 +337,9 @@ object GestureManager {
         val session = mGestureSession ?: return false
 
         if (session.isSwiping) {
+            if (shouldProxyToNative(session)) {
+                injectEventInternal(context, event)
+            }
             return finishGestureSession()
         }
 
