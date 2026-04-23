@@ -5,27 +5,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.database.Cursor
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
-
 import android.view.WindowManager
-import android.widget.Toast
-import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.overlay.DrawerManager
-import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 
 @SuppressLint("StaticFieldLeak")
 object GestureManager {
@@ -57,6 +50,18 @@ object GestureManager {
     private val nativeTouchHandoff = NativeTouchHandoff { message ->
         XposedBridge.log("$TAG: $message")
     }
+    private val actionDispatcher by lazy {
+        GestureActionDispatcher(
+            configUri = CONFIG_URI,
+            actionBroadcast = ACTION_PERFORM,
+            actionExtra = EXTRA_ACTION,
+            resolveConfig = ::getConfig,
+            systemContextProvider = { systemContext },
+            systemUiContextProvider = { systemUIContext },
+            handlerProvider = ::mainHandler,
+            log = { message -> XposedBridge.log("$TAG: $message") },
+        )
+    }
     private val gestureDetector by lazy {
         EdgeGestureDetector(
             handoff = nativeTouchHandoff,
@@ -75,15 +80,15 @@ object GestureManager {
                     touchX: Float,
                     touchY: Float,
                 ) {
-                    triggerAction(zone, gestureType, context, touchX, touchY)
+                    actionDispatcher.triggerGestureAction(zone, gestureType, context, touchX, touchY)
                 }
 
                 override fun performContinuousAdjustment(action: String, context: Context, up: Boolean) {
                     when {
                         action == "brightness_up" || action == "brightness_down" ->
-                            adjustBrightness(context, up)
+                            actionDispatcher.adjustBrightness(context, up)
                         action == "volume_up" || action == "volume_down" ->
-                            adjustVolume(context, up)
+                            actionDispatcher.adjustVolume(context, up)
                     }
                 }
 
@@ -187,10 +192,7 @@ object GestureManager {
      * Execute an action triggered by a key press (called from KeyManager).
      */
     fun executeKeyAction(action: String, context: Context) {
-        val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
-        handler.post {
-            performAction(action, context, 0f, 0f)
-        }
+        actionDispatcher.executeKeyAction(action, context)
     }
 
     /**
@@ -230,7 +232,7 @@ object GestureManager {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-                performActionInSystemUI(action, context)
+                actionDispatcher.handleSystemUiAction(action, context)
             }
         }
 
@@ -609,447 +611,4 @@ object GestureManager {
         return ""
     }
 
-    // ======== Action Handling ========
-
-    private fun triggerAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float) {
-        val configKey = AppConfig.gestureAction(zone, gestureType)
-        val action = getConfig(configKey)
-
-        XposedBridge.log("$TAG: [Gesture] triggerAction key=$configKey action='$action'")
-
-        if (action.isNotEmpty() && action != "none") {
-            // Post to main handler — NEVER block the InputDispatcher thread with action execution
-            val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
-            handler.post {
-                performAction(action, context, touchX, touchY)
-            }
-        }
-    }
-    /**
-     * Called from system_server process. For shell-based actions, execute directly.
-     * For UI actions (drawer, toast, etc.), send broadcast to SystemUI.
-     */
-    private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
-        XposedBridge.log("$TAG: performAction called with action='$action'")
-        when {
-            action == "back" -> {
-                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_BACK")
-                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
-                XposedBridge.log("$TAG: GLOBAL_ACTION_BACK result=$result")
-            }
-            action == "home" -> {
-                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_HOME")
-                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_HOME)
-                XposedBridge.log("$TAG: GLOBAL_ACTION_HOME result=$result")
-            }
-            action == "recent" || action == "recents" -> {
-                XposedBridge.log("$TAG: Performing GLOBAL_ACTION_RECENTS")
-                val result = GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
-                XposedBridge.log("$TAG: GLOBAL_ACTION_RECENTS result=$result")
-            }
-            action == "notifications" -> {
-                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_NOTIFICATIONS)
-            }
-            action == "quick_settings" -> {
-                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_QUICK_SETTINGS)
-            }
-            action == "power_dialog" -> {
-                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_POWER_DIALOG)
-            }
-            action == "lock_screen" -> {
-                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_LOCK_SCREEN)
-            }
-            action == "kill_app" -> {
-                killForegroundApp(context)
-            }
-            action == "brightness_up" || action == "brightness_down" -> {
-                adjustBrightness(context, action == "brightness_up")
-            }
-            action == "volume_up" || action == "volume_down" -> {
-                adjustVolume(context, action == "volume_up")
-            }
-            action == "screenshot" -> {
-                performScreenshot(context)
-            }
-            action == "universal_copy" -> {
-                UniversalCopyManager.collectAllTexts(context) { result ->
-                    when (result.status) {
-                        UniversalCopyManager.CollectStatus.FOUND -> {
-                            TextSelectionOverlay.show(context, result.blocks)
-                        }
-                        UniversalCopyManager.CollectStatus.NO_TEXT -> {
-                            showToast(context, ModuleRes.getString(R.string.toast_no_text_found))
-                        }
-                        UniversalCopyManager.CollectStatus.UNAVAILABLE -> {
-                            showToast(context, ModuleRes.getString(R.string.toast_copy_unavailable))
-                        }
-                    }
-                }
-            }
-            action.startsWith("shell:") -> {
-                executeShellCommand(action, context)
-            }
-            else -> {
-                // UI actions need SystemUI context -> send broadcast
-                sendActionToSystemUI(action, context)
-            }
-        }
-    }
-
-    private fun killForegroundApp(context: Context) {
-        try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            @Suppress("DEPRECATION")
-            val tasks = am.getRunningTasks(1)
-            if (tasks.isNullOrEmpty()) return
-            val pkg = tasks[0].topActivity?.packageName ?: return
-            if (pkg == context.packageName) return
-            XposedHelpers.callMethod(am, "forceStopPackage", pkg)
-            XposedBridge.log("$TAG: Killed foreground app: $pkg")
-        } catch (e: Exception) {
-            XposedBridge.log("$TAG: killForegroundApp failed: ${e.message}")
-        }
-    }
-
-    private fun adjustBrightness(context: Context, up: Boolean) {
-        try {
-            val displayManager = context.getSystemService("display") as android.hardware.display.DisplayManager
-            val getBrightness = android.hardware.display.DisplayManager::class.java
-                .getMethod("getBrightness", Int::class.java)
-            val setBrightness = android.hardware.display.DisplayManager::class.java
-                .getMethod("setBrightness", Int::class.java, Float::class.java)
-            val current = getBrightness.invoke(displayManager, 0) as Float
-            val step = 1.0f / 16f
-            val newVal = if (up) minOf(1.0f, current + step) else maxOf(0.0f, current - step)
-            setBrightness.invoke(displayManager, 0, newVal)
-            XposedBridge.log("$TAG: Brightness $current -> $newVal")
-        } catch (e: Exception) {
-            XposedBridge.log("$TAG: adjustBrightness failed: ${e.message}")
-        }
-    }
-
-    private fun adjustVolume(context: Context, up: Boolean) {
-        try {
-            val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-            val direction = if (up) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
-            am.adjustVolume(direction, android.media.AudioManager.FLAG_SHOW_UI)
-        } catch (e: Exception) {
-            XposedBridge.log("$TAG: adjustVolume failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Execute a shell command action.
-     * Since system_server cannot directly execute shell commands due to SELinux,
-     * we send it to SystemUI process for execution.
-     * Format: shell:{runAsRoot}:{command}
-     */
-    private fun executeShellCommand(action: String, context: Context) {
-        // Send to SystemUI for execution (system_server has SELinux restrictions)
-        sendActionToSystemUI(action, context)
-    }
-
-    /**
-     * Actually execute shell command (called in SystemUI process).
-     * Format: shell:{runAsRoot}:{command}
-     */
-    private fun doExecuteShellCommand(action: String, context: Context) {
-        Thread {
-            try {
-                val content = action.removePrefix("shell:")
-                val parts = content.split(":", limit = 2)
-                if (parts.size != 2) {
-                    showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
-                    return@Thread
-                }
-
-                val runAsRoot = parts[0] == "true"
-                val command = parts[1]
-
-                if (command.isBlank()) {
-                    showToast(context, ModuleRes.getString(R.string.toast_empty_command))
-                    return@Thread
-                }
-
-                XposedBridge.log("$TAG: Executing shell command (root=$runAsRoot): $command")
-
-                if (runAsRoot) {
-                    val result = Shell.cmd(command).exec()
-                    if (!result.isSuccess) {
-                        val errorMsg = result.err.joinToString("\n")
-                        XposedBridge.log("$TAG: Shell command failed: $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = result.out.joinToString("\n")
-                        XposedBridge.log("$TAG: Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
-                    }
-                } else {
-                    val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-                    p.outputStream.close()
-                    val exitCode = p.waitFor()
-                    if (exitCode != 0) {
-                        val errorMsg = p.errorStream.bufferedReader().readText()
-                        XposedBridge.log("$TAG: Shell command failed (exit=$exitCode): $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = p.inputStream.bufferedReader().readText()
-                        XposedBridge.log("$TAG: Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
-                    }
-                }
-            } catch (e: Exception) {
-                XposedBridge.log("$TAG: Shell command exception: ${e.message}")
-                e.printStackTrace()
-                showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
-            }
-        }.start()
-    }
-
-    /**
-     * Send action command to SystemUI process via broadcast.
-     * Uses sendBroadcastAsUser to handle system_server context properly.
-     */
-    private fun sendActionToSystemUI(action: String, context: Context) {
-        try {
-            val intent = Intent(ACTION_PERFORM).apply {
-                putExtra(EXTRA_ACTION, action)
-                setPackage("com.android.systemui")
-            }
-            val userHandle = android.os.UserHandle::class.java
-                .getField("CURRENT").get(null) as android.os.UserHandle
-            context.sendBroadcastAsUser(intent, userHandle)
-        } catch (e: Exception) {
-            XposedBridge.log("$TAG: Failed to send broadcast: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-
-    /**
-     * Execute action within SystemUI process (called by BroadcastReceiver).
-     */
-    private fun performActionInSystemUI(action: String, context: Context) {
-        val ctx = systemUIContext ?: context
-
-        when {
-            action.startsWith("app_shortcut:") -> {
-                Handler(Looper.getMainLooper()).post {
-                    launchShortcut(ctx, action)
-                }
-            }
-            action.startsWith("shell:") -> {
-                doExecuteShellCommand(action, ctx)
-            }
-            action == "freezer_drawer" -> {
-                Handler(Looper.getMainLooper()).post {
-                    DrawerManager.showDrawer(ctx)
-                }
-            }
-            action == "refreeze" -> {
-                performRefreeze(ctx)
-            }
-            else -> {
-                Handler(Looper.getMainLooper()).post {
-                    showToast(ctx, ModuleRes.getString(R.string.toast_unknown_action, action))
-                }
-            }
-        }
-    }
-
-    private fun showToast(context: Context, text: String) {
-        if (mHandler == null) mHandler = Handler(Looper.getMainLooper())
-        mHandler?.post {
-            try {
-                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-            } catch (t: Throwable) {}
-        }
-    }
-
-    private fun launchShortcut(context: Context, action: String) {
-        try {
-            val parts = action.split(":")
-            if (parts.size != 3) {
-                showToast(context, ModuleRes.getString(R.string.toast_shortcut_format_error))
-                return
-            }
-
-            val packageName = parts[1]
-            val shortcutId = parts[2]
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
-                val launcherApps = context.getSystemService(Context.LAUNCHER_APPS_SERVICE)
-                        as android.content.pm.LauncherApps
-
-                try {
-                    launcherApps.startShortcut(
-                        packageName, shortcutId, null, null,
-                        android.os.Process.myUserHandle()
-                    )
-                } catch (e: Exception) {
-                    XposedBridge.log("$TAG: Failed to launch shortcut: ${e.message}")
-                    try {
-                        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-                        if (intent != null) {
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } else {
-                            showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
-                        }
-                    } catch (e2: Exception) {
-                        showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
-                    }
-                }
-            } else {
-                showToast(context, ModuleRes.getString(R.string.toast_requires_android_71))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            showToast(context, ModuleRes.getString(R.string.toast_shortcut_launch_failed, e.message))
-        }
-    }
-
-    private fun performRefreeze(context: Context) {
-        val handler = Handler(Looper.getMainLooper())
-        Thread {
-            try {
-                val packageList = mutableListOf<String>()
-                val cursor: Cursor? = systemContext?.contentResolver?.query(
-                    Uri.withAppendedPath(CONFIG_URI, AppConfig.FREEZER_APP_LIST),
-                    null, null, null, null
-                )
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            val packages = listStr.split(",")
-                            packageList.addAll(packages)
-                        }
-                    }
-                }
-
-                if (packageList.isEmpty()) {
-                    val historySet = DrawerManager.frozenAppsHistory
-                    if (historySet.isEmpty()) {
-                        handler.post { 
-                            Toast.makeText(
-                                context, 
-                                ModuleRes.getString(R.string.toast_freezer_list_empty),
-                                Toast.LENGTH_SHORT
-                            ).show() 
-                        }
-                        return@Thread
-                    }
-                    packageList.addAll(historySet)
-                }
-
-                val pm = context.packageManager
-                var count = 0
-
-                for (pkg in packageList) {
-                    if (pkg.isBlank()) continue
-                    try {
-                        val info = pm.getApplicationInfo(pkg, 0)
-                        if (info.enabled) {
-                            var success = false
-                            try {
-                                pm.setApplicationEnabledSetting(
-                                    pkg,
-                                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                                    0
-                                )
-                                success = true
-                                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API freeze SUCCESS for $pkg")
-                            } catch (e: Exception) {
-                                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API freeze FAILED for $pkg: ${e.message}")
-                                // DO NOT fallback to su in SystemUI process - it causes system crashes
-                            }
-
-                            if (success) count++
-                        }
-                    } catch (e: android.content.pm.PackageManager.NameNotFoundException) {
-                        // App not found
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-
-                if (count > 0) {
-                    handler.post {
-                        Toast.makeText(
-                            context,
-                            ModuleRes.getString(R.string.toast_refrozen_apps, count),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                } else {
-                    handler.post {
-                        Toast.makeText(
-                            context,
-                            ModuleRes.getString(R.string.toast_no_apps_to_freeze),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                handler.post { 
-                    Toast.makeText(
-                        context, 
-                        ModuleRes.getString(R.string.toast_freeze_error, e.message),
-                        Toast.LENGTH_SHORT
-                    ).show() 
-                }
-            }
-        }.start()
-    }
-
-    private fun performScreenshot(context: Context) {
-        val now = SystemClock.uptimeMillis()
-        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
-        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
-        val errors = mutableListOf<String>()
-
-        // Path A: use context system service instance (works on newer Android).
-        try {
-            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
-            if (inputManager != null) {
-                val injectMethod = inputManager.javaClass.getMethod(
-                    "injectInputEvent",
-                    Class.forName("android.view.InputEvent"),
-                    Int::class.javaPrimitiveType
-                )
-                injectMethod.invoke(inputManager, down, 0) // ASYNC
-                injectMethod.invoke(inputManager, up, 0)
-                return
-            }
-        } catch (t: Throwable) {
-            errors.add("INPUT_SERVICE: ${t.message}")
-        }
-
-        // Path B: InputManagerGlobal singleton (works on some builds).
-        try {
-            val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
-            val getInstance = globalCls.getMethod("getInstance")
-            val global = getInstance.invoke(null)
-            val injectMethod = globalCls.getMethod(
-                "injectInputEvent",
-                Class.forName("android.view.InputEvent"),
-                Int::class.javaPrimitiveType
-            )
-            injectMethod.invoke(global, down, 0)
-            injectMethod.invoke(global, up, 0)
-            return
-        } catch (t: Throwable) {
-            errors.add("InputManagerGlobal: ${t.message}")
-        }
-
-        // Path C fallback: shell command (may be denied in system_server).
-        try {
-            Runtime.getRuntime().exec("input keyevent 120")
-        } catch (e: Exception) {
-            errors.add("shell: ${e.message}")
-            XposedBridge.log("$TAG: screenshot failed -> ${errors.joinToString(" | ")}")
-        }
-    }
 }
