@@ -50,6 +50,7 @@ class FreezerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_freezer)
         FreezerBootstrap.ensureMigrated(this)
+        ThemeManager.applyToActivity(this)
 
         // Header Insets
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
@@ -279,6 +280,7 @@ class FreezerActivity : AppCompatActivity() {
             holder.name.text = app.label
             holder.pkg.text = app.info.packageName
             holder.icon.setImageDrawable(app.info.loadIcon(packageManager))
+            ThemeManager.applyToView(holder.itemView, this@FreezerActivity)
             
             holder.checkbox.setOnCheckedChangeListener(null)
             holder.checkbox.isChecked = app.isChecked

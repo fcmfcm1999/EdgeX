@@ -16,6 +16,7 @@ class GesturesActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_gestures)
+        ThemeManager.applyToActivity(this)
 
         // Immersive Header Fix
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->

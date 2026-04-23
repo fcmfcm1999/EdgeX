@@ -40,6 +40,7 @@ class ActionSelectionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_action_selection)
+        ThemeManager.applyToActivity(this)
 
         // Header Insets
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
@@ -93,6 +94,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             val item = items[position]
             holder.title.text = item.label
             holder.icon.setImageResource(item.iconRes)
+            ThemeManager.applyToView(holder.itemView, this@ActionSelectionActivity)
             holder.itemView.setOnClickListener { onClick(item) }
         }
 

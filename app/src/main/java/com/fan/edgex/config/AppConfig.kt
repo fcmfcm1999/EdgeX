@@ -10,6 +10,8 @@ object AppConfig {
     const val FREEZER_ARC_DRAWER = "freezer_arc_drawer_enabled"
     const val FREEZER_APP_LIST = "freezer_app_list"
     const val HAS_MIGRATED_FREEZER_LIST = "has_migrated_freezer_list"
+    const val THEME_PRESET = "theme_preset"
+    const val THEME_CUSTOM_COLOR = "theme_custom_color"
 
     val ZONES = listOf("left_top", "left_mid", "left_bottom", "right_top", "right_mid", "right_bottom")
     val GESTURES = listOf("click", "double_click", "long_press", "swipe_up", "swipe_down", "swipe_left", "swipe_right")

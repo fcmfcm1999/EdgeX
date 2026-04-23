@@ -38,6 +38,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shortcut_selection)
+        ThemeManager.applyToActivity(this)
 
         // Header Insets
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
@@ -295,6 +296,7 @@ class ShortcutSelectionActivity : AppCompatActivity() {
             holder.title.text = item.label
             holder.subtitle.text = item.appLabel
             holder.icon.setImageDrawable(item.icon)
+            ThemeManager.applyToView(holder.itemView, this@ShortcutSelectionActivity)
             holder.itemView.setOnClickListener { onClick(item) }
         }
 

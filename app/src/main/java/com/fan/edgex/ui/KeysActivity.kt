@@ -54,6 +54,7 @@ class KeysActivity : AppCompatActivity() {
             keyViews[keyConfig.keyCode] = view
             container.addView(view)
         }
+        ThemeManager.applyToActivity(this)
     }
 
     override fun onResume() {
@@ -69,6 +70,7 @@ class KeysActivity : AppCompatActivity() {
 
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.item_key, null)
+        ThemeManager.applyToView(view, this)
 
         val title = view.findViewById<TextView>(R.id.title)
         val subtitle = view.findViewById<TextView>(R.id.subtitle)

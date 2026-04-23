@@ -50,6 +50,11 @@
             android:windowSoftInputMode="adjustResize"/>
 
         <activity
+            android:name=".ui.ThemeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
+        <activity
             android:name=".ui.ActionSelectionActivity"
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />

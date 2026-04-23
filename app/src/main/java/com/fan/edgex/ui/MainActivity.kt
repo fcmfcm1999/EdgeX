@@ -17,6 +17,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        ThemeManager.applyToActivity(this)
         
         // Fix for "Header too tall": fitsSystemWindows="true" defaults to applying ALL system insets (Top + Bottom).
         // Since this view is at the top, we only want the Top Inset (Status Bar).
@@ -55,6 +56,10 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.item_freezer).setOnClickListener {
             startActivity(android.content.Intent(this, FreezerActivity::class.java))
+        }
+
+        findViewById<View>(R.id.item_theme).setOnClickListener {
+            startActivity(android.content.Intent(this, ThemeActivity::class.java))
         }
 
         // Advanced Options (Collapsible)
@@ -132,5 +137,10 @@ class MainActivity : AppCompatActivity() {
 
         // Auto update check on launch
         UpdateChecker.checkOnLaunch(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ThemeManager.applyToActivity(this)
     }
 }
