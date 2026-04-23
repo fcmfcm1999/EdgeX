@@ -19,7 +19,10 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.net.Uri
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ConfigProvider
 import de.robv.android.xposed.XposedBridge
 
 /**
@@ -80,10 +83,34 @@ object TextSelectionOverlay {
         }
     }
 
+    private fun readAccentColor(context: Context): Int {
+        val presetId = queryConfig(context, AppConfig.THEME_PRESET)
+        return when (presetId) {
+            "custom" -> {
+                val hex = queryConfig(context, AppConfig.THEME_CUSTOM_COLOR)
+                runCatching { Color.parseColor(hex) }.getOrElse { Color.parseColor("#326D32") }
+            }
+            "classic" -> Color.parseColor("#00796B")
+            "cedar"   -> Color.parseColor("#496B3D")
+            "ocean"   -> Color.parseColor("#2F6F8F")
+            "ember"   -> Color.parseColor("#C56B2A")
+            else      -> Color.parseColor("#326D32")
+        }
+    }
+
+    private fun queryConfig(context: Context, key: String): String = try {
+        context.contentResolver.query(
+            Uri.withAppendedPath(ConfigProvider.CONTENT_URI, key),
+            null, null, null, null
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else "" } ?: ""
+    } catch (_: Exception) { "" }
+
     private fun addOverlay(context: Context, blocks: List<SelectableBlock>) {
         val density = context.resources.displayMetrics.density
         val dp = { value: Int -> (value * density + 0.5f).toInt() }
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
+        val accentColor = readAccentColor(context)
 
         val root = object : FrameLayout(context) {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -99,7 +126,7 @@ object TextSelectionOverlay {
         }
 
         // Custom view for drawing and selecting text blocks
-        val blocksView = TextBlocksView(context, blocks, density,
+        val blocksView = TextBlocksView(context, blocks, density, accentColor,
             onEmptyTap = { dismiss() },
             onSelectionChanged = { updateToolbarState(blocks) }
         )
@@ -109,7 +136,7 @@ object TextSelectionOverlay {
         ))
 
         // Bottom toolbar
-        val toolbar = createToolbar(context, blocks, density)
+        val toolbar = createToolbar(context, blocks, density, accentColor)
         val toolbarParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
@@ -140,7 +167,8 @@ object TextSelectionOverlay {
     private fun createToolbar(
         context: Context,
         blocks: List<SelectableBlock>,
-        density: Float
+        density: Float,
+        accentColor: Int
     ): LinearLayout {
         val dp = { value: Int -> (value * density + 0.5f).toInt() }
 
@@ -187,7 +215,7 @@ object TextSelectionOverlay {
         // Copy button
         val copy = createToolbarButton(context, density,
             ModuleRes.getString(R.string.copy_copy),
-            Color.parseColor("#009688"),
+            accentColor,
             Color.WHITE
         ) {
             val selected = blocks.filter { it.selected }
@@ -276,6 +304,7 @@ object TextSelectionOverlay {
         context: Context,
         private val blocks: List<SelectableBlock>,
         private val density: Float,
+        accentColor: Int,
         private val onEmptyTap: () -> Unit,
         private val onSelectionChanged: () -> Unit
     ) : View(context) {
@@ -301,12 +330,12 @@ object TextSelectionOverlay {
         }
 
         private val selectedFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#404FC3F7")
+            color = (accentColor and 0x00FFFFFF) or (0x55 shl 24)
             style = Paint.Style.FILL
         }
 
         private val selectedStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#DD4FC3F7")
+            color = (accentColor and 0x00FFFFFF) or (0xDD.toInt() shl 24)
             style = Paint.Style.STROKE
             strokeWidth = 2f * density
         }

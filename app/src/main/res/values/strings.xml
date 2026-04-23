@@ -7,12 +7,15 @@
     <string name="header_freezer">Freezer</string>
     <string name="header_action_selection">Select Action</string>
     <string name="header_shortcut_selection">Select Shortcut</string>
+    <string name="header_theme">Theme</string>
 
     <!-- Main Screen Menu Items -->
     <string name="menu_gestures">Gestures</string>
     <string name="menu_gestures_desc">Configure edge gesture zones</string>
     <string name="menu_freezer">Freezer</string>
     <string name="menu_freezer_desc">Manage frozen apps</string>
+    <string name="menu_theme">Theme</string>
+    <string name="menu_theme_desc">Choose an accent color</string>
     <string name="menu_advanced">Advanced Options</string>
     <string name="menu_debug_matrix">Debug Mode</string>
     <string name="menu_debug_matrix_desc">Show gesture trigger area</string>
@@ -107,6 +110,19 @@
     <!-- Labels and Hints -->
     <string name="hint_search_apps">Search apps…</string>
     <string name="hint_search_shortcuts">Search shortcuts…</string>
+    <string name="theme_current_color">Current Accent</string>
+    <string name="theme_section_presets">Preset Themes</string>
+    <string name="theme_section_custom">Custom RGB</string>
+    <string name="theme_custom_hint">Enter RGB values from 0 to 255.</string>
+    <string name="theme_red">R</string>
+    <string name="theme_green">G</string>
+    <string name="theme_blue">B</string>
+    <string name="theme_apply_custom">Apply Custom Color</string>
+    <string name="theme_preset_default">Default</string>
+    <string name="theme_preset_classic">Classic</string>
+    <string name="theme_preset_cedar">Cedar</string>
+    <string name="theme_preset_ocean">Ocean</string>
+    <string name="theme_preset_ember">Ember</string>
     <string name="label_frozen">FROZEN</string>
     <string name="label_zone_event_subtitle">Zone / Event</string>
     <string name="label_empty_drawer">Nothing here</string>
@@ -124,6 +140,8 @@
     <string name="toast_freeze_failed">Failed to freeze. Check Root.</string>
     <string name="toast_unfreeze_failed">Failed to unfreeze. Check Root.</string>
     <string name="toast_requires_android_71">Requires Android 7.1 or higher</string>
+    <string name="toast_theme_saved">Theme updated</string>
+    <string name="toast_theme_invalid_rgb">RGB values must be between 0 and 255</string>
     <string name="toast_shortcuts_loaded_via_root">Loaded %d shortcuts via root</string>
     <string name="toast_no_shortcuts_found">No shortcuts found (root attempt failed)</string>
     <string name="toast_launching">Launching %s…</string>

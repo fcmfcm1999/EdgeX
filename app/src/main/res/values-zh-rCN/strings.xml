@@ -109,6 +109,24 @@
     <!-- 标签与提示 -->
     <string name="hint_search_apps">搜索应用…</string>
     <string name="hint_search_shortcuts">搜索快捷方式…</string>
+    <string name="theme_current_color">当前主题色</string>
+    <string name="theme_section_presets">预设主题</string>
+    <string name="theme_section_custom">自定义 RGB</string>
+    <string name="theme_custom_hint">输入 0 到 255 之间的 RGB 值。</string>
+    <string name="theme_red">R</string>
+    <string name="theme_green">G</string>
+    <string name="theme_blue">B</string>
+    <string name="theme_apply_custom">应用自定义颜色</string>
+    <string name="theme_preset_default">默认</string>
+    <string name="theme_preset_classic">经典</string>
+    <string name="theme_preset_cedar">雪松</string>
+    <string name="theme_preset_ocean">海洋</string>
+    <string name="theme_preset_ember">炭火</string>
+    <string name="header_theme">主题</string>
+    <string name="menu_theme">主题</string>
+    <string name="menu_theme_desc">选择一个主题色</string>
+    <string name="toast_theme_saved">主题已更新</string>
+    <string name="toast_theme_invalid_rgb">RGB 值必须在 0 到 255 之间</string>
     <string name="label_frozen">已冻结</string>
     <string name="label_zone_event_subtitle">区域 / 事件</string>
     <string name="label_empty_drawer">空空如也</string>
