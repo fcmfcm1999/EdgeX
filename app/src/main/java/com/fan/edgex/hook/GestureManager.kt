@@ -27,7 +27,6 @@ import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import kotlin.math.abs
-import kotlin.math.sqrt
 
 @SuppressLint("StaticFieldLeak")
 object GestureManager {
@@ -46,26 +45,37 @@ object GestureManager {
     private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
     private const val EXTRA_ACTION = "action"
 
-    // Gesture detection variables (used in system_server process)
-    private var mDownX = 0f
-    private var mDownY = 0f
-    private var mTargetX = 0f
-    private var mTargetY = 0f
-    private var mIsSwiping = false
-    private var mIsInSection = false
-    private var mActiveZone: String? = null
-    private var mGestureDownTime = 0L  // Timestamp when mIsInSection was set true
-    // For left-edge zones: DOWN is not consumed so the system back gesture can proceed.
-    // Once we determine it's NOT a back swipe (rightward), we switch to consuming events.
-    private var mLeftEdgeConsuming = false
-    private var mInjectedCancelled = false
+    private enum class EdgeSide { LEFT, RIGHT }
+
+    private data class EdgeZoneMatch(
+        val zone: String,
+        val side: EdgeSide,
+    )
+
+    private data class GestureSession(
+        val zone: String,
+        val side: EdgeSide,
+        val downX: Float,
+        val downY: Float,
+        var targetX: Float,
+        var targetY: Float,
+        val startedAtMs: Long,
+        val savedDownEvent: MotionEvent,
+        var isSwiping: Boolean = false,
+        var consumeStream: Boolean = true,
+        var nativeStreamCancelled: Boolean = false,
+        var nativeDownInjected: Boolean = false,
+        var continuousAction: String? = null,
+        var lastAdjustY: Float = 0f,
+    )
+
+    // Gesture detection state (used in system_server process)
+    private var mGestureSession: GestureSession? = null
     private var mInjectMethod: java.lang.reflect.Method? = null
 
-    // Continuous adjustment state for brightness/volume swipe actions
-    private var mContinuousAction: String? = null  // set once swipe direction is known
-    private var mLastAdjustY = 0f                  // last Y position where we triggered an adjustment
-    private const val CONTINUOUS_STEP_PX = 30      // pixels of Y travel per one adjustment step
-    private const val GESTURE_TIMEOUT_MS = 5000L  // Safety timeout to auto-reset stale gesture state
+    // Continuous adjustment state
+    private const val CONTINUOUS_STEP_PX = 30
+    private const val GESTURE_TIMEOUT_MS = 5000L
 
     // Double-tap and Long-press detection state
     private var mLastTapUpTime = 0L
@@ -74,16 +84,15 @@ object GestureManager {
     private var mPendingLongPressRunnable: Runnable? = null
     private const val DOUBLE_TAP_TIMEOUT_MS = 300L
     private const val LONG_PRESS_TIMEOUT_MS = 500L
-    
-    private var mSavedDownEvent: MotionEvent? = null
 
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
     // Whether we've registered the screen state broadcast receiver (SystemUI)
     private var screenStateReceiverRegisteredUI = false
 
-    private val TOUCH_SLOP = 24
-    private var mSwipeThreshold = 0f  // set in ACTION_DOWN based on screen density
+    private const val EDGE_THRESHOLD_DP = 8f
+    private const val TOUCH_SLOP_PX = 24f
+    private const val TOUCH_SLOP_SQ = TOUCH_SLOP_PX * TOUCH_SLOP_PX
 
     private var mHandler: Handler? = null
 
@@ -95,75 +104,63 @@ object GestureManager {
      * Called on SCREEN_OFF to prevent stale state from blocking touches after unlock.
      */
     private fun resetGestureState() {
-        val wasInSection = mIsInSection
-        mIsInSection = false
-        mActiveZone = null
-        mIsSwiping = false
-        mDownX = 0f
-        mDownY = 0f
-        mTargetX = 0f
-        mTargetY = 0f
-        mGestureDownTime = 0L
-        mContinuousAction = null
-        mLastAdjustY = 0f
-        mLeftEdgeConsuming = false
-        mInjectedCancelled = false
-        
-        mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
-        mPendingClickRunnable = null
+        val previousSession = mGestureSession
+        mGestureSession = null
+
         mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
         mPendingLongPressRunnable = null
-        
-        mSavedDownEvent?.recycle()
-        mSavedDownEvent = null
-        
-        
-        // Note: mLastTapUpTime and mLastTapZone are NOT reset here 
-        // because they need to persist across gestures for double-tap detection.
-        
-        if (wasInSection) {
-            XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale mIsInSection")
+
+        previousSession?.savedDownEvent?.recycle()
+
+        // Note: pending click / tap state are intentionally kept here so the
+        // click half of a click-vs-double-click decision can complete after
+        // the gesture session itself has ended.
+        if (previousSession != null) {
+            XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale gesture session")
         }
     }
 
-    private fun startLongPressTimer(context: Context) {
+    private fun startLongPressTimer(context: Context, session: GestureSession) {
         mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
         val r = Runnable {
             mPendingLongPressRunnable = null
-            val zone = mActiveZone ?: return@Runnable
-            if (mIsSwiping) return@Runnable // Moved too much
-            
+            if (mGestureSession !== session) return@Runnable
+            if (session.isSwiping) return@Runnable
+
+            val zone = session.zone
             val lpAction = getConfig(AppConfig.gestureAction(zone, "long_press"))
             if (lpAction.isNotEmpty() && lpAction != "none") {
-                cancelNativeStream()
-                triggerAction(zone, "long_press", context, mTargetX, mTargetY)
+                cancelNativeStream(session, context)
+                triggerAction(zone, "long_press", context, session.targetX, session.targetY)
             } else {
                 // No long-press action: Release the DOWN event to the app!
                 XposedBridge.log("$TAG: [Gesture] Long press timeout — no EdgeX action, releasing DOWN")
-                mSavedDownEvent?.let { injectEventInternal(context, it) }
-                // Subsequent MOVEs will now be injected in handleMotionEvent
+                dispatchSavedDownIfNeeded(context, session)
             }
         }
         mPendingLongPressRunnable = r
         (mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }).postDelayed(r, LONG_PRESS_TIMEOUT_MS)
     }
 
-    private fun cancelNativeStream() {
-        if (!mInjectedCancelled) {
-            mSavedDownEvent?.let {
-                injectEventInternal(systemContext!!, it, MotionEvent.ACTION_CANCEL)
-            }
-            mInjectedCancelled = true
+    private fun cancelNativeStream(session: GestureSession, context: Context) {
+        if (!session.nativeStreamCancelled) {
+            injectEventInternal(context, session.savedDownEvent, MotionEvent.ACTION_CANCEL)
+            session.nativeStreamCancelled = true
         }
         mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
         mPendingLongPressRunnable = null
     }
 
-    private fun resumeNativeStream(context: Context, currentEvent: MotionEvent) {
-        if (!mInjectedCancelled) {
-            // First re-inject the DOWN event if it wasn't already re-injected
-            mSavedDownEvent?.let { injectEventInternal(context, it) }
-            // Then inject the current event
+    private fun dispatchSavedDownIfNeeded(context: Context, session: GestureSession) {
+        if (!session.nativeDownInjected && !session.nativeStreamCancelled) {
+            injectEventInternal(context, session.savedDownEvent)
+            session.nativeDownInjected = true
+        }
+    }
+
+    private fun resumeNativeStream(session: GestureSession, context: Context, currentEvent: MotionEvent) {
+        if (!session.nativeStreamCancelled) {
+            dispatchSavedDownIfNeeded(context, session)
             injectEventInternal(context, currentEvent)
         }
         mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
@@ -228,13 +225,13 @@ object GestureManager {
             registerConfigObserver(context)
         }
 
-        // Safety guard: if mIsInSection has been true for too long without
+        // Safety guard: if the session has been active for too long without
         // receiving UP/CANCEL (e.g. screen was locked mid-gesture),
         // auto-reset to prevent blocking touch events.
-        if (mIsInSection && mGestureDownTime > 0) {
-            val elapsed = System.currentTimeMillis() - mGestureDownTime
+        mGestureSession?.let { session ->
+            val elapsed = System.currentTimeMillis() - session.startedAtMs
             if (elapsed > GESTURE_TIMEOUT_MS) {
-                XposedBridge.log("$TAG: [Gesture] Safety timeout: mIsInSection stuck for ${elapsed}ms — resetting")
+                XposedBridge.log("$TAG: [Gesture] Safety timeout: session stuck for ${elapsed}ms — resetting")
                 resetGestureState()
             }
         }
@@ -248,221 +245,26 @@ object GestureManager {
         } catch (_: Exception) {}
 
         val action = event.actionMasked
-        val x = event.rawX
-        val y = event.rawY
         val pointerCount = event.pointerCount
 
         when (action) {
-            MotionEvent.ACTION_DOWN -> {
-                val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                val realSize = android.graphics.Point()
-                wm.defaultDisplay.getRealSize(realSize)
-                val screenWidth = realSize.x
-                val screenHeight = realSize.y
-                
-                val density = context.resources.displayMetrics.density
-                val edgeThreshold = 8 * density
-                mSwipeThreshold = 60 * density
-                val isInLeftEdge = x < edgeThreshold
-                val isInRightEdge = x > (screenWidth - edgeThreshold)
-
-                if (!isInLeftEdge && !isInRightEdge) {
-                    if (mIsInSection) {
-                        XposedBridge.log("$TAG: [Gesture] DOWN outside edge while mIsInSection=true — resetting state")
-                    }
-                    mIsInSection = false
-                    return false
-                }
-
-                val side = if (isInLeftEdge) "left" else "right"
-                val verticalZone = when {
-                    y < screenHeight * 0.33f -> "top"
-                    y < screenHeight * 0.66f -> "mid"
-                    else -> "bottom"
-                }
-                val zone = "${side}_${verticalZone}"
-                if (!isZoneEnabled(zone)) {
-                    mIsInSection = false
-                    return false
-                }
-
-                // Cancel any pending single-click from a previous gesture
-                mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
-                mPendingClickRunnable = null
-                mIsInSection = true
-                mGestureDownTime = System.currentTimeMillis()
-                mActiveZone = zone
-                mDownX = x
-                mDownY = y
-                mTargetX = x
-                mTargetY = y
-
-                // XEP-style Delayed Decision:
-                // Consume original DOWN to silence system handlers. 
-                // We'll re-inject it if no EdgeX action is triggered within 500ms.
-                mLeftEdgeConsuming = true 
-                mInjectedCancelled = false
-                mSavedDownEvent = MotionEvent.obtain(event)
-                
-                startLongPressTimer(context)
-                return true
-            }
+            MotionEvent.ACTION_DOWN -> return handleGestureDown(event, context)
 
             MotionEvent.ACTION_POINTER_DOWN -> {
-                // Extra finger added: cancel the gesture to avoid direction confusion
-                mIsInSection = false
-                mActiveZone = null
-                mIsSwiping = false
+                // Extra finger added: reset state to avoid direction confusion.
+                resetGestureState()
                 return false
             }
 
-            MotionEvent.ACTION_MOVE -> {
-                if (!mIsInSection) return false
-                updateTargetPoint(x, y)
-                if (!mIsSwiping) {
-                    val dx = x - mDownX
-                    val dy = y - mDownY
-                    if (sqrt(dx * dx + dy * dy) > TOUCH_SLOP) {
-                        mIsSwiping = true
+            MotionEvent.ACTION_MOVE -> return handleGestureMove(event, context)
 
-                        // Swipe detected! Determine if it's an EdgeX action or native fallback
-                        if (mActiveZone != null) {
-                            val gestureType = when {
-                                abs(dx) > abs(dy) -> if (dx < 0) "swipe_left" else "swipe_right"
-                                else -> if (dy < 0) "swipe_up" else "swipe_down"
-                            }
-                            
-                            val configKey = AppConfig.gestureAction(mActiveZone!!, gestureType)
-                            val action = getConfig(configKey)
-                            
-                            if (action.isNotEmpty() && action != "none") {
-                                // EdgeX swipe action: Take over!
-                                cancelNativeStream()
-                                
-                                if (action == "brightness_up" || action == "brightness_down" ||
-                                    action == "volume_up" || action == "volume_down") {
-                                    mContinuousAction = action
-                                    mLastAdjustY = y
-                                } else {
-                                    triggerAction(mActiveZone!!, gestureType, context, mTargetX, mTargetY)
-                                }
-                            } else {
-                                // No EdgeX action: Resume native stream (e.g. for system back gesture)
-                                resumeNativeStream(context, event)
-                            }
-                        }
-                    }
-                } else {
-                    // Continuous adjustment or already resumed native stream
-                    val contAction = mContinuousAction
-                    if (contAction != null) {
-                        val delta = mLastAdjustY - y  // positive = finger moved up
-                        if (abs(delta) >= CONTINUOUS_STEP_PX) {
-                            val steps = (abs(delta) / CONTINUOUS_STEP_PX).toInt()
-                            val up = delta > 0
-                            val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
-                            val ctx = context
-                            repeat(steps) {
-                                handler.post {
-                                    when {
-                                        contAction == "brightness_up" || contAction == "brightness_down" ->
-                                            adjustBrightness(ctx, up)
-                                        contAction == "volume_up" || contAction == "volume_down" ->
-                                            adjustVolume(ctx, up)
-                                    }
-                                }
-                            }
-                            mLastAdjustY -= steps * CONTINUOUS_STEP_PX * (if (delta > 0) 1 else -1)
-                        }
-                    } else if (mLeftEdgeConsuming && !mInjectedCancelled) {
-                        // If we already resumed native stream, keep injecting
-                        injectEventInternal(context, event)
-                    }
-                }
-                return mLeftEdgeConsuming
-            }
+            MotionEvent.ACTION_UP -> return handleGestureUp(event, context)
 
-            MotionEvent.ACTION_UP -> {
-                if (!mIsInSection) {
-                    mIsSwiping = false
-                    return false
-                }
-
-                val zone = mActiveZone
-
-                if (mIsSwiping && zone != null) {
-                    // Swipe already handled in ACTION_MOVE or is continuous
-                    if (mContinuousAction != null) {
-                        resetGestureState()
-                        return true
-                    }
-                } else if (zone != null) {
-                    // detect click vs double_click
-                    val capturedX = mTargetX
-                    val capturedY = mTargetY
-                    
-                    val clickAction = getConfig(AppConfig.gestureAction(zone, "click"))
-                    val hasClickAction = clickAction.isNotEmpty() && clickAction != "none"
-                    val hasDoubleClickAction = getConfig(AppConfig.gestureAction(zone, "double_click"))
-                        .let { it.isNotEmpty() && it != "none" }
-
-                    if (hasClickAction || hasDoubleClickAction) {
-                        // EdgeX action triggered: Cancel native stream
-                        cancelNativeStream()
-                        
-                        if (!hasDoubleClickAction) {
-                            triggerAction(zone, "click", context, capturedX, capturedY)
-                        } else {
-                            val now = event.eventTime
-                            val timeSinceLast = now - mLastTapUpTime
-                            if (timeSinceLast < DOUBLE_TAP_TIMEOUT_MS && mLastTapZone == zone) {
-                                mPendingClickRunnable?.let {
-                                    mHandler?.removeCallbacks(it)
-                                }
-                                mPendingClickRunnable = null
-                                // Reset after successful double-tap
-                                mLastTapUpTime = 0L
-                                mLastTapZone = null
-                                triggerAction(zone, "double_click", context, capturedX, capturedY)
-                            } else {
-                                mLastTapUpTime = now
-                                mLastTapZone = zone
-                                val r = Runnable {
-                                    mPendingClickRunnable = null
-                                    // Reset after single-click timeout
-                                    mLastTapUpTime = 0L
-                                    mLastTapZone = null
-                                    triggerAction(zone, "click", context, capturedX, capturedY)
-                                }
-                                mPendingClickRunnable = r
-                                (mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }).postDelayed(r, DOUBLE_TAP_TIMEOUT_MS)
-                            }
-                        }
-                    } else {
-                        // No EdgeX action: Resume native stream (DOWN + UP)
-                        resumeNativeStream(context, event)
-                    }
-                }
-
-                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    val consumed = mLeftEdgeConsuming
-                    resetGestureState()
-                    return consumed
-                }
-                return true
-            }
-
-            MotionEvent.ACTION_CANCEL -> {
-                if (mLeftEdgeConsuming && !mInjectedCancelled) {
-                    resumeNativeStream(context, event)
-                }
-                resetGestureState()
-                return true
-            }
+            MotionEvent.ACTION_CANCEL -> return handleGestureCancel(event, context)
 
             else -> {
-                if (mIsInSection) {
-                    XposedBridge.log("$TAG: [Gesture] unhandled action=$action pointers=$pointerCount mIsInSection=$mIsInSection")
+                if (mGestureSession != null) {
+                    XposedBridge.log("$TAG: [Gesture] unhandled action=$action pointers=$pointerCount sessionActive=true")
                 }
             }
         }
@@ -470,25 +272,217 @@ object GestureManager {
         return false
     }
 
-    private fun updateTargetPoint(x: Float, y: Float) {
-        when {
-            mActiveZone?.startsWith("left_") == true -> {
-                if (x > mTargetX) {
-                    mTargetX = x
-                    mTargetY = y
+    private fun handleGestureDown(event: MotionEvent, context: Context): Boolean {
+        val zoneMatch = resolveEdgeZone(context, event.rawX, event.rawY) ?: run {
+            if (mGestureSession != null) {
+                XposedBridge.log("$TAG: [Gesture] DOWN outside edge while sessionActive=true — resetting state")
+            }
+            resetGestureState()
+            return false
+        }
+
+        clearPendingSingleClick()
+
+        val session = GestureSession(
+            zone = zoneMatch.zone,
+            side = zoneMatch.side,
+            downX = event.rawX,
+            downY = event.rawY,
+            targetX = event.rawX,
+            targetY = event.rawY,
+            startedAtMs = System.currentTimeMillis(),
+            savedDownEvent = MotionEvent.obtain(event),
+        )
+        mGestureSession = session
+        startLongPressTimer(context, session)
+        return session.consumeStream
+    }
+
+    private fun handleGestureMove(event: MotionEvent, context: Context): Boolean {
+        val session = mGestureSession ?: return false
+        updateTargetPoint(session, event.rawX, event.rawY)
+
+        if (!session.isSwiping) {
+            val dx = event.rawX - session.downX
+            val dy = event.rawY - session.downY
+            if ((dx * dx) + (dy * dy) > TOUCH_SLOP_SQ) {
+                session.isSwiping = true
+                val gestureType = resolveSwipeGesture(dx, dy)
+                val action = getConfig(AppConfig.gestureAction(session.zone, gestureType))
+
+                if (hasConfiguredAction(action)) {
+                    cancelNativeStream(session, context)
+                    if (isContinuousAdjustmentAction(action)) {
+                        session.continuousAction = action
+                        session.lastAdjustY = event.rawY
+                    } else {
+                        triggerAction(session.zone, gestureType, context, session.targetX, session.targetY)
+                    }
+                } else {
+                    resumeNativeStream(session, context, event)
                 }
             }
-            mActiveZone?.startsWith("right_") == true -> {
-                if (x < mTargetX) {
-                    mTargetX = x
-                    mTargetY = y
-                }
-            }
-            else -> {
-                mTargetX = x
-                mTargetY = y
+        } else {
+            val continuousAction = session.continuousAction
+            when {
+                continuousAction != null -> handleContinuousAdjustment(session, continuousAction, context, event.rawY)
+                shouldProxyToNative(session) -> injectEventInternal(context, event)
             }
         }
+
+        return session.consumeStream
+    }
+
+    private fun handleGestureUp(event: MotionEvent, context: Context): Boolean {
+        val session = mGestureSession ?: return false
+
+        if (session.isSwiping) {
+            return finishGestureSession()
+        }
+
+        val clickAction = getConfig(AppConfig.gestureAction(session.zone, "click"))
+        val hasClickAction = hasConfiguredAction(clickAction)
+        val hasDoubleClickAction = hasConfiguredAction(
+            getConfig(AppConfig.gestureAction(session.zone, "double_click"))
+        )
+
+        if (hasClickAction || hasDoubleClickAction) {
+            cancelNativeStream(session, context)
+
+            if (!hasDoubleClickAction) {
+                triggerAction(session.zone, "click", context, session.targetX, session.targetY)
+            } else {
+                resolveTapAction(session, context, event.eventTime)
+            }
+        } else {
+            resumeNativeStream(session, context, event)
+        }
+
+        return finishGestureSession()
+    }
+
+    private fun handleGestureCancel(event: MotionEvent, context: Context): Boolean {
+        val session = mGestureSession ?: return false
+        if (!session.nativeStreamCancelled) {
+            resumeNativeStream(session, context, event)
+        }
+        resetGestureState()
+        return true
+    }
+
+    private fun finishGestureSession(): Boolean {
+        val consumed = mGestureSession?.consumeStream ?: false
+        resetGestureState()
+        return consumed
+    }
+
+    private fun clearPendingSingleClick() {
+        mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
+        mPendingClickRunnable = null
+    }
+
+    private fun resolveEdgeZone(context: Context, x: Float, y: Float): EdgeZoneMatch? {
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val realSize = android.graphics.Point()
+        wm.defaultDisplay.getRealSize(realSize)
+
+        val edgeThreshold = EDGE_THRESHOLD_DP * context.resources.displayMetrics.density
+        val side = when {
+            x < edgeThreshold -> EdgeSide.LEFT
+            x > realSize.x - edgeThreshold -> EdgeSide.RIGHT
+            else -> return null
+        }
+
+        val verticalZone = when {
+            y < realSize.y * 0.33f -> "top"
+            y < realSize.y * 0.66f -> "mid"
+            else -> "bottom"
+        }
+        val zone = "${side.name.lowercase()}_$verticalZone"
+        return EdgeZoneMatch(zone, side).takeIf { isZoneEnabled(zone) }
+    }
+
+    private fun updateTargetPoint(session: GestureSession, x: Float, y: Float) {
+        when (session.side) {
+            EdgeSide.LEFT -> {
+                if (x > session.targetX) {
+                    session.targetX = x
+                    session.targetY = y
+                }
+            }
+            EdgeSide.RIGHT -> {
+                if (x < session.targetX) {
+                    session.targetX = x
+                    session.targetY = y
+                }
+            }
+        }
+    }
+
+    private fun resolveSwipeGesture(dx: Float, dy: Float): String =
+        when {
+            abs(dx) > abs(dy) -> if (dx < 0) "swipe_left" else "swipe_right"
+            else -> if (dy < 0) "swipe_up" else "swipe_down"
+        }
+
+    private fun hasConfiguredAction(action: String): Boolean =
+        action.isNotEmpty() && action != "none"
+
+    private fun isContinuousAdjustmentAction(action: String): Boolean =
+        action == "brightness_up" || action == "brightness_down" ||
+                action == "volume_up" || action == "volume_down"
+
+    private fun shouldProxyToNative(session: GestureSession): Boolean =
+        session.consumeStream && session.nativeDownInjected && !session.nativeStreamCancelled
+
+    private fun handleContinuousAdjustment(
+        session: GestureSession,
+        action: String,
+        context: Context,
+        currentY: Float,
+    ) {
+        val delta = session.lastAdjustY - currentY
+        if (abs(delta) < CONTINUOUS_STEP_PX) return
+
+        val steps = (abs(delta) / CONTINUOUS_STEP_PX).toInt()
+        val up = delta > 0
+        val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
+        repeat(steps) {
+            handler.post {
+                when {
+                    action == "brightness_up" || action == "brightness_down" -> adjustBrightness(context, up)
+                    action == "volume_up" || action == "volume_down" -> adjustVolume(context, up)
+                }
+            }
+        }
+        session.lastAdjustY -= steps * CONTINUOUS_STEP_PX * (if (delta > 0) 1 else -1)
+    }
+
+    private fun resolveTapAction(session: GestureSession, context: Context, eventTime: Long) {
+        val zone = session.zone
+        val capturedX = session.targetX
+        val capturedY = session.targetY
+        val timeSinceLast = eventTime - mLastTapUpTime
+
+        if (timeSinceLast < DOUBLE_TAP_TIMEOUT_MS && mLastTapZone == zone) {
+            clearPendingSingleClick()
+            mLastTapUpTime = 0L
+            mLastTapZone = null
+            triggerAction(zone, "double_click", context, capturedX, capturedY)
+            return
+        }
+
+        mLastTapUpTime = eventTime
+        mLastTapZone = zone
+        val runnable = Runnable {
+            mPendingClickRunnable = null
+            mLastTapUpTime = 0L
+            mLastTapZone = null
+            triggerAction(zone, "click", context, capturedX, capturedY)
+        }
+        mPendingClickRunnable = runnable
+        (mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it })
+            .postDelayed(runnable, DOUBLE_TAP_TIMEOUT_MS)
     }
 
     /**
