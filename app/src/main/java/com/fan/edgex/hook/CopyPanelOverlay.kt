@@ -3,12 +3,18 @@ package com.fan.edgex.hook
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.*
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
-import java.lang.ref.WeakReference
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -19,11 +25,11 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import android.net.Uri
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import de.robv.android.xposed.XposedBridge
+import java.lang.ref.WeakReference
 
 /**
  * Google Lens-style text selection overlay.

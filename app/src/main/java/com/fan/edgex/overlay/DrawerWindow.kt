@@ -18,7 +18,6 @@ import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.hook.ModuleRes
-import java.io.DataOutputStream
 
 class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
 

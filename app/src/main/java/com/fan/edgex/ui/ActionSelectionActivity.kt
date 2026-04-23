@@ -11,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
-import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.putConfig
 
 class ActionSelectionActivity : AppCompatActivity() {

@@ -1,15 +1,14 @@
 package com.fan.edgex.ui
 
-import android.content.Context
 import android.os.Bundle
-import com.fan.edgex.config.getConfigString
-import com.fan.edgex.config.putConfig
 import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
+import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 
 /**
  * Activity for configuring a shell command action.

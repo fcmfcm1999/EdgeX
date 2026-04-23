@@ -2,8 +2,6 @@ package com.fan.edgex.ui
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ShortcutInfo
-import android.content.pm.ShortcutManager
 import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
