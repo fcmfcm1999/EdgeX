@@ -26,7 +26,6 @@ import com.fan.edgex.overlay.DrawerManager
 import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
-import kotlin.math.abs
 
 @SuppressLint("StaticFieldLeak")
 object GestureManager {
@@ -45,127 +44,58 @@ object GestureManager {
     private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
     private const val EXTRA_ACTION = "action"
 
-    private enum class EdgeSide { LEFT, RIGHT }
-
-    private data class EdgeZoneMatch(
-        val zone: String,
-        val side: EdgeSide,
-    )
-
-    private data class GestureSession(
-        val zone: String,
-        val side: EdgeSide,
-        val downX: Float,
-        val downY: Float,
-        var targetX: Float,
-        var targetY: Float,
-        val startedAtMs: Long,
-        val savedDownEvent: MotionEvent,
-        var isSwiping: Boolean = false,
-        var consumeStream: Boolean = true,
-        var nativeStreamCancelled: Boolean = false,
-        var nativeDownInjected: Boolean = false,
-        var continuousAction: String? = null,
-        var lastAdjustY: Float = 0f,
-    )
-
-    // Gesture detection state (used in system_server process)
-    private var mGestureSession: GestureSession? = null
-    private var mInjectMethod: java.lang.reflect.Method? = null
-
-    // Continuous adjustment state
-    private const val CONTINUOUS_STEP_PX = 30
-    private const val GESTURE_TIMEOUT_MS = 5000L
-
-    // Double-tap and Long-press detection state
-    private var mLastTapUpTime = 0L
-    private var mLastTapZone: String? = null
-    private var mPendingClickRunnable: Runnable? = null
-    private var mPendingLongPressRunnable: Runnable? = null
-    private const val DOUBLE_TAP_TIMEOUT_MS = 300L
-    private const val LONG_PRESS_TIMEOUT_MS = 500L
-
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
     // Whether we've registered the screen state broadcast receiver (SystemUI)
     private var screenStateReceiverRegisteredUI = false
-
-    private const val EDGE_THRESHOLD_DP = 8f
-    private const val TOUCH_SLOP_PX = 24f
-    private const val TOUCH_SLOP_SQ = TOUCH_SLOP_PX * TOUCH_SLOP_PX
 
     private var mHandler: Handler? = null
 
     // Debug overlay views (in SystemUI process)
     private val debugViews = mutableListOf<DebugOverlayView>()
 
-    /**
-     * Reset all gesture detection state.
-     * Called on SCREEN_OFF to prevent stale state from blocking touches after unlock.
-     */
-    private fun resetGestureState() {
-        val previousSession = mGestureSession
-        mGestureSession = null
+    private val nativeTouchHandoff = NativeTouchHandoff { message ->
+        XposedBridge.log("$TAG: $message")
+    }
+    private val gestureDetector by lazy {
+        EdgeGestureDetector(
+            handoff = nativeTouchHandoff,
+            handlerProvider = ::mainHandler,
+            callbacks = object : EdgeGestureDetector.Callbacks {
+                override fun isZoneEnabled(zone: String): Boolean =
+                    GestureManager.isZoneEnabled(zone)
 
-        mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
-        mPendingLongPressRunnable = null
+                override fun resolveAction(zone: String, gestureType: String): String =
+                    getConfig(AppConfig.gestureAction(zone, gestureType))
 
-        previousSession?.savedDownEvent?.recycle()
+                override fun dispatchAction(
+                    zone: String,
+                    gestureType: String,
+                    context: Context,
+                    touchX: Float,
+                    touchY: Float,
+                ) {
+                    triggerAction(zone, gestureType, context, touchX, touchY)
+                }
 
-        // Note: pending click / tap state are intentionally kept here so the
-        // click half of a click-vs-double-click decision can complete after
-        // the gesture session itself has ended.
-        if (previousSession != null) {
-            XposedBridge.log("$TAG: [Gesture] resetGestureState — cleared stale gesture session")
-        }
+                override fun performContinuousAdjustment(action: String, context: Context, up: Boolean) {
+                    when {
+                        action == "brightness_up" || action == "brightness_down" ->
+                            adjustBrightness(context, up)
+                        action == "volume_up" || action == "volume_down" ->
+                            adjustVolume(context, up)
+                    }
+                }
+
+                override fun log(message: String) {
+                    XposedBridge.log("$TAG: [Gesture] $message")
+                }
+            },
+        )
     }
 
-    private fun startLongPressTimer(context: Context, session: GestureSession) {
-        mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
-        val r = Runnable {
-            mPendingLongPressRunnable = null
-            if (mGestureSession !== session) return@Runnable
-            if (session.isSwiping) return@Runnable
-
-            val zone = session.zone
-            val lpAction = getConfig(AppConfig.gestureAction(zone, "long_press"))
-            if (lpAction.isNotEmpty() && lpAction != "none") {
-                cancelNativeStream(session, context)
-                triggerAction(zone, "long_press", context, session.targetX, session.targetY)
-            } else {
-                // No long-press action: Release the DOWN event to the app!
-                XposedBridge.log("$TAG: [Gesture] Long press timeout — no EdgeX action, releasing DOWN")
-                dispatchSavedDownIfNeeded(context, session)
-            }
-        }
-        mPendingLongPressRunnable = r
-        (mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }).postDelayed(r, LONG_PRESS_TIMEOUT_MS)
-    }
-
-    private fun cancelNativeStream(session: GestureSession, context: Context) {
-        if (!session.nativeStreamCancelled) {
-            injectEventInternal(context, session.savedDownEvent, MotionEvent.ACTION_CANCEL)
-            session.nativeStreamCancelled = true
-        }
-        mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
-        mPendingLongPressRunnable = null
-    }
-
-    private fun dispatchSavedDownIfNeeded(context: Context, session: GestureSession) {
-        if (!session.nativeDownInjected && !session.nativeStreamCancelled) {
-            injectEventInternal(context, session.savedDownEvent)
-            session.nativeDownInjected = true
-        }
-    }
-
-    private fun resumeNativeStream(session: GestureSession, context: Context, currentEvent: MotionEvent) {
-        if (!session.nativeStreamCancelled) {
-            dispatchSavedDownIfNeeded(context, session)
-            injectEventInternal(context, currentEvent)
-        }
-        mPendingLongPressRunnable?.let { mHandler?.removeCallbacks(it) }
-        mPendingLongPressRunnable = null
-    }
+    private fun mainHandler(): Handler =
+        mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
 
     /**
      * Register broadcast receiver for SCREEN_OFF/ON in system_server process.
@@ -181,7 +111,7 @@ object GestureManager {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
                         XposedBridge.log("$TAG: SCREEN_OFF — resetting gesture and key state")
-                        resetGestureState()
+                        gestureDetector.reset()
                         KeyManager.reset()
                     }
                     Intent.ACTION_SCREEN_ON -> {
@@ -225,17 +155,6 @@ object GestureManager {
             registerConfigObserver(context)
         }
 
-        // Safety guard: if the session has been active for too long without
-        // receiving UP/CANCEL (e.g. screen was locked mid-gesture),
-        // auto-reset to prevent blocking touch events.
-        mGestureSession?.let { session ->
-            val elapsed = System.currentTimeMillis() - session.startedAtMs
-            if (elapsed > GESTURE_TIMEOUT_MS) {
-                XposedBridge.log("$TAG: [Gesture] Safety timeout: session stuck for ${elapsed}ms — resetting")
-                resetGestureState()
-            }
-        }
-
         if (!isGesturesEnabled()) return false
 
         // Skip gestures when keyguard (lockscreen) is showing to avoid intercepting unlock swipes
@@ -244,248 +163,7 @@ object GestureManager {
             if (km?.isKeyguardLocked == true) return false
         } catch (_: Exception) {}
 
-        val action = event.actionMasked
-        val pointerCount = event.pointerCount
-
-        when (action) {
-            MotionEvent.ACTION_DOWN -> return handleGestureDown(event, context)
-
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                // Extra finger added: reset state to avoid direction confusion.
-                resetGestureState()
-                return false
-            }
-
-            MotionEvent.ACTION_MOVE -> return handleGestureMove(event, context)
-
-            MotionEvent.ACTION_UP -> return handleGestureUp(event, context)
-
-            MotionEvent.ACTION_CANCEL -> return handleGestureCancel(event, context)
-
-            else -> {
-                if (mGestureSession != null) {
-                    XposedBridge.log("$TAG: [Gesture] unhandled action=$action pointers=$pointerCount sessionActive=true")
-                }
-            }
-        }
-
-        return false
-    }
-
-    private fun handleGestureDown(event: MotionEvent, context: Context): Boolean {
-        val zoneMatch = resolveEdgeZone(context, event.rawX, event.rawY) ?: run {
-            if (mGestureSession != null) {
-                XposedBridge.log("$TAG: [Gesture] DOWN outside edge while sessionActive=true — resetting state")
-            }
-            resetGestureState()
-            return false
-        }
-
-        clearPendingSingleClick()
-
-        val session = GestureSession(
-            zone = zoneMatch.zone,
-            side = zoneMatch.side,
-            downX = event.rawX,
-            downY = event.rawY,
-            targetX = event.rawX,
-            targetY = event.rawY,
-            startedAtMs = System.currentTimeMillis(),
-            savedDownEvent = MotionEvent.obtain(event),
-        )
-        mGestureSession = session
-        startLongPressTimer(context, session)
-        return session.consumeStream
-    }
-
-    private fun handleGestureMove(event: MotionEvent, context: Context): Boolean {
-        val session = mGestureSession ?: return false
-        updateTargetPoint(session, event.rawX, event.rawY)
-
-        if (!session.isSwiping) {
-            val dx = event.rawX - session.downX
-            val dy = event.rawY - session.downY
-            if ((dx * dx) + (dy * dy) > TOUCH_SLOP_SQ) {
-                session.isSwiping = true
-                val gestureType = resolveSwipeGesture(dx, dy)
-                val action = getConfig(AppConfig.gestureAction(session.zone, gestureType))
-
-                if (hasConfiguredAction(action)) {
-                    cancelNativeStream(session, context)
-                    if (isContinuousAdjustmentAction(action)) {
-                        session.continuousAction = action
-                        session.lastAdjustY = event.rawY
-                    } else {
-                        triggerAction(session.zone, gestureType, context, session.targetX, session.targetY)
-                    }
-                } else {
-                    resumeNativeStream(session, context, event)
-                }
-            }
-        } else {
-            val continuousAction = session.continuousAction
-            when {
-                continuousAction != null -> handleContinuousAdjustment(session, continuousAction, context, event.rawY)
-                shouldProxyToNative(session) -> injectEventInternal(context, event)
-            }
-        }
-
-        return session.consumeStream
-    }
-
-    private fun handleGestureUp(event: MotionEvent, context: Context): Boolean {
-        val session = mGestureSession ?: return false
-
-        if (session.isSwiping) {
-            if (shouldProxyToNative(session)) {
-                injectEventInternal(context, event)
-            }
-            return finishGestureSession()
-        }
-
-        val clickAction = getConfig(AppConfig.gestureAction(session.zone, "click"))
-        val hasClickAction = hasConfiguredAction(clickAction)
-        val hasDoubleClickAction = hasConfiguredAction(
-            getConfig(AppConfig.gestureAction(session.zone, "double_click"))
-        )
-
-        if (hasClickAction || hasDoubleClickAction) {
-            cancelNativeStream(session, context)
-
-            if (!hasDoubleClickAction) {
-                triggerAction(session.zone, "click", context, session.targetX, session.targetY)
-            } else {
-                resolveTapAction(session, context, event.eventTime)
-            }
-        } else {
-            resumeNativeStream(session, context, event)
-        }
-
-        return finishGestureSession()
-    }
-
-    private fun handleGestureCancel(event: MotionEvent, context: Context): Boolean {
-        val session = mGestureSession ?: return false
-        if (!session.nativeStreamCancelled) {
-            resumeNativeStream(session, context, event)
-        }
-        resetGestureState()
-        return true
-    }
-
-    private fun finishGestureSession(): Boolean {
-        val consumed = mGestureSession?.consumeStream ?: false
-        resetGestureState()
-        return consumed
-    }
-
-    private fun clearPendingSingleClick() {
-        mPendingClickRunnable?.let { mHandler?.removeCallbacks(it) }
-        mPendingClickRunnable = null
-    }
-
-    private fun resolveEdgeZone(context: Context, x: Float, y: Float): EdgeZoneMatch? {
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val realSize = android.graphics.Point()
-        wm.defaultDisplay.getRealSize(realSize)
-
-        val edgeThreshold = EDGE_THRESHOLD_DP * context.resources.displayMetrics.density
-        val side = when {
-            x < edgeThreshold -> EdgeSide.LEFT
-            x > realSize.x - edgeThreshold -> EdgeSide.RIGHT
-            else -> return null
-        }
-
-        val verticalZone = when {
-            y < realSize.y * 0.33f -> "top"
-            y < realSize.y * 0.66f -> "mid"
-            else -> "bottom"
-        }
-        val zone = "${side.name.lowercase()}_$verticalZone"
-        return EdgeZoneMatch(zone, side).takeIf { isZoneEnabled(zone) }
-    }
-
-    private fun updateTargetPoint(session: GestureSession, x: Float, y: Float) {
-        when (session.side) {
-            EdgeSide.LEFT -> {
-                if (x > session.targetX) {
-                    session.targetX = x
-                    session.targetY = y
-                }
-            }
-            EdgeSide.RIGHT -> {
-                if (x < session.targetX) {
-                    session.targetX = x
-                    session.targetY = y
-                }
-            }
-        }
-    }
-
-    private fun resolveSwipeGesture(dx: Float, dy: Float): String =
-        when {
-            abs(dx) > abs(dy) -> if (dx < 0) "swipe_left" else "swipe_right"
-            else -> if (dy < 0) "swipe_up" else "swipe_down"
-        }
-
-    private fun hasConfiguredAction(action: String): Boolean =
-        action.isNotEmpty() && action != "none"
-
-    private fun isContinuousAdjustmentAction(action: String): Boolean =
-        action == "brightness_up" || action == "brightness_down" ||
-                action == "volume_up" || action == "volume_down"
-
-    private fun shouldProxyToNative(session: GestureSession): Boolean =
-        session.consumeStream && session.nativeDownInjected && !session.nativeStreamCancelled
-
-    private fun handleContinuousAdjustment(
-        session: GestureSession,
-        action: String,
-        context: Context,
-        currentY: Float,
-    ) {
-        val delta = session.lastAdjustY - currentY
-        if (abs(delta) < CONTINUOUS_STEP_PX) return
-
-        val steps = (abs(delta) / CONTINUOUS_STEP_PX).toInt()
-        val up = delta > 0
-        val handler = mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }
-        repeat(steps) {
-            handler.post {
-                when {
-                    action == "brightness_up" || action == "brightness_down" -> adjustBrightness(context, up)
-                    action == "volume_up" || action == "volume_down" -> adjustVolume(context, up)
-                }
-            }
-        }
-        session.lastAdjustY -= steps * CONTINUOUS_STEP_PX * (if (delta > 0) 1 else -1)
-    }
-
-    private fun resolveTapAction(session: GestureSession, context: Context, eventTime: Long) {
-        val zone = session.zone
-        val capturedX = session.targetX
-        val capturedY = session.targetY
-        val timeSinceLast = eventTime - mLastTapUpTime
-
-        if (timeSinceLast < DOUBLE_TAP_TIMEOUT_MS && mLastTapZone == zone) {
-            clearPendingSingleClick()
-            mLastTapUpTime = 0L
-            mLastTapZone = null
-            triggerAction(zone, "double_click", context, capturedX, capturedY)
-            return
-        }
-
-        mLastTapUpTime = eventTime
-        mLastTapZone = zone
-        val runnable = Runnable {
-            mPendingClickRunnable = null
-            mLastTapUpTime = 0L
-            mLastTapZone = null
-            triggerAction(zone, "click", context, capturedX, capturedY)
-        }
-        mPendingClickRunnable = runnable
-        (mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it })
-            .postDelayed(runnable, DOUBLE_TAP_TIMEOUT_MS)
+        return gestureDetector.handle(event, context)
     }
 
     /**
@@ -1324,26 +1002,6 @@ object GestureManager {
                 }
             }
         }.start()
-    }
-
-    private fun injectEventInternal(context: Context, event: MotionEvent, action: Int? = null) {
-        try {
-            val im = context.getSystemService(Context.INPUT_SERVICE) as android.hardware.input.InputManager
-            if (mInjectMethod == null) {
-                mInjectMethod = im.javaClass.getMethod("injectInputEvent", android.view.InputEvent::class.java, Int::class.javaPrimitiveType)
-            }
-            
-            val injected = if (action != null) {
-                MotionEvent.obtain(event.downTime, SystemClock.uptimeMillis(), action, event.rawX, event.rawY, event.metaState)
-            } else {
-                MotionEvent.obtain(event)
-            }
-            
-            mInjectMethod?.invoke(im, injected, 0) // ASYNC
-            injected.recycle()
-        } catch (e: Exception) {
-            XposedBridge.log("$TAG: Proxy injection failed: ${e.message}")
-        }
     }
 
     private fun performScreenshot(context: Context) {
