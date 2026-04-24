@@ -91,7 +91,13 @@ internal class HookConfigRepository(
         for (zone in AppConfig.ZONES) {
             query(AppConfig.zoneEnabled(zone))
             for (gesture in AppConfig.GESTURES) {
-                query(AppConfig.gestureAction(zone, gesture))
+                val parentKey = AppConfig.gestureAction(zone, gesture)
+                query(parentKey)
+                if (configCache[parentKey] == AppConfig.SUB_GESTURE_ACTION) {
+                    for (direction in AppConfig.SUB_GESTURE_DIRECTIONS) {
+                        query(AppConfig.subGestureChildKey(parentKey, direction))
+                    }
+                }
             }
         }
 
