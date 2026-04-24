@@ -17,15 +17,19 @@ object AppConfig {
         "left_top",
         "left_mid",
         "left_bottom",
+        "left",
         "right_top",
         "right_mid",
         "right_bottom",
+        "right",
         "top_left",
         "top_mid",
         "top_right",
+        "top",
         "bottom_left",
         "bottom_mid",
         "bottom_right",
+        "bottom",
     )
     val GESTURES = listOf("click", "double_click", "long_press", "swipe_up", "swipe_down", "swipe_left", "swipe_right")
     val KEY_TRIGGERS = listOf("click", "double_click", "long_press")
@@ -36,4 +40,13 @@ object AppConfig {
     fun keyEnabled(keyCode: Int) = "key_enabled_$keyCode"
     fun keyAction(keyCode: Int, trigger: String) = "key_${keyCode}_$trigger"
     fun keyActionLabel(keyCode: Int, trigger: String) = "key_${keyCode}_${trigger}_label"
+
+    fun fallbackEdgeZone(zone: String): String? =
+        when (zone) {
+            "left_top", "left_mid", "left_bottom" -> "left"
+            "right_top", "right_mid", "right_bottom" -> "right"
+            "top_left", "top_mid", "top_right" -> "top"
+            "bottom_left", "bottom_mid", "bottom_right" -> "bottom"
+            else -> null
+        }
 }

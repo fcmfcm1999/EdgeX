@@ -172,24 +172,40 @@ internal class DebugOverlayController(
 
             when (edge) {
                 OverlayEdge.LEFT -> {
-                    if (config.isZoneEnabled("left_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
-                    if (config.isZoneEnabled("left_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
-                    if (config.isZoneEnabled("left_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    if (config.isZoneEnabled("left")) {
+                        canvas.drawRect(0f, 0f, w, h, paint)
+                    } else {
+                        if (config.isZoneEnabled("left_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
+                        if (config.isZoneEnabled("left_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
+                        if (config.isZoneEnabled("left_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    }
                 }
                 OverlayEdge.RIGHT -> {
-                    if (config.isZoneEnabled("right_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
-                    if (config.isZoneEnabled("right_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
-                    if (config.isZoneEnabled("right_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    if (config.isZoneEnabled("right")) {
+                        canvas.drawRect(0f, 0f, w, h, paint)
+                    } else {
+                        if (config.isZoneEnabled("right_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
+                        if (config.isZoneEnabled("right_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
+                        if (config.isZoneEnabled("right_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    }
                 }
                 OverlayEdge.TOP -> {
-                    if (config.isZoneEnabled("top_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
-                    if (config.isZoneEnabled("top_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
-                    if (config.isZoneEnabled("top_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    if (config.isZoneEnabled("top")) {
+                        canvas.drawRect(0f, 0f, w, h, paint)
+                    } else {
+                        if (config.isZoneEnabled("top_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
+                        if (config.isZoneEnabled("top_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
+                        if (config.isZoneEnabled("top_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    }
                 }
                 OverlayEdge.BOTTOM -> {
-                    if (config.isZoneEnabled("bottom_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
-                    if (config.isZoneEnabled("bottom_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
-                    if (config.isZoneEnabled("bottom_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    if (config.isZoneEnabled("bottom")) {
+                        canvas.drawRect(0f, 0f, w, h, paint)
+                    } else {
+                        if (config.isZoneEnabled("bottom_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
+                        if (config.isZoneEnabled("bottom_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
+                        if (config.isZoneEnabled("bottom_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    }
                 }
             }
         }

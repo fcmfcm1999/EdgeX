@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.view.MotionEvent
 import android.view.WindowManager
+import com.fan.edgex.config.AppConfig
 import kotlin.math.abs
 
 internal class EdgeGestureDetector(
@@ -288,6 +289,12 @@ internal class EdgeGestureDetector(
             val zone = resolveZoneForEdge(edge, x, y, width, height)
             if (callbacks.isZoneEnabled(zone)) {
                 return EdgeZoneMatch(zone, edge)
+            }
+
+            val fallbackZone = AppConfig.fallbackEdgeZone(zone)
+            if (fallbackZone != null && callbacks.isZoneEnabled(fallbackZone)) {
+                callbacks.log("resolveEdgeZone fallback $zone -> $fallbackZone")
+                return EdgeZoneMatch(fallbackZone, edge)
             }
         }
         return null

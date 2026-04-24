@@ -73,8 +73,13 @@ object GestureManager {
                 override fun isZoneEnabled(zone: String): Boolean =
                     configRepository.isZoneEnabled(zone)
 
-                override fun resolveAction(zone: String, gestureType: String): String =
-                    configRepository.get(AppConfig.gestureAction(zone, gestureType))
+                override fun resolveAction(zone: String, gestureType: String): String {
+                    val direct = configRepository.get(AppConfig.gestureAction(zone, gestureType))
+                    if (direct.isNotEmpty() && direct != "none") return direct
+
+                    val fallbackZone = AppConfig.fallbackEdgeZone(zone) ?: return direct
+                    return configRepository.get(AppConfig.gestureAction(fallbackZone, gestureType), direct)
+                }
 
                 override fun dispatchAction(
                     zone: String,

@@ -23,6 +23,7 @@ class GesturesActivity : AppCompatActivity() {
     private data class ZoneSpec(
         val viewId: Int,
         @StringRes val titleRes: Int,
+        @StringRes val subtitleRes: Int? = null,
         val zoneKey: String,
         @DrawableRes val iconRes: Int,
         val actions: List<ActionSpec>,
@@ -59,18 +60,22 @@ class GesturesActivity : AppCompatActivity() {
     )
 
     private val zoneSpecs = listOf(
-        ZoneSpec(R.id.zone_left_top, R.string.zone_left_top, "left_top", R.drawable.ic_edge_left_top, sideLeftActions),
-        ZoneSpec(R.id.zone_left_mid, R.string.zone_left_mid, "left_mid", R.drawable.ic_edge_left_mid, sideLeftActions),
-        ZoneSpec(R.id.zone_left_bottom, R.string.zone_left_bottom, "left_bottom", R.drawable.ic_edge_left_bottom, sideLeftActions),
-        ZoneSpec(R.id.zone_right_top, R.string.zone_right_top, "right_top", R.drawable.ic_edge_right_top, sideRightActions),
-        ZoneSpec(R.id.zone_right_mid, R.string.zone_right_mid, "right_mid", R.drawable.ic_edge_right_mid, sideRightActions),
-        ZoneSpec(R.id.zone_right_bottom, R.string.zone_right_bottom, "right_bottom", R.drawable.ic_edge_right_bottom, sideRightActions),
-        ZoneSpec(R.id.zone_top_left, R.string.zone_top_left, "top_left", R.drawable.ic_edge_top_left, topActions),
-        ZoneSpec(R.id.zone_top_mid, R.string.zone_top_mid, "top_mid", R.drawable.ic_edge_top_mid, topActions),
-        ZoneSpec(R.id.zone_top_right, R.string.zone_top_right, "top_right", R.drawable.ic_edge_top_right, topActions),
-        ZoneSpec(R.id.zone_bottom_left, R.string.zone_bottom_left, "bottom_left", R.drawable.ic_edge_bottom_left, bottomActions),
-        ZoneSpec(R.id.zone_bottom_mid, R.string.zone_bottom_mid, "bottom_mid", R.drawable.ic_edge_bottom_mid, bottomActions),
-        ZoneSpec(R.id.zone_bottom_right, R.string.zone_bottom_right, "bottom_right", R.drawable.ic_edge_bottom_right, bottomActions),
+        ZoneSpec(R.id.zone_left_top, R.string.zone_left_top, zoneKey = "left_top", iconRes = R.drawable.ic_edge_left_top, actions = sideLeftActions),
+        ZoneSpec(R.id.zone_left_mid, R.string.zone_left_mid, zoneKey = "left_mid", iconRes = R.drawable.ic_edge_left_mid, actions = sideLeftActions),
+        ZoneSpec(R.id.zone_left_bottom, R.string.zone_left_bottom, zoneKey = "left_bottom", iconRes = R.drawable.ic_edge_left_bottom, actions = sideLeftActions),
+        ZoneSpec(R.id.zone_left_full, R.string.zone_left_full, R.string.zone_low_priority_subtitle, "left", R.drawable.ic_edge_left_full, sideLeftActions),
+        ZoneSpec(R.id.zone_right_top, R.string.zone_right_top, zoneKey = "right_top", iconRes = R.drawable.ic_edge_right_top, actions = sideRightActions),
+        ZoneSpec(R.id.zone_right_mid, R.string.zone_right_mid, zoneKey = "right_mid", iconRes = R.drawable.ic_edge_right_mid, actions = sideRightActions),
+        ZoneSpec(R.id.zone_right_bottom, R.string.zone_right_bottom, zoneKey = "right_bottom", iconRes = R.drawable.ic_edge_right_bottom, actions = sideRightActions),
+        ZoneSpec(R.id.zone_right_full, R.string.zone_right_full, R.string.zone_low_priority_subtitle, "right", R.drawable.ic_edge_right_full, sideRightActions),
+        ZoneSpec(R.id.zone_top_left, R.string.zone_top_left, zoneKey = "top_left", iconRes = R.drawable.ic_edge_top_left, actions = topActions),
+        ZoneSpec(R.id.zone_top_mid, R.string.zone_top_mid, zoneKey = "top_mid", iconRes = R.drawable.ic_edge_top_mid, actions = topActions),
+        ZoneSpec(R.id.zone_top_right, R.string.zone_top_right, zoneKey = "top_right", iconRes = R.drawable.ic_edge_top_right, actions = topActions),
+        ZoneSpec(R.id.zone_top_full, R.string.zone_top_full, R.string.zone_low_priority_subtitle, "top", R.drawable.ic_edge_top_full, topActions),
+        ZoneSpec(R.id.zone_bottom_left, R.string.zone_bottom_left, zoneKey = "bottom_left", iconRes = R.drawable.ic_edge_bottom_left, actions = bottomActions),
+        ZoneSpec(R.id.zone_bottom_mid, R.string.zone_bottom_mid, zoneKey = "bottom_mid", iconRes = R.drawable.ic_edge_bottom_mid, actions = bottomActions),
+        ZoneSpec(R.id.zone_bottom_right, R.string.zone_bottom_right, zoneKey = "bottom_right", iconRes = R.drawable.ic_edge_bottom_right, actions = bottomActions),
+        ZoneSpec(R.id.zone_bottom_full, R.string.zone_bottom_full, R.string.zone_low_priority_subtitle, "bottom", R.drawable.ic_edge_bottom_full, bottomActions),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -98,6 +103,16 @@ class GesturesActivity : AppCompatActivity() {
         val zoneKey = spec.zoneKey
 
         root.findViewById<TextView>(R.id.title).text = title
+        root.findViewById<TextView>(R.id.subtitle).apply {
+            val subtitleRes = spec.subtitleRes
+            if (subtitleRes != null) {
+                text = getString(subtitleRes)
+                visibility = View.VISIBLE
+            } else {
+                text = ""
+                visibility = View.GONE
+            }
+        }
         root.findViewById<ImageView>(R.id.zone_icon).setImageResource(spec.iconRes)
 
         val checkBox = root.findViewById<android.widget.CheckBox>(R.id.checkbox)

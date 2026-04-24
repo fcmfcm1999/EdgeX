@@ -61,6 +61,10 @@
             <include layout="@layout/item_gesture_zone_left"
                 android:id="@+id/zone_left_bottom" />
 
+            <!-- ================= LEFT FULL ================= -->
+            <include layout="@layout/item_gesture_zone_left"
+                android:id="@+id/zone_left_full" />
+
             <!-- ================= RIGHT TOP ================= -->
             <include layout="@layout/item_gesture_zone_right"
                 android:id="@+id/zone_right_top" />
@@ -72,6 +76,10 @@
             <!-- ================= RIGHT BOTTOM ================= -->
             <include layout="@layout/item_gesture_zone_right"
                 android:id="@+id/zone_right_bottom" />
+
+            <!-- ================= RIGHT FULL ================= -->
+            <include layout="@layout/item_gesture_zone_right"
+                android:id="@+id/zone_right_full" />
 
             <!-- ================= TOP LEFT ================= -->
             <include layout="@layout/item_gesture_zone_top"
@@ -85,6 +93,10 @@
             <include layout="@layout/item_gesture_zone_top"
                 android:id="@+id/zone_top_right" />
 
+            <!-- ================= TOP FULL ================= -->
+            <include layout="@layout/item_gesture_zone_top"
+                android:id="@+id/zone_top_full" />
+
             <!-- ================= BOTTOM LEFT ================= -->
             <include layout="@layout/item_gesture_zone_bottom"
                 android:id="@+id/zone_bottom_left" />
@@ -96,6 +108,10 @@
             <!-- ================= BOTTOM RIGHT ================= -->
             <include layout="@layout/item_gesture_zone_bottom"
                 android:id="@+id/zone_bottom_right" />
+
+            <!-- ================= BOTTOM FULL ================= -->
+            <include layout="@layout/item_gesture_zone_bottom"
+                android:id="@+id/zone_bottom_full" />
 
         </LinearLayout>
     </ScrollView>

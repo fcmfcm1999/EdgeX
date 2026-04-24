@@ -59,12 +59,17 @@
     <string name="zone_right_top">Top-Right</string>
     <string name="zone_right_mid">Mid-Right</string>
     <string name="zone_right_bottom">Bottom-Right</string>
+    <string name="zone_left_full">Left Edge</string>
+    <string name="zone_right_full">Right Edge</string>
     <string name="zone_top_left">Left-Top</string>
     <string name="zone_top_mid">Mid-Top</string>
     <string name="zone_top_right">Right-Top</string>
+    <string name="zone_top_full">Top Edge</string>
     <string name="zone_bottom_left">Left-Bottom</string>
     <string name="zone_bottom_mid">Mid-Bottom</string>
     <string name="zone_bottom_right">Right-Bottom</string>
+    <string name="zone_bottom_full">Bottom Edge</string>
+    <string name="zone_low_priority_subtitle">Fallback</string>
     <string name="zone_left_default_title">Left Zone</string>
     <string name="zone_right_default_title">Right Zone</string>
     <string name="zone_top_default_title">Top Zone</string>
