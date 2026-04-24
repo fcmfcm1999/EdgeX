@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
@@ -12,45 +14,91 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 
 class GesturesActivity : AppCompatActivity() {
+    private data class ActionSpec(
+        val viewId: Int,
+        @StringRes val labelRes: Int,
+        val actionKey: String,
+    )
+
+    private data class ZoneSpec(
+        val viewId: Int,
+        @StringRes val titleRes: Int,
+        val zoneKey: String,
+        @DrawableRes val iconRes: Int,
+        val actions: List<ActionSpec>,
+    )
+
+    private val defaultActions = listOf(
+        ActionSpec(R.id.action_click, R.string.gesture_click, "click"),
+        ActionSpec(R.id.action_double_click, R.string.gesture_double_click, "double_click"),
+        ActionSpec(R.id.action_long_press, R.string.gesture_long_press, "long_press"),
+    )
+
+    private val sideLeftActions = defaultActions + listOf(
+        ActionSpec(R.id.action_swipe_right, R.string.gesture_swipe_right, "swipe_right"),
+        ActionSpec(R.id.action_swipe_up, R.string.gesture_swipe_up, "swipe_up"),
+        ActionSpec(R.id.action_swipe_down, R.string.gesture_swipe_down, "swipe_down"),
+    )
+
+    private val sideRightActions = defaultActions + listOf(
+        ActionSpec(R.id.action_swipe_left, R.string.gesture_swipe_left, "swipe_left"),
+        ActionSpec(R.id.action_swipe_up, R.string.gesture_swipe_up, "swipe_up"),
+        ActionSpec(R.id.action_swipe_down, R.string.gesture_swipe_down, "swipe_down"),
+    )
+
+    private val topActions = defaultActions + listOf(
+        ActionSpec(R.id.action_swipe_down, R.string.gesture_swipe_down, "swipe_down"),
+        ActionSpec(R.id.action_swipe_left, R.string.gesture_swipe_left, "swipe_left"),
+        ActionSpec(R.id.action_swipe_right, R.string.gesture_swipe_right, "swipe_right"),
+    )
+
+    private val bottomActions = defaultActions + listOf(
+        ActionSpec(R.id.action_swipe_up, R.string.gesture_swipe_up, "swipe_up"),
+        ActionSpec(R.id.action_swipe_left, R.string.gesture_swipe_left, "swipe_left"),
+        ActionSpec(R.id.action_swipe_right, R.string.gesture_swipe_right, "swipe_right"),
+    )
+
+    private val zoneSpecs = listOf(
+        ZoneSpec(R.id.zone_left_top, R.string.zone_left_top, "left_top", R.drawable.ic_edge_left_top, sideLeftActions),
+        ZoneSpec(R.id.zone_left_mid, R.string.zone_left_mid, "left_mid", R.drawable.ic_edge_left_mid, sideLeftActions),
+        ZoneSpec(R.id.zone_left_bottom, R.string.zone_left_bottom, "left_bottom", R.drawable.ic_edge_left_bottom, sideLeftActions),
+        ZoneSpec(R.id.zone_right_top, R.string.zone_right_top, "right_top", R.drawable.ic_edge_right_top, sideRightActions),
+        ZoneSpec(R.id.zone_right_mid, R.string.zone_right_mid, "right_mid", R.drawable.ic_edge_right_mid, sideRightActions),
+        ZoneSpec(R.id.zone_right_bottom, R.string.zone_right_bottom, "right_bottom", R.drawable.ic_edge_right_bottom, sideRightActions),
+        ZoneSpec(R.id.zone_top_left, R.string.zone_top_left, "top_left", R.drawable.ic_edge_top_left, topActions),
+        ZoneSpec(R.id.zone_top_mid, R.string.zone_top_mid, "top_mid", R.drawable.ic_edge_top_mid, topActions),
+        ZoneSpec(R.id.zone_top_right, R.string.zone_top_right, "top_right", R.drawable.ic_edge_top_right, topActions),
+        ZoneSpec(R.id.zone_bottom_left, R.string.zone_bottom_left, "bottom_left", R.drawable.ic_edge_bottom_left, bottomActions),
+        ZoneSpec(R.id.zone_bottom_mid, R.string.zone_bottom_mid, "bottom_mid", R.drawable.ic_edge_bottom_mid, bottomActions),
+        ZoneSpec(R.id.zone_bottom_right, R.string.zone_bottom_right, "bottom_right", R.drawable.ic_edge_bottom_right, bottomActions),
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_gestures)
         ThemeManager.applyToActivity(this)
 
-        // Immersive Header Fix
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(view.paddingLeft, insets.systemWindowInsetTop, view.paddingRight, view.paddingBottom)
             insets
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
-        // Initialize Zones with specific icons
-        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
-        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
-        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
-
-        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
-        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
-        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
+        zoneSpecs.forEach(::setupZone)
     }
 
     override fun onResume() {
         super.onResume()
-        // Refresh UI to show new selections
-        setupZone(findViewById(R.id.zone_left_top), getString(R.string.zone_left_top), "left_top", R.drawable.ic_edge_left_top)
-        setupZone(findViewById(R.id.zone_left_mid), getString(R.string.zone_left_mid), "left_mid", R.drawable.ic_edge_left_mid)
-        setupZone(findViewById(R.id.zone_left_bottom), getString(R.string.zone_left_bottom), "left_bottom", R.drawable.ic_edge_left_bottom)
-        setupZone(findViewById(R.id.zone_right_top), getString(R.string.zone_right_top), "right_top", R.drawable.ic_edge_right_top)
-        setupZone(findViewById(R.id.zone_right_mid), getString(R.string.zone_right_mid), "right_mid", R.drawable.ic_edge_right_mid)
-        setupZone(findViewById(R.id.zone_right_bottom), getString(R.string.zone_right_bottom), "right_bottom", R.drawable.ic_edge_right_bottom)
+        zoneSpecs.forEach(::setupZone)
     }
 
-    private fun setupZone(root: View, title: String, zoneKey: String, iconRes: Int) {
-        root.findViewById<TextView>(R.id.title).text = title
-        root.findViewById<ImageView>(R.id.zone_icon).setImageResource(iconRes)
+    private fun setupZone(spec: ZoneSpec) {
+        val root = findViewById<View>(spec.viewId)
+        val title = getString(spec.titleRes)
+        val zoneKey = spec.zoneKey
 
-        val isLeft = zoneKey.startsWith("left")
+        root.findViewById<TextView>(R.id.title).text = title
+        root.findViewById<ImageView>(R.id.zone_icon).setImageResource(spec.iconRes)
 
         val checkBox = root.findViewById<android.widget.CheckBox>(R.id.checkbox)
         val enabledKey = AppConfig.zoneEnabled(zoneKey)
@@ -78,16 +126,8 @@ class GesturesActivity : AppCompatActivity() {
             }
         }
 
-        setupAction(root.findViewById(R.id.action_click), getString(R.string.gesture_click), zoneKey, "click", title)
-        setupAction(root.findViewById(R.id.action_double_click), getString(R.string.gesture_double_click), zoneKey, "double_click", title)
-        setupAction(root.findViewById(R.id.action_long_press), getString(R.string.gesture_long_press), zoneKey, "long_press", title)
-        setupAction(root.findViewById(R.id.action_swipe_up), getString(R.string.gesture_swipe_up), zoneKey, "swipe_up", title)
-        setupAction(root.findViewById(R.id.action_swipe_down), getString(R.string.gesture_swipe_down), zoneKey, "swipe_down", title)
-
-        if (isLeft) {
-            setupAction(root.findViewById(R.id.action_swipe_right), getString(R.string.gesture_swipe_right), zoneKey, "swipe_right", title)
-        } else {
-            setupAction(root.findViewById(R.id.action_swipe_left), getString(R.string.gesture_swipe_left), zoneKey, "swipe_left", title)
+        spec.actions.forEach { action ->
+            setupAction(root.findViewById(action.viewId), getString(action.labelRes), zoneKey, action.actionKey, title)
         }
     }
 

@@ -21,16 +21,18 @@ internal class EdgeGestureDetector(
         fun log(message: String)
     }
 
-    private enum class EdgeSide { LEFT, RIGHT }
+    private enum class Edge { LEFT, RIGHT, TOP, BOTTOM }
+
+    private enum class AdjustmentAxis { HORIZONTAL, VERTICAL }
 
     private data class EdgeZoneMatch(
         val zone: String,
-        val side: EdgeSide,
+        val edge: Edge,
     )
 
     private data class GestureSession(
         val zone: String,
-        val side: EdgeSide,
+        val edge: Edge,
         val downX: Float,
         val downY: Float,
         var targetX: Float,
@@ -39,7 +41,8 @@ internal class EdgeGestureDetector(
         val handoff: NativeTouchHandoff.Session,
         var isSwiping: Boolean = false,
         var continuousAction: String? = null,
-        var lastAdjustY: Float = 0f,
+        var adjustmentAxis: AdjustmentAxis? = null,
+        var lastAdjustCoord: Float = 0f,
     )
 
     private var activeSession: GestureSession? = null
@@ -111,7 +114,7 @@ internal class EdgeGestureDetector(
 
         val session = GestureSession(
             zone = zoneMatch.zone,
-            side = zoneMatch.side,
+            edge = zoneMatch.edge,
             downX = event.rawX,
             downY = event.rawY,
             targetX = event.rawX,
@@ -141,7 +144,9 @@ internal class EdgeGestureDetector(
                     cancelLongPressTimer()
                     if (isContinuousAdjustmentAction(action)) {
                         session.continuousAction = action
-                        session.lastAdjustY = event.rawY
+                        session.adjustmentAxis = resolveAdjustmentAxis(gestureType)
+                        session.lastAdjustCoord =
+                            resolveAdjustCoord(session.adjustmentAxis ?: AdjustmentAxis.VERTICAL, event.rawX, event.rawY)
                     } else {
                         callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
                     }
@@ -153,7 +158,8 @@ internal class EdgeGestureDetector(
         } else {
             val continuousAction = session.continuousAction
             when {
-                continuousAction != null -> handleContinuousAdjustment(session, continuousAction, context, event.rawY)
+                continuousAction != null ->
+                    handleContinuousAdjustment(session, continuousAction, context, event.rawX, event.rawY)
                 handoff.shouldProxyToNative(session.handoff) -> handoff.forwardToNative(session.handoff, context, event)
             }
         }
@@ -267,31 +273,79 @@ internal class EdgeGestureDetector(
         windowManager.defaultDisplay.getRealSize(realSize)
 
         val edgeThreshold = EDGE_THRESHOLD_DP * context.resources.displayMetrics.density
-        val side = when {
-            x < edgeThreshold -> EdgeSide.LEFT
-            x > realSize.x - edgeThreshold -> EdgeSide.RIGHT
-            else -> return null
-        }
+        val width = realSize.x.toFloat()
+        val height = realSize.y.toFloat()
 
-        val verticalZone = when {
-            y < realSize.y * 0.33f -> "top"
-            y < realSize.y * 0.66f -> "mid"
-            else -> "bottom"
+        val candidates = buildList {
+            if (x < edgeThreshold) add(Edge.LEFT to x)
+            if (x > width - edgeThreshold) add(Edge.RIGHT to (width - x))
+            if (y < edgeThreshold) add(Edge.TOP to y)
+            if (y > height - edgeThreshold) add(Edge.BOTTOM to (height - y))
         }
-        val zone = "${side.name.lowercase()}_$verticalZone"
-        return EdgeZoneMatch(zone, side).takeIf { callbacks.isZoneEnabled(zone) }
+        if (candidates.isEmpty()) return null
+
+        for ((edge, _) in candidates.sortedBy { it.second }) {
+            val zone = resolveZoneForEdge(edge, x, y, width, height)
+            if (callbacks.isZoneEnabled(zone)) {
+                return EdgeZoneMatch(zone, edge)
+            }
+        }
+        return null
     }
 
+    private fun resolveZoneForEdge(edge: Edge, x: Float, y: Float, width: Float, height: Float): String =
+        when (edge) {
+            Edge.LEFT -> "left_${resolveVerticalThird(y, height)}"
+            Edge.RIGHT -> "right_${resolveVerticalThird(y, height)}"
+            Edge.TOP -> "top_${resolveHorizontalThird(x, width)}"
+            Edge.BOTTOM -> "bottom_${resolveHorizontalThird(x, width)}"
+        }
+
+    private fun resolveVerticalThird(y: Float, height: Float): String =
+        when {
+            y < height * 0.33f -> "top"
+            y < height * 0.66f -> "mid"
+            else -> "bottom"
+        }
+
+    private fun resolveHorizontalThird(x: Float, width: Float): String =
+        when {
+            x < width * 0.33f -> "left"
+            x < width * 0.66f -> "mid"
+            else -> "right"
+        }
+
+    private fun resolveAdjustmentAxis(gestureType: String): AdjustmentAxis =
+        when (gestureType) {
+            "swipe_left", "swipe_right" -> AdjustmentAxis.HORIZONTAL
+            else -> AdjustmentAxis.VERTICAL
+        }
+
+    private fun resolveAdjustCoord(axis: AdjustmentAxis, x: Float, y: Float): Float =
+        if (axis == AdjustmentAxis.HORIZONTAL) x else y
+
     private fun updateTargetPoint(session: GestureSession, x: Float, y: Float) {
-        when (session.side) {
-            EdgeSide.LEFT -> {
+        when (session.edge) {
+            Edge.LEFT -> {
                 if (x > session.targetX) {
                     session.targetX = x
                     session.targetY = y
                 }
             }
-            EdgeSide.RIGHT -> {
+            Edge.RIGHT -> {
                 if (x < session.targetX) {
+                    session.targetX = x
+                    session.targetY = y
+                }
+            }
+            Edge.TOP -> {
+                if (y > session.targetY) {
+                    session.targetX = x
+                    session.targetY = y
+                }
+            }
+            Edge.BOTTOM -> {
+                if (y < session.targetY) {
                     session.targetX = x
                     session.targetY = y
                 }
@@ -316,19 +370,23 @@ internal class EdgeGestureDetector(
         session: GestureSession,
         action: String,
         context: Context,
+        currentX: Float,
         currentY: Float,
     ) {
-        val delta = session.lastAdjustY - currentY
-        if (abs(delta) < CONTINUOUS_STEP_PX) return
+        val axis = session.adjustmentAxis ?: return
+        val currentCoord = resolveAdjustCoord(axis, currentX, currentY)
+        val rawDelta = currentCoord - session.lastAdjustCoord
+        val effectiveDelta = if (axis == AdjustmentAxis.HORIZONTAL) rawDelta else -rawDelta
+        if (abs(effectiveDelta) < CONTINUOUS_STEP_PX) return
 
-        val steps = (abs(delta) / CONTINUOUS_STEP_PX).toInt()
-        val up = delta > 0
+        val steps = (abs(effectiveDelta) / CONTINUOUS_STEP_PX).toInt()
+        val up = effectiveDelta > 0
         repeat(steps) {
             handlerProvider().post {
                 callbacks.performContinuousAdjustment(action, context, up)
             }
         }
-        session.lastAdjustY -= steps * CONTINUOUS_STEP_PX * (if (delta > 0) 1 else -1)
+        session.lastAdjustCoord += steps * CONTINUOUS_STEP_PX * (if (rawDelta > 0) 1 else -1)
     }
 
     private companion object {

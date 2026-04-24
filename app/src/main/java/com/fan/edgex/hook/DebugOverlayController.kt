@@ -17,6 +17,13 @@ internal class DebugOverlayController(
     private val config: ConfigAccess,
     private val log: (String) -> Unit,
 ) {
+    private enum class OverlayEdge {
+        LEFT,
+        RIGHT,
+        TOP,
+        BOTTOM,
+    }
+
     interface ConfigAccess {
         fun isGesturesEnabled(): Boolean
         fun isZoneEnabled(zone: String): Boolean
@@ -34,8 +41,10 @@ internal class DebugOverlayController(
         systemUiContext = context
         registerScreenStateReceiver(context)
         try {
-            addDebugOverlayView(context, Gravity.LEFT)
-            addDebugOverlayView(context, Gravity.RIGHT)
+            addDebugOverlayView(context, OverlayEdge.LEFT)
+            addDebugOverlayView(context, OverlayEdge.RIGHT)
+            addDebugOverlayView(context, OverlayEdge.TOP)
+            addDebugOverlayView(context, OverlayEdge.BOTTOM)
         } catch (t: Throwable) {
             log("Failed to add debug overlay views: ${t.message}")
         }
@@ -84,14 +93,14 @@ internal class DebugOverlayController(
         }
     }
 
-    private fun addDebugOverlayView(context: Context, gravity: Int) {
+    private fun addDebugOverlayView(context: Context, edge: OverlayEdge) {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val widthPx = (12 * context.resources.displayMetrics.density).toInt()
+        val thicknessPx = (12 * context.resources.displayMetrics.density).toInt()
 
-        val view = DebugOverlayView(context, gravity, config)
+        val view = DebugOverlayView(context, edge, config)
         val params = WindowManager.LayoutParams(
-            widthPx,
-            WindowManager.LayoutParams.MATCH_PARENT,
+            if (edge == OverlayEdge.LEFT || edge == OverlayEdge.RIGHT) thicknessPx else WindowManager.LayoutParams.MATCH_PARENT,
+            if (edge == OverlayEdge.TOP || edge == OverlayEdge.BOTTOM) thicknessPx else WindowManager.LayoutParams.MATCH_PARENT,
             2027,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -99,20 +108,26 @@ internal class DebugOverlayController(
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            this.gravity = gravity
+            gravity = overlayGravity(edge)
         }
 
         wm.addView(view, params)
         debugViews.add(view)
     }
 
+    private fun overlayGravity(edge: OverlayEdge): Int =
+        when (edge) {
+            OverlayEdge.LEFT -> Gravity.START or Gravity.TOP
+            OverlayEdge.RIGHT -> Gravity.END or Gravity.TOP
+            OverlayEdge.TOP -> Gravity.TOP or Gravity.START
+            OverlayEdge.BOTTOM -> Gravity.BOTTOM or Gravity.START
+        }
+
     private class DebugOverlayView(
         context: Context,
-        private val edgeGravity: Int,
+        private val edge: OverlayEdge,
         private val config: ConfigAccess,
     ) : View(context) {
-        private var windowOffsetY = 0
-        private var lastScreenHeight = 0
         private val handler = Handler(Looper.getMainLooper())
         private val paint = android.graphics.Paint()
         private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
@@ -152,27 +167,30 @@ internal class DebugOverlayController(
             if (!config.isDebugEnabled()) return
             if (!config.isGesturesEnabled()) return
 
-            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val realSize = android.graphics.Point()
-            wm.defaultDisplay.getRealSize(realSize)
-
-            if (realSize.y != lastScreenHeight) {
-                lastScreenHeight = realSize.y
-                handler.post { updateWindowRegion() }
-            }
-
-            val h = realSize.y.toFloat()
+            val h = height.toFloat()
             val w = width.toFloat()
-            val offsetY = -windowOffsetY.toFloat()
 
-            if (edgeGravity == Gravity.LEFT) {
-                if (config.isZoneEnabled("left_top")) canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
-                if (config.isZoneEnabled("left_mid")) canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
-                if (config.isZoneEnabled("left_bottom")) canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
-            } else {
-                if (config.isZoneEnabled("right_top")) canvas.drawRect(0f, 0f + offsetY, w, h * 0.33f + offsetY, paint)
-                if (config.isZoneEnabled("right_mid")) canvas.drawRect(0f, h * 0.33f + offsetY, w, h * 0.66f + offsetY, paint)
-                if (config.isZoneEnabled("right_bottom")) canvas.drawRect(0f, h * 0.66f + offsetY, w, h + offsetY, paint)
+            when (edge) {
+                OverlayEdge.LEFT -> {
+                    if (config.isZoneEnabled("left_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
+                    if (config.isZoneEnabled("left_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
+                    if (config.isZoneEnabled("left_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                }
+                OverlayEdge.RIGHT -> {
+                    if (config.isZoneEnabled("right_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
+                    if (config.isZoneEnabled("right_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
+                    if (config.isZoneEnabled("right_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                }
+                OverlayEdge.TOP -> {
+                    if (config.isZoneEnabled("top_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
+                    if (config.isZoneEnabled("top_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
+                    if (config.isZoneEnabled("top_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                }
+                OverlayEdge.BOTTOM -> {
+                    if (config.isZoneEnabled("bottom_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
+                    if (config.isZoneEnabled("bottom_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
+                    if (config.isZoneEnabled("bottom_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                }
             }
         }
 
@@ -180,68 +198,28 @@ internal class DebugOverlayController(
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val realSize = android.graphics.Point()
             wm.defaultDisplay.getRealSize(realSize)
-            val h = realSize.y
-
-            var minTop = h
-            var maxBottom = 0
-            var hasEnabledZone = false
-
-            if (edgeGravity == Gravity.LEFT) {
-                if (config.isZoneEnabled("left_top")) {
-                    minTop = kotlin.math.min(minTop, 0)
-                    maxBottom = kotlin.math.max(maxBottom, (h * 0.33f).toInt())
-                    hasEnabledZone = true
-                }
-                if (config.isZoneEnabled("left_mid")) {
-                    minTop = kotlin.math.min(minTop, (h * 0.33f).toInt())
-                    maxBottom = kotlin.math.max(maxBottom, (h * 0.66f).toInt())
-                    hasEnabledZone = true
-                }
-                if (config.isZoneEnabled("left_bottom")) {
-                    minTop = kotlin.math.min(minTop, (h * 0.66f).toInt())
-                    maxBottom = kotlin.math.max(maxBottom, h)
-                    hasEnabledZone = true
-                }
-            } else {
-                if (config.isZoneEnabled("right_top")) {
-                    minTop = kotlin.math.min(minTop, 0)
-                    maxBottom = kotlin.math.max(maxBottom, (h * 0.33f).toInt())
-                    hasEnabledZone = true
-                }
-                if (config.isZoneEnabled("right_mid")) {
-                    minTop = kotlin.math.min(minTop, (h * 0.33f).toInt())
-                    maxBottom = kotlin.math.max(maxBottom, (h * 0.66f).toInt())
-                    hasEnabledZone = true
-                }
-                if (config.isZoneEnabled("right_bottom")) {
-                    minTop = kotlin.math.min(minTop, (h * 0.66f).toInt())
-                    maxBottom = kotlin.math.max(maxBottom, h)
-                    hasEnabledZone = true
-                }
-            }
+            val thicknessPx = (12 * context.resources.displayMetrics.density).toInt()
 
             try {
                 val params = layoutParams as WindowManager.LayoutParams
-                when {
-                    config.isDebugEnabled() -> {
-                        visibility = VISIBLE
-                        params.gravity = Gravity.TOP or edgeGravity
-                        params.y = 0
-                        params.height = h
-                        windowOffsetY = 0
+                if (config.isDebugEnabled()) {
+                    visibility = VISIBLE
+                    params.gravity = when (edge) {
+                        OverlayEdge.LEFT -> Gravity.START or Gravity.TOP
+                        OverlayEdge.RIGHT -> Gravity.END or Gravity.TOP
+                        OverlayEdge.TOP -> Gravity.TOP or Gravity.START
+                        OverlayEdge.BOTTOM -> Gravity.BOTTOM or Gravity.START
                     }
-                    !hasEnabledZone -> {
-                        params.height = 0
-                        visibility = GONE
-                        windowOffsetY = 0
-                    }
-                    else -> {
-                        visibility = VISIBLE
-                        params.gravity = Gravity.TOP or edgeGravity
-                        params.y = minTop
-                        params.height = maxBottom - minTop
-                        windowOffsetY = minTop
-                    }
+                    params.x = 0
+                    params.y = 0
+                    params.width =
+                        if (edge == OverlayEdge.LEFT || edge == OverlayEdge.RIGHT) thicknessPx else realSize.x
+                    params.height =
+                        if (edge == OverlayEdge.TOP || edge == OverlayEdge.BOTTOM) thicknessPx else realSize.y
+                } else {
+                    visibility = GONE
+                    params.width = 0
+                    params.height = 0
                 }
                 wm.updateViewLayout(this, params)
             } catch (e: Exception) {

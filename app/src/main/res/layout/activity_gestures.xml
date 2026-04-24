@@ -73,6 +73,30 @@
             <include layout="@layout/item_gesture_zone_right"
                 android:id="@+id/zone_right_bottom" />
 
+            <!-- ================= TOP LEFT ================= -->
+            <include layout="@layout/item_gesture_zone_top"
+                android:id="@+id/zone_top_left" />
+
+            <!-- ================= TOP MID ================= -->
+            <include layout="@layout/item_gesture_zone_top"
+                android:id="@+id/zone_top_mid" />
+
+            <!-- ================= TOP RIGHT ================= -->
+            <include layout="@layout/item_gesture_zone_top"
+                android:id="@+id/zone_top_right" />
+
+            <!-- ================= BOTTOM LEFT ================= -->
+            <include layout="@layout/item_gesture_zone_bottom"
+                android:id="@+id/zone_bottom_left" />
+
+            <!-- ================= BOTTOM MID ================= -->
+            <include layout="@layout/item_gesture_zone_bottom"
+                android:id="@+id/zone_bottom_mid" />
+
+            <!-- ================= BOTTOM RIGHT ================= -->
+            <include layout="@layout/item_gesture_zone_bottom"
+                android:id="@+id/zone_bottom_right" />
+
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -58,8 +58,16 @@
     <string name="zone_right_top">右上</string>
     <string name="zone_right_mid">右中</string>
     <string name="zone_right_bottom">右下</string>
+    <string name="zone_top_left">上左</string>
+    <string name="zone_top_mid">上中</string>
+    <string name="zone_top_right">上右</string>
+    <string name="zone_bottom_left">下左</string>
+    <string name="zone_bottom_mid">下中</string>
+    <string name="zone_bottom_right">下右</string>
     <string name="zone_left_default_title">左侧区域</string>
     <string name="zone_right_default_title">右侧区域</string>
+    <string name="zone_top_default_title">上边缘区域</string>
+    <string name="zone_bottom_default_title">下边缘区域</string>
 
     <!-- 手势事件类型 -->
     <string name="gesture_click">单击</string>
