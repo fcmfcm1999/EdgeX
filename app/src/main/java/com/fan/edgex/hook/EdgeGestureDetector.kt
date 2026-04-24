@@ -5,6 +5,7 @@ import android.os.Handler
 import android.view.MotionEvent
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.AppConfig.SUB_GESTURE_ACTION
 import kotlin.math.abs
 
 internal class EdgeGestureDetector(
@@ -44,6 +45,11 @@ internal class EdgeGestureDetector(
         var continuousAction: String? = null,
         var adjustmentAxis: AdjustmentAxis? = null,
         var lastAdjustCoord: Float = 0f,
+        // Sub-gesture state
+        var subGestureMode: Boolean = false,
+        var subGestureAnchorX: Float = 0f,
+        var subGestureAnchorY: Float = 0f,
+        var primaryGesture: String = "",
     )
 
     private var activeSession: GestureSession? = null
@@ -132,6 +138,10 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
         updateTargetPoint(session, event.rawX, event.rawY)
 
+        if (session.subGestureMode) {
+            return session.handoff.consumeStream
+        }
+
         if (!session.isSwiping) {
             val dx = event.rawX - session.downX
             val dy = event.rawY - session.downY
@@ -140,20 +150,32 @@ internal class EdgeGestureDetector(
                 val gestureType = resolveSwipeGesture(dx, dy)
                 val action = callbacks.resolveAction(session.zone, gestureType)
 
-                if (hasConfiguredAction(action)) {
-                    handoff.cancel(session.handoff, context)
-                    cancelLongPressTimer()
-                    if (isContinuousAdjustmentAction(action)) {
-                        session.continuousAction = action
-                        session.adjustmentAxis = resolveAdjustmentAxis(gestureType)
-                        session.lastAdjustCoord =
-                            resolveAdjustCoord(session.adjustmentAxis ?: AdjustmentAxis.VERTICAL, event.rawX, event.rawY)
-                    } else {
-                        callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
+                when {
+                    action == SUB_GESTURE_ACTION -> {
+                        handoff.cancel(session.handoff, context)
+                        cancelLongPressTimer()
+                        session.subGestureMode = true
+                        session.subGestureAnchorX = event.rawX
+                        session.subGestureAnchorY = event.rawY
+                        session.primaryGesture = gestureType
+                        callbacks.log("Sub-gesture mode via $gestureType at (${event.rawX}, ${event.rawY})")
                     }
-                } else {
-                    handoff.resume(session.handoff, context, event)
-                    cancelLongPressTimer()
+                    hasConfiguredAction(action) -> {
+                        handoff.cancel(session.handoff, context)
+                        cancelLongPressTimer()
+                        if (isContinuousAdjustmentAction(action)) {
+                            session.continuousAction = action
+                            session.adjustmentAxis = resolveAdjustmentAxis(gestureType)
+                            session.lastAdjustCoord =
+                                resolveAdjustCoord(session.adjustmentAxis ?: AdjustmentAxis.VERTICAL, event.rawX, event.rawY)
+                        } else {
+                            callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
+                        }
+                    }
+                    else -> {
+                        handoff.resume(session.handoff, context, event)
+                        cancelLongPressTimer()
+                    }
                 }
             }
         } else {
@@ -170,6 +192,22 @@ internal class EdgeGestureDetector(
 
     private fun handleUp(event: MotionEvent, context: Context): Boolean {
         val session = activeSession ?: return false
+
+        if (session.subGestureMode) {
+            val dx = event.rawX - session.subGestureAnchorX
+            val dy = event.rawY - session.subGestureAnchorY
+            val distSq = dx * dx + dy * dy
+            val subDirection = if (distSq < SUB_GESTURE_SLOP_SQ) "hold" else resolveSwipeGesture(dx, dy)
+            val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
+            val childAction = callbacks.resolveAction(session.zone, subGestureType)
+            if (hasConfiguredAction(childAction)) {
+                callbacks.dispatchAction(session.zone, subGestureType, context, session.targetX, session.targetY)
+                callbacks.log("Sub-gesture dispatched: zone=${session.zone} type=$subGestureType")
+            } else {
+                callbacks.log("Sub-gesture $subDirection — no action for $subGestureType")
+            }
+            return finishSession()
+        }
 
         if (session.isSwiping) {
             handoff.forwardToNative(session.handoff, context, event)
@@ -220,12 +258,23 @@ internal class EdgeGestureDetector(
             if (session.isSwiping) return@Runnable
 
             val action = callbacks.resolveAction(session.zone, "long_press")
-            if (hasConfiguredAction(action)) {
-                handoff.cancel(session.handoff, context)
-                callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
-            } else {
-                callbacks.log("Long press timeout — no EdgeX action, releasing DOWN")
-                handoff.dispatchSavedDownIfNeeded(session.handoff, context)
+            when {
+                action == SUB_GESTURE_ACTION -> {
+                    handoff.cancel(session.handoff, context)
+                    session.subGestureMode = true
+                    session.subGestureAnchorX = session.targetX
+                    session.subGestureAnchorY = session.targetY
+                    session.primaryGesture = "long_press"
+                    callbacks.log("Sub-gesture mode via long_press at (${session.targetX}, ${session.targetY})")
+                }
+                hasConfiguredAction(action) -> {
+                    handoff.cancel(session.handoff, context)
+                    callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
+                }
+                else -> {
+                    callbacks.log("Long press timeout — no EdgeX action, releasing DOWN")
+                    handoff.dispatchSavedDownIfNeeded(session.handoff, context)
+                }
             }
         }
         pendingLongPressRunnable = runnable
@@ -404,5 +453,7 @@ internal class EdgeGestureDetector(
         const val EDGE_THRESHOLD_DP = 8f
         const val TOUCH_SLOP_PX = 24f
         const val TOUCH_SLOP_SQ = TOUCH_SLOP_PX * TOUCH_SLOP_PX
+        const val SUB_GESTURE_SLOP_PX = 40f
+        const val SUB_GESTURE_SLOP_SQ = SUB_GESTURE_SLOP_PX * SUB_GESTURE_SLOP_PX
     }
 }

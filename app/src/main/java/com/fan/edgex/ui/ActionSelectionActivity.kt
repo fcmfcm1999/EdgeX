@@ -33,7 +33,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
         ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps),
-        ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal)
+        ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal),
+        ActionItem(getString(R.string.action_sub_gesture), "sub_gesture", R.drawable.ic_sub_gesture),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,6 +68,14 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "shell_command" -> {
                     startActivity(Intent(this, ShellCommandActivity::class.java)
                         .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                "sub_gesture" -> {
+                    putConfig(prefKey, "sub_gesture")
+                    putConfig("${prefKey}_label", getString(R.string.action_sub_gesture))
+                    startActivity(Intent(this, SubGestureActivity::class.java)
+                        .putExtra("pref_key", prefKey)
+                        .putExtra("title", title))
                     finish()
                 }
                 else -> {

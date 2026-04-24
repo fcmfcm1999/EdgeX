@@ -34,6 +34,11 @@ object AppConfig {
     val GESTURES = listOf("click", "double_click", "long_press", "swipe_up", "swipe_down", "swipe_left", "swipe_right")
     val KEY_TRIGGERS = listOf("click", "double_click", "long_press")
 
+    const val SUB_GESTURE_ACTION = "sub_gesture"
+    val SUB_GESTURE_DIRECTIONS = listOf("hold", "swipe_left", "swipe_right", "swipe_up", "swipe_down")
+
+    fun subGestureChildKey(parentKey: String, direction: String) = "${parentKey}_sub_${direction}"
+
     fun zoneEnabled(zone: String) = "zone_enabled_$zone"
     fun gestureAction(zone: String, gesture: String) = "${zone}_${gesture}"
     fun gestureActionLabel(zone: String, gesture: String) = "${zone}_${gesture}_label"

@@ -101,6 +101,12 @@
     <string name="action_volume_down">Volume Down</string>
     <string name="action_app_shortcut">App Shortcut</string>
     <string name="action_shell_command">Shell Command</string>
+    <string name="action_sub_gesture">Sub-gesture</string>
+
+    <!-- Sub-gesture Configuration -->
+    <string name="header_sub_gesture">Sub-gesture</string>
+    <string name="sub_gesture_description">Hold finger after the trigger gesture, then swipe in a direction to activate the matching action. Release without swiping to trigger Hold.</string>
+    <string name="sub_gesture_hold">Hold (no swipe)</string>
 
     <!-- Shell Command Configuration -->
     <string name="header_shell_command">Shell Command</string>
