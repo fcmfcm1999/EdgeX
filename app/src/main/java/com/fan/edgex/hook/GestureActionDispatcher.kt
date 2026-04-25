@@ -414,28 +414,70 @@ internal class GestureActionDispatcher(
     private fun clearBackgroundApps(context: Context) {
         try {
             val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val activityTaskManager = getActivityTaskManagerService()
             @Suppress("DEPRECATION")
             val recentTasks = XposedHelpers.callMethod(
                 activityManager, "getRecentTasks",
                 100, android.app.ActivityManager.RECENT_IGNORE_UNAVAILABLE,
             ) as List<*>
             var count = 0
-            for (task in recentTasks) {
+            for ((index, task) in recentTasks.withIndex()) {
+                if (index == 0 || task == null) continue
                 try {
-                    val id = XposedHelpers.getIntField(task, "persistentId")
-                    XposedHelpers.callMethod(activityManager, "removeTask", id)
-                    count++
-                } catch (e: Exception) {
-                    log("removeTask failed: ${e.message}")
+                    val taskId = getRecentTaskId(task)
+                    if (taskId < 0) continue
+                    val removed = XposedHelpers.callMethod(activityTaskManager, "removeTask", taskId) as? Boolean
+                    if (removed != false) count++
+                } catch (t: Throwable) {
+                    log("removeTask failed: ${t.message}")
                 }
             }
             log("Cleared $count background app(s)")
             if (count > 0) {
                 showToast(context, ModuleRes.getString(R.string.toast_cleared_background, count))
             }
-        } catch (e: Exception) {
-            log("clearBackgroundApps failed: ${e.message}")
+        } catch (t: Throwable) {
+            log("clearBackgroundApps failed: ${t.message}")
         }
+    }
+
+    private fun getActivityTaskManagerService(): Any {
+        try {
+            val activityTaskManager = XposedHelpers.findClass(
+                "android.app.ActivityTaskManager",
+                ClassLoader.getSystemClassLoader(),
+            )
+            val service = XposedHelpers.callStaticMethod(activityTaskManager, "getService")
+            if (service != null) return service
+        } catch (t: Throwable) {
+            log("ActivityTaskManager.getService failed: ${t.message}")
+        }
+
+        try {
+            val service = XposedHelpers.callStaticMethod(android.app.ActivityManager::class.java, "getTaskService")
+            if (service != null) return service
+        } catch (t: Throwable) {
+            log("ActivityManager.getTaskService failed: ${t.message}")
+        }
+
+        val serviceManager = XposedHelpers.findClass("android.os.ServiceManager", ClassLoader.getSystemClassLoader())
+        val binder = XposedHelpers.callStaticMethod(serviceManager, "getService", "activity_task")
+        val stub = XposedHelpers.findClass(
+            "android.app.IActivityTaskManager.Stub",
+            ClassLoader.getSystemClassLoader(),
+        )
+        return XposedHelpers.callStaticMethod(stub, "asInterface", binder)
+    }
+
+    private fun getRecentTaskId(task: Any): Int {
+        for (field in listOf("taskId", "persistentId", "id")) {
+            try {
+                val id = XposedHelpers.getIntField(task, field)
+                if (id >= 0) return id
+            } catch (_: Throwable) {
+            }
+        }
+        return -1
     }
 
     private fun dispatchMediaKey(context: Context, action: String) {
