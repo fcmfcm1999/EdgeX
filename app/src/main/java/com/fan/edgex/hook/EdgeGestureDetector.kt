@@ -49,8 +49,6 @@ internal class EdgeGestureDetector(
         var subGestureMode: Boolean = false,
         var subGestureAnchorX: Float = 0f,   // advances in primary direction (turning-point anchor)
         var subGestureAnchorY: Float = 0f,
-        var subGestureFixedAnchorX: Float = 0f, // stays at the activation point (same-direction fallback)
-        var subGestureFixedAnchorY: Float = 0f,
         var primaryGesture: String = "",
     )
 
@@ -160,8 +158,6 @@ internal class EdgeGestureDetector(
                         session.subGestureMode = true
                         session.subGestureAnchorX = event.rawX
                         session.subGestureAnchorY = event.rawY
-                        session.subGestureFixedAnchorX = event.rawX
-                        session.subGestureFixedAnchorY = event.rawY
                         session.primaryGesture = gestureType
                         callbacks.log("Sub-gesture mode via $gestureType at (${event.rawX}, ${event.rawY})")
                     }
@@ -199,24 +195,16 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
 
         if (session.subGestureMode) {
-            // Primary: measure from the advancing (turning-point) anchor.
-            // Fallback: if the finger ended up near the advancing anchor (e.g. continued in the
-            // primary direction and lifted), measure from the fixed activation anchor instead so
-            // the same-direction sub-gesture can still be detected.
+            // Direction measured from the advancing (turning-point) anchor.
+            // If the finger lifts near the anchor the user made no secondary gesture → hold.
+            // Same-direction sub-gesture fires when the user deliberately swipes further past
+            // the anchor in the primary direction (distSq >= slop).
             val dx = event.rawX - session.subGestureAnchorX
             val dy = event.rawY - session.subGestureAnchorY
             val distSq = dx * dx + dy * dy
             val subDirection = when {
                 distSq >= SUB_GESTURE_SLOP_SQ -> resolveSwipeGesture(dx, dy)
-                else -> {
-                    // Finger lifted near the advancing anchor. Check how far the advancing anchor
-                    // itself moved from the fixed activation point: if it traveled enough, the user
-                    // kept going in the primary direction → fire that direction; otherwise they
-                    // barely moved at all → hold.
-                    val adx = session.subGestureAnchorX - session.subGestureFixedAnchorX
-                    val ady = session.subGestureAnchorY - session.subGestureFixedAnchorY
-                    if (adx * adx + ady * ady >= SUB_GESTURE_SLOP_SQ) session.primaryGesture else "hold"
-                }
+                else -> "hold"
             }
             val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
             val childAction = callbacks.resolveAction(session.zone, subGestureType)
@@ -284,8 +272,6 @@ internal class EdgeGestureDetector(
                     session.subGestureMode = true
                     session.subGestureAnchorX = session.targetX
                     session.subGestureAnchorY = session.targetY
-                    session.subGestureFixedAnchorX = session.targetX
-                    session.subGestureFixedAnchorY = session.targetY
                     session.primaryGesture = "long_press"
                     callbacks.log("Sub-gesture mode via long_press at (${session.targetX}, ${session.targetY})")
                 }
@@ -467,9 +453,6 @@ internal class EdgeGestureDetector(
         session.lastAdjustCoord += steps * CONTINUOUS_STEP_PX * (if (rawDelta > 0) 1 else -1)
     }
 
-    // Slide the sub-gesture anchor forward while the finger keeps going in the primary swipe
-    // direction, so direction is always measured from the "turning point" rather than from
-    // wherever the slop threshold happened to fire.
     private fun advanceSubGestureAnchor(session: GestureSession, x: Float, y: Float) {
         when (session.primaryGesture) {
             "swipe_down"  -> if (y > session.subGestureAnchorY) { session.subGestureAnchorX = x; session.subGestureAnchorY = y }
