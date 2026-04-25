@@ -22,6 +22,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_back), "back", R.drawable.ic_arrow_back),
         ActionItem(getString(R.string.action_home), "home", R.drawable.ic_edge_panel),
         ActionItem(getString(R.string.action_recents), "recents", R.drawable.ic_edge_panel),
+        ActionItem(getString(R.string.action_expand_notifications), "expand_notifications", R.drawable.ic_notifications),
+        ActionItem(getString(R.string.action_clear_background), "clear_background", R.drawable.ic_clear_recent),
         ActionItem(getString(R.string.action_freezer_drawer), "freezer_drawer", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
@@ -32,6 +34,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_brightness_down), "brightness_down", R.drawable.ic_brightness_down),
         ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
         ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
+        ActionItem(getString(R.string.action_music_control), "music_control", R.drawable.ic_music),
+        ActionItem(getString(R.string.action_launch_app), "launch_app", R.drawable.ic_apps),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_apps),
         ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal),
         ActionItem(getString(R.string.action_sub_gesture), "sub_gesture", R.drawable.ic_sub_gesture),
@@ -76,6 +80,16 @@ class ActionSelectionActivity : AppCompatActivity() {
                     startActivity(Intent(this, SubGestureActivity::class.java)
                         .putExtra("pref_key", prefKey)
                         .putExtra("title", title))
+                    finish()
+                }
+                "launch_app" -> {
+                    startActivity(Intent(this, AppSelectionActivity::class.java)
+                        .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                "music_control" -> {
+                    startActivity(Intent(this, MusicControlActivity::class.java)
+                        .putExtra("pref_key", prefKey))
                     finish()
                 }
                 else -> {

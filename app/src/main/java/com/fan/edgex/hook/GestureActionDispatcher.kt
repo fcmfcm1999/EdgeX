@@ -3,6 +3,7 @@ package com.fan.edgex.hook
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -55,6 +56,9 @@ internal class GestureActionDispatcher(
         when {
             action.startsWith("app_shortcut:") -> {
                 handlerProvider().post { launchShortcut(ctx, action) }
+            }
+            action.startsWith("launch_app:") -> {
+                handlerProvider().post { launchApp(ctx, action) }
             }
             action.startsWith("shell:") -> {
                 doExecuteShellCommand(action, ctx)
@@ -126,7 +130,7 @@ internal class GestureActionDispatcher(
                     GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
                 log("GLOBAL_ACTION_RECENTS result=$result")
             }
-            action == "notifications" -> {
+            action == "notifications" || action == "expand_notifications" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_NOTIFICATIONS)
             }
             action == "quick_settings" -> {
@@ -140,6 +144,12 @@ internal class GestureActionDispatcher(
             }
             action == "kill_app" -> {
                 killForegroundApp(context)
+            }
+            action == "clear_background" -> {
+                clearBackgroundApps(context)
+            }
+            action.startsWith("music_control:") -> {
+                dispatchMediaKey(context, action)
             }
             action == "brightness_up" || action == "brightness_down" -> {
                 adjustBrightness(context, action == "brightness_up")
@@ -399,6 +409,69 @@ internal class GestureActionDispatcher(
                 }
             }
         }.start()
+    }
+
+    private fun clearBackgroundApps(context: Context) {
+        try {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            val recentTasks = XposedHelpers.callMethod(
+                activityManager, "getRecentTasks",
+                100, android.app.ActivityManager.RECENT_IGNORE_UNAVAILABLE,
+            ) as List<*>
+            var count = 0
+            for (task in recentTasks) {
+                try {
+                    val id = XposedHelpers.getIntField(task, "persistentId")
+                    XposedHelpers.callMethod(activityManager, "removeTask", id)
+                    count++
+                } catch (e: Exception) {
+                    log("removeTask failed: ${e.message}")
+                }
+            }
+            log("Cleared $count background app(s)")
+            if (count > 0) {
+                showToast(context, ModuleRes.getString(R.string.toast_cleared_background, count))
+            }
+        } catch (e: Exception) {
+            log("clearBackgroundApps failed: ${e.message}")
+        }
+    }
+
+    private fun dispatchMediaKey(context: Context, action: String) {
+        try {
+            val keyCode = when (action.removePrefix("music_control:")) {
+                "play"       -> KeyEvent.KEYCODE_MEDIA_PLAY
+                "play_pause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                "stop"       -> KeyEvent.KEYCODE_MEDIA_STOP
+                "next"       -> KeyEvent.KEYCODE_MEDIA_NEXT
+                "previous"   -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                else -> { log("Unknown music_control subaction: $action"); return }
+            }
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val now = SystemClock.uptimeMillis()
+            audioManager.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0))
+            audioManager.dispatchMediaKeyEvent(KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode, 0))
+            log("Dispatched media key: $keyCode for $action")
+        } catch (e: Exception) {
+            log("dispatchMediaKey failed: ${e.message}")
+        }
+    }
+
+    private fun launchApp(context: Context, action: String) {
+        try {
+            val packageName = action.removePrefix("launch_app:")
+            if (packageName.isBlank()) return
+            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            } else {
+                showToast(context, ModuleRes.getString(R.string.toast_app_not_found))
+            }
+        } catch (e: Exception) {
+            log("launchApp failed: ${e.message}")
+        }
     }
 
     private fun configResolver(context: Context) =

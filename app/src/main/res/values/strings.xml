@@ -102,6 +102,23 @@
     <string name="action_app_shortcut">App Shortcut</string>
     <string name="action_shell_command">Shell Command</string>
     <string name="action_sub_gesture">Sub-gesture</string>
+    <string name="action_expand_notifications">Expand Notifications</string>
+    <string name="action_clear_background">Clear Background Apps</string>
+    <string name="action_launch_app">Launch App</string>
+    <string name="action_music_control">Music Control</string>
+    <string name="action_music_play">Play Music</string>
+    <string name="action_music_play_pause">Play / Pause</string>
+    <string name="action_music_stop">Stop</string>
+    <string name="action_music_previous">Previous Track</string>
+    <string name="action_music_next">Next Track</string>
+
+    <!-- Music Control / App Selection Configuration -->
+    <string name="header_music_control">Music Control</string>
+    <string name="header_app_selection">Select App</string>
+    <string name="label_app_prefix">App: %s</string>
+    <string name="label_music_prefix">Music: %s</string>
+    <string name="toast_app_not_found">App not found</string>
+    <string name="toast_cleared_background">Cleared %d background app(s)</string>
 
     <!-- Sub-gesture Configuration -->
     <string name="header_sub_gesture">Sub-gesture</string>
