@@ -47,7 +47,7 @@ internal class EdgeGestureDetector(
         var lastAdjustCoord: Float = 0f,
         // Sub-gesture state
         var subGestureMode: Boolean = false,
-        var subGestureAnchorX: Float = 0f,   // advances in primary direction (turning-point anchor)
+        var subGestureAnchorX: Float = 0f,   // fixed activation anchor for secondary turns
         var subGestureAnchorY: Float = 0f,
         var primaryGesture: String = "",
     )
@@ -194,23 +194,25 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
 
         if (session.subGestureMode) {
-            // Direction measured from the fixed activation anchor using axis decomposition.
-            // The primary-direction component and the perpendicular component are evaluated
-            // independently so that even a large primary-direction travel doesn't mask a
-            // small perpendicular secondary swipe.
-            val dx = event.rawX - session.subGestureAnchorX
-            val dy = event.rawY - session.subGestureAnchorY
-            val (primaryComp, perpDx, perpDy) = when (session.primaryGesture) {
-                "swipe_left"  -> Triple(-dx, 0f, dy)
-                "swipe_right" -> Triple(dx,  0f, dy)
-                "swipe_up"    -> Triple(-dy, dx, 0f)
-                "swipe_down"  -> Triple(dy,  dx, 0f)
-                else          -> Triple(0f,  dx, dy)  // long_press: no primary axis
+            // XPE keeps the already-recognized swipe direction as the active sub-gesture
+            // direction unless the user turns perpendicular to it. Measure perpendicular
+            // turns from the activation anchor, but keep same-direction selection based on
+            // the full swipe from DOWN so swipe-left -> swipe-left does not collapse to hold.
+            val anchorDx = event.rawX - session.subGestureAnchorX
+            val anchorDy = event.rawY - session.subGestureAnchorY
+            val totalDx = event.rawX - session.downX
+            val totalDy = event.rawY - session.downY
+            val (sameDirectionComp, perpDx, perpDy) = when (session.primaryGesture) {
+                "swipe_left"  -> Triple(-totalDx, 0f, anchorDy)
+                "swipe_right" -> Triple(totalDx,  0f, anchorDy)
+                "swipe_up"    -> Triple(-totalDy, anchorDx, 0f)
+                "swipe_down"  -> Triple(totalDy,  anchorDx, 0f)
+                else          -> Triple(0f, anchorDx, anchorDy)  // long_press: no primary axis
             }
             val perpSq = perpDx * perpDx + perpDy * perpDy
             val subDirection = when {
                 perpSq >= SUB_GESTURE_PERP_SLOP_SQ -> resolveSwipeGesture(perpDx, perpDy)
-                primaryComp >= SUB_GESTURE_SAME_DIR_SLOP -> session.primaryGesture
+                sameDirectionComp >= TOUCH_SLOP_PX -> session.primaryGesture
                 else -> "hold"
             }
             val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
@@ -470,6 +472,5 @@ internal class EdgeGestureDetector(
         const val TOUCH_SLOP_SQ = TOUCH_SLOP_PX * TOUCH_SLOP_PX
         const val SUB_GESTURE_PERP_SLOP_PX = 40f
         const val SUB_GESTURE_PERP_SLOP_SQ = SUB_GESTURE_PERP_SLOP_PX * SUB_GESTURE_PERP_SLOP_PX
-        const val SUB_GESTURE_SAME_DIR_SLOP = 80f
     }
 }
