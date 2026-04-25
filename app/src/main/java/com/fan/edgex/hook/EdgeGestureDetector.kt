@@ -47,8 +47,10 @@ internal class EdgeGestureDetector(
         var lastAdjustCoord: Float = 0f,
         // Sub-gesture state
         var subGestureMode: Boolean = false,
-        var subGestureAnchorX: Float = 0f,   // fixed activation anchor for secondary turns
+        var subGestureAnchorX: Float = 0f,   // tracks the farthest point in the primary direction
         var subGestureAnchorY: Float = 0f,
+        var subGestureAnchorEventTime: Long = 0L,
+        var subGestureAnchorLocked: Boolean = false,
         var primaryGesture: String = "",
     )
 
@@ -139,6 +141,7 @@ internal class EdgeGestureDetector(
         updateTargetPoint(session, event.rawX, event.rawY)
 
         if (session.subGestureMode) {
+            updateSubGestureAnchor(session, event.rawX, event.rawY, event.eventTime)
             return session.handoff.consumeStream
         }
 
@@ -157,6 +160,7 @@ internal class EdgeGestureDetector(
                         session.subGestureMode = true
                         session.subGestureAnchorX = event.rawX
                         session.subGestureAnchorY = event.rawY
+                        session.subGestureAnchorEventTime = event.eventTime
                         session.primaryGesture = gestureType
                         callbacks.log("Sub-gesture mode via $gestureType at (${event.rawX}, ${event.rawY})")
                     }
@@ -194,25 +198,14 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
 
         if (session.subGestureMode) {
-            // XPE keeps the already-recognized swipe direction as the active sub-gesture
-            // direction unless the user turns perpendicular to it. Measure perpendicular
-            // turns from the activation anchor, but keep same-direction selection based on
-            // the full swipe from DOWN so swipe-left -> swipe-left does not collapse to hold.
+            // The anchor follows the first swipe to its farthest primary point. Child
+            // direction is selected only by movement after that point, so the first swipe
+            // itself does not get mistaken for a same-direction child gesture.
             val anchorDx = event.rawX - session.subGestureAnchorX
             val anchorDy = event.rawY - session.subGestureAnchorY
-            val totalDx = event.rawX - session.downX
-            val totalDy = event.rawY - session.downY
-            val (sameDirectionComp, perpDx, perpDy) = when (session.primaryGesture) {
-                "swipe_left"  -> Triple(-totalDx, 0f, anchorDy)
-                "swipe_right" -> Triple(totalDx,  0f, anchorDy)
-                "swipe_up"    -> Triple(-totalDy, anchorDx, 0f)
-                "swipe_down"  -> Triple(totalDy,  anchorDx, 0f)
-                else          -> Triple(0f, anchorDx, anchorDy)  // long_press: no primary axis
-            }
-            val perpSq = perpDx * perpDx + perpDy * perpDy
+            val anchorDistanceSq = anchorDx * anchorDx + anchorDy * anchorDy
             val subDirection = when {
-                perpSq >= SUB_GESTURE_PERP_SLOP_SQ -> resolveSwipeGesture(perpDx, perpDy)
-                sameDirectionComp >= TOUCH_SLOP_PX -> session.primaryGesture
+                anchorDistanceSq >= SUB_GESTURE_SLOP_SQ -> resolveSwipeGesture(anchorDx, anchorDy)
                 else -> "hold"
             }
             val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
@@ -281,6 +274,7 @@ internal class EdgeGestureDetector(
                     session.subGestureMode = true
                     session.subGestureAnchorX = session.targetX
                     session.subGestureAnchorY = session.targetY
+                    session.subGestureAnchorEventTime = nowMillis()
                     session.primaryGesture = "long_press"
                     callbacks.log("Sub-gesture mode via long_press at (${session.targetX}, ${session.targetY})")
                 }
@@ -397,6 +391,71 @@ internal class EdgeGestureDetector(
     private fun resolveAdjustCoord(axis: AdjustmentAxis, x: Float, y: Float): Float =
         if (axis == AdjustmentAxis.HORIZONTAL) x else y
 
+    private fun updateSubGestureAnchor(session: GestureSession, x: Float, y: Float, eventTime: Long) {
+        val advanced = when (session.primaryGesture) {
+            "swipe_left" -> {
+                if (x < session.subGestureAnchorX) {
+                    updatePrimaryAnchorOrLock(session, x, y, eventTime)
+                    true
+                } else {
+                    false
+                }
+            }
+            "swipe_right" -> {
+                if (x > session.subGestureAnchorX) {
+                    updatePrimaryAnchorOrLock(session, x, y, eventTime)
+                    true
+                } else {
+                    false
+                }
+            }
+            "swipe_up" -> {
+                if (y < session.subGestureAnchorY) {
+                    updatePrimaryAnchorOrLock(session, x, y, eventTime)
+                    true
+                } else {
+                    false
+                }
+            }
+            "swipe_down" -> {
+                if (y > session.subGestureAnchorY) {
+                    updatePrimaryAnchorOrLock(session, x, y, eventTime)
+                    true
+                } else {
+                    false
+                }
+            }
+            else -> false
+        }
+
+        if (!advanced) {
+            lockSubGestureAnchorOnTurn(session, x, y)
+        }
+    }
+
+    private fun updatePrimaryAnchorOrLock(session: GestureSession, x: Float, y: Float, eventTime: Long) {
+        if (session.subGestureAnchorLocked) return
+
+        val elapsedSinceAnchor = eventTime - session.subGestureAnchorEventTime
+        if (elapsedSinceAnchor >= SUB_GESTURE_SEGMENT_PAUSE_MS) {
+            session.subGestureAnchorLocked = true
+            return
+        }
+
+        session.subGestureAnchorX = x
+        session.subGestureAnchorY = y
+        session.subGestureAnchorEventTime = eventTime
+    }
+
+    private fun lockSubGestureAnchorOnTurn(session: GestureSession, x: Float, y: Float) {
+        if (session.subGestureAnchorLocked) return
+        val dx = x - session.subGestureAnchorX
+        val dy = y - session.subGestureAnchorY
+        if ((dx * dx) + (dy * dy) >= SUB_GESTURE_SLOP_SQ) {
+            session.subGestureAnchorLocked = true
+        }
+    }
+
     private fun updateTargetPoint(session: GestureSession, x: Float, y: Float) {
         when (session.edge) {
             Edge.LEFT -> {
@@ -470,7 +529,8 @@ internal class EdgeGestureDetector(
         const val EDGE_THRESHOLD_DP = 8f
         const val TOUCH_SLOP_PX = 24f
         const val TOUCH_SLOP_SQ = TOUCH_SLOP_PX * TOUCH_SLOP_PX
-        const val SUB_GESTURE_PERP_SLOP_PX = 40f
-        const val SUB_GESTURE_PERP_SLOP_SQ = SUB_GESTURE_PERP_SLOP_PX * SUB_GESTURE_PERP_SLOP_PX
+        const val SUB_GESTURE_SLOP_PX = 40f
+        const val SUB_GESTURE_SLOP_SQ = SUB_GESTURE_SLOP_PX * SUB_GESTURE_SLOP_PX
+        const val SUB_GESTURE_SEGMENT_PAUSE_MS = 120L
     }
 }
