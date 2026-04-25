@@ -30,10 +30,15 @@ import com.fan.edgex.hook.ModuleRes
 
 class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
 
+    private data class AppEntry(val resolveInfo: android.content.pm.ResolveInfo, val isFrozen: Boolean)
+
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
     private var drawerPanel: View? = null
     private var contentLeftBound = 0
+
+    // Set to true to bypass config and load 20 real device apps for UI preview
+    private val MOCK_MODE = true
 
     private val isDarkMode: Boolean
         get() = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
@@ -79,36 +84,10 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         }
 
         val pm = context.packageManager
-        val displayApps = mutableListOf<android.content.pm.ResolveInfo>()
-        try {
-            val configuredPackages = linkedSetOf<String>()
-            try {
-                context.contentResolver.query(
-                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
-                    null, null, null, null
-                )?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            configuredPackages.addAll(
-                                listStr.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
-            }
-
-            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
-            pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
-                .filter { configuredPackages.contains(it.activityInfo.applicationInfo.packageName) }
-                .sortedWith { a, b ->
-                    a.loadLabel(pm).toString().compareTo(b.loadLabel(pm).toString(), ignoreCase = true)
-                }
-                .also { displayApps.addAll(it) }
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: ${e.message}")
+        val displayApps: List<AppEntry> = if (MOCK_MODE) {
+            loadMockApps(pm)
+        } else {
+            loadConfiguredApps(pm)
         }
 
         if (useArcDrawer) {
@@ -151,7 +130,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     }
 
     private fun setupModernLayout(
-        displayApps: List<android.content.pm.ResolveInfo>,
+        displayApps: List<AppEntry>,
         pm: android.content.pm.PackageManager,
         panelWidth: Int
     ) {
@@ -204,7 +183,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                 setTextColor(textPrimary)
                 letterSpacing = -0.02f
             })
-            val frozenCount = displayApps.count { !it.activityInfo.applicationInfo.enabled }
+            val frozenCount = displayApps.count { it.isFrozen }
             addView(TextView(context).apply {
                 text = "${displayApps.size} apps · $frozenCount frozen"
                 textSize = 12.5f
@@ -255,11 +234,9 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             var currentRow: LinearLayout? = null
             var col = 0
 
-            for (ri in displayApps) {
-                val appInfo = ri.activityInfo.applicationInfo
-                val pkg = appInfo.packageName
+            for ((ri, frozen) in displayApps) {
+                val pkg = ri.activityInfo.applicationInfo.packageName
                 if (!shownPackages.add(pkg)) continue
-                val frozen = !appInfo.enabled
 
                 if (col % columns == 0) {
                     currentRow = LinearLayout(context).apply {
@@ -367,7 +344,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     }
 
     private fun setupArcLayout(
-        displayApps: List<android.content.pm.ResolveInfo>,
+        displayApps: List<AppEntry>,
         pm: android.content.pm.PackageManager,
         displayMetrics: android.util.DisplayMetrics
     ) {
@@ -400,10 +377,8 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             )
             val shownPackages = mutableSetOf<String>()
 
-            for (ri in displayApps) {
-                val appInfo = ri.activityInfo.applicationInfo
-                val pkg = appInfo.packageName
-                val frozen = !appInfo.enabled
+            for ((ri, frozen) in displayApps) {
+                val pkg = ri.activityInfo.applicationInfo.packageName
                 if (!shownPackages.add(pkg)) continue
 
                 try {
@@ -517,6 +492,56 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             }
         } else {
             dismiss()
+        }
+    }
+
+    private fun loadMockApps(pm: android.content.pm.PackageManager): List<AppEntry> {
+        return try {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+            pm.queryIntentActivities(mainIntent, 0)
+                .sortedWith { a, b ->
+                    a.loadLabel(pm).toString().compareTo(b.loadLabel(pm).toString(), ignoreCase = true)
+                }
+                .distinctBy { it.activityInfo.applicationInfo.packageName }
+                .take(20)
+                .mapIndexed { index, ri -> AppEntry(ri, isFrozen = index % 4 == 3) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadConfiguredApps(pm: android.content.pm.PackageManager): List<AppEntry> {
+        return try {
+            val configuredPackages = linkedSetOf<String>()
+            try {
+                context.contentResolver.query(
+                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
+                    null, null, null, null
+                )?.use {
+                    if (it.moveToFirst()) {
+                        val listStr = it.getString(0)
+                        if (!listStr.isNullOrEmpty()) {
+                            configuredPackages.addAll(
+                                listStr.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
+            }
+
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+            pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+                .filter { configuredPackages.contains(it.activityInfo.applicationInfo.packageName) }
+                .sortedWith { a, b ->
+                    a.loadLabel(pm).toString().compareTo(b.loadLabel(pm).toString(), ignoreCase = true)
+                }
+                .distinctBy { it.activityInfo.applicationInfo.packageName }
+                .map { ri -> AppEntry(ri, isFrozen = !ri.activityInfo.applicationInfo.enabled) }
+        } catch (e: Exception) {
+            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: ${e.message}")
+            emptyList()
         }
     }
 
