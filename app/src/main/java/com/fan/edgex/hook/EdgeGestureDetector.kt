@@ -47,8 +47,10 @@ internal class EdgeGestureDetector(
         var lastAdjustCoord: Float = 0f,
         // Sub-gesture state
         var subGestureMode: Boolean = false,
-        var subGestureAnchorX: Float = 0f,
+        var subGestureAnchorX: Float = 0f,   // advances in primary direction (turning-point anchor)
         var subGestureAnchorY: Float = 0f,
+        var subGestureFixedAnchorX: Float = 0f, // stays at the activation point (same-direction fallback)
+        var subGestureFixedAnchorY: Float = 0f,
         var primaryGesture: String = "",
     )
 
@@ -158,6 +160,8 @@ internal class EdgeGestureDetector(
                         session.subGestureMode = true
                         session.subGestureAnchorX = event.rawX
                         session.subGestureAnchorY = event.rawY
+                        session.subGestureFixedAnchorX = event.rawX
+                        session.subGestureFixedAnchorY = event.rawY
                         session.primaryGesture = gestureType
                         callbacks.log("Sub-gesture mode via $gestureType at (${event.rawX}, ${event.rawY})")
                     }
@@ -195,10 +199,21 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
 
         if (session.subGestureMode) {
+            // Primary: measure from the advancing (turning-point) anchor.
+            // Fallback: if the finger ended up near the advancing anchor (e.g. continued in the
+            // primary direction and lifted), measure from the fixed activation anchor instead so
+            // the same-direction sub-gesture can still be detected.
             val dx = event.rawX - session.subGestureAnchorX
             val dy = event.rawY - session.subGestureAnchorY
             val distSq = dx * dx + dy * dy
-            val subDirection = if (distSq < SUB_GESTURE_SLOP_SQ) "hold" else resolveSwipeGesture(dx, dy)
+            val subDirection = when {
+                distSq >= SUB_GESTURE_SLOP_SQ -> resolveSwipeGesture(dx, dy)
+                else -> {
+                    val fdx = event.rawX - session.subGestureFixedAnchorX
+                    val fdy = event.rawY - session.subGestureFixedAnchorY
+                    if (fdx * fdx + fdy * fdy >= SUB_GESTURE_SLOP_SQ) resolveSwipeGesture(fdx, fdy) else "hold"
+                }
+            }
             val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
             val childAction = callbacks.resolveAction(session.zone, subGestureType)
             if (hasConfiguredAction(childAction)) {
@@ -265,6 +280,8 @@ internal class EdgeGestureDetector(
                     session.subGestureMode = true
                     session.subGestureAnchorX = session.targetX
                     session.subGestureAnchorY = session.targetY
+                    session.subGestureFixedAnchorX = session.targetX
+                    session.subGestureFixedAnchorY = session.targetY
                     session.primaryGesture = "long_press"
                     callbacks.log("Sub-gesture mode via long_press at (${session.targetX}, ${session.targetY})")
                 }
