@@ -94,7 +94,11 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             setupArcLayout(displayApps, pm, displayMetrics)
             contentLeftBound = displayMetrics.widthPixels - (200 * displayMetrics.density).toInt()
         } else {
-            val panelWidth = (displayMetrics.widthPixels * 0.62f).toInt()
+            val isLandscape = context.resources.configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            // Portrait needs a wider panel (70%) to comfortably fit 3 columns
+            val panelFraction = if (isLandscape) 0.62f else 0.70f
+            val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
             contentLeftBound = displayMetrics.widthPixels - panelWidth
             setupModernLayout(displayApps, pm, panelWidth)
         }
@@ -220,7 +224,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         } else {
             val isLandscape = context.resources.configuration.orientation ==
                     android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val columns = if (isLandscape) 4 else 2
+            val columns = if (isLandscape) 4 else 3
             val gap = (8 * dp).toInt()
             val hPad = (12 * dp).toInt()
 
