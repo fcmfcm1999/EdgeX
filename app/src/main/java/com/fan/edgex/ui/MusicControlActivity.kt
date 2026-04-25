@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -14,13 +15,17 @@ import com.fan.edgex.config.putConfig
 
 class MusicControlActivity : AppCompatActivity() {
 
-    data class MusicOption(val label: String, val code: String)
+    data class MusicOption(
+        val label: String,
+        val code: String,
+        @DrawableRes val iconRes: Int,
+    )
 
     private val options get() = listOf(
-        MusicOption(getString(R.string.action_music_play_pause), "play_pause"),
-        MusicOption(getString(R.string.action_music_stop),       "stop"),
-        MusicOption(getString(R.string.action_music_previous),   "previous"),
-        MusicOption(getString(R.string.action_music_next),       "next"),
+        MusicOption(getString(R.string.action_music_play_pause), "play_pause", R.drawable.ic_music_play_pause),
+        MusicOption(getString(R.string.action_music_stop),       "stop",       R.drawable.ic_music_stop),
+        MusicOption(getString(R.string.action_music_previous),   "previous",   R.drawable.ic_music_previous),
+        MusicOption(getString(R.string.action_music_next),       "next",       R.drawable.ic_music_next),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,7 +69,7 @@ class MusicControlActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = items[position]
             holder.title.text = item.label
-            holder.icon.setImageResource(R.drawable.ic_music)
+            holder.icon.setImageResource(item.iconRes)
             ThemeManager.applyToView(holder.itemView, this@MusicControlActivity)
             holder.itemView.setOnClickListener { onClick(item) }
         }
