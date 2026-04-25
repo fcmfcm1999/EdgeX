@@ -218,9 +218,25 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                 })
             })
         } else {
-            val columns = 3
+            val isLandscape = context.resources.configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val columns = if (isLandscape) 4 else 2
             val gap = (8 * dp).toInt()
             val hPad = (12 * dp).toInt()
+
+            // Pre-compute card dimensions so content never overflows the card boundary
+            val cardWidth = (panelWidth - 2 * hPad - columns * 2 * gap) / columns
+            // Icon occupies at most 56% of card width, hard-capped at 52dp
+            val iconSize = (cardWidth * 0.56f).toInt().coerceIn((32 * dp).toInt(), (52 * dp).toInt())
+            // Equal horizontal padding so icon is centered with room to spare
+            val innerPadH = ((cardWidth - iconSize) / 2).coerceAtLeast((4 * dp).toInt())
+            // Vertical: fixed padding values, card height = icon + label row + padding
+            val innerPadTop = (10 * dp).toInt()
+            val innerPadBot = (8 * dp).toInt()
+            val labelTopPad = (5 * dp).toInt()
+            val labelHeightPx = (18 * dp).toInt()
+            val cardHeight = iconSize + innerPadTop + labelTopPad + labelHeightPx + innerPadBot
+            val cardCorner = (cardWidth * 0.22f).coerceAtMost(20f * dp)
 
             val gridContainer = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -249,16 +265,17 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                 }
 
                 val card = FrameLayout(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    // Use explicit cardHeight so card is always square-ish regardless of orientation
+                    layoutParams = LinearLayout.LayoutParams(0, cardHeight, 1f).apply {
                         setMargins(gap, gap, gap, gap)
                     }
                     background = GradientDrawable().apply {
                         setColor(cardBg)
-                        cornerRadius = 20f * dp
+                        cornerRadius = cardCorner
                     }
                     outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
-                            outline.setRoundRect(0, 0, view.width, view.height, 20f * dp)
+                            outline.setRoundRect(0, 0, view.width, view.height, cardCorner)
                         }
                     }
                     clipToOutline = true
@@ -271,36 +288,38 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                     }
                 }
 
+                // inner fills the card and centers content vertically
                 val inner = LinearLayout(context).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
-                    setPadding((8 * dp).toInt(), (14 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt())
+                    setPadding(innerPadH, innerPadTop, innerPadH, innerPadBot)
                     layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 }
 
                 val iconFrame = FrameLayout(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        (52 * dp).toInt(), (52 * dp).toInt()
-                    ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+                    layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    }
                 }
                 iconFrame.addView(ImageView(context).apply {
                     setImageDrawable(ri.loadIcon(pm))
-                    layoutParams = FrameLayout.LayoutParams((52 * dp).toInt(), (52 * dp).toInt())
+                    layoutParams = FrameLayout.LayoutParams(iconSize, iconSize)
                     if (frozen) { colorFilter = grayscaleFilter; alpha = 0.55f }
                 })
                 if (frozen) {
+                    val badgeSize = (iconSize * 0.38f).toInt()
                     iconFrame.addView(TextView(context).apply {
                         text = "❄"
-                        textSize = 11f
+                        textSize = (badgeSize / dp * 0.62f)
                         gravity = Gravity.CENTER
                         setTextColor(Color.parseColor("#90CAF9"))
                         background = GradientDrawable().apply {
                             setColor(frozenBadgeBg)
-                            cornerRadius = 7f * dp
+                            cornerRadius = badgeSize * 0.38f
                         }
-                        setPadding((3 * dp).toInt(), (1 * dp).toInt(), (3 * dp).toInt(), (1 * dp).toInt())
+                        setPadding((2 * dp).toInt(), (1 * dp).toInt(), (2 * dp).toInt(), (1 * dp).toInt())
                         layoutParams = FrameLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
                         ).apply { gravity = Gravity.BOTTOM or Gravity.END }
@@ -310,12 +329,12 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
                 inner.addView(iconFrame)
                 inner.addView(TextView(context).apply {
                     text = ri.loadLabel(pm)
-                    textSize = 11f
+                    textSize = (iconSize / dp * 0.22f).coerceIn(9f, 12f)
                     gravity = Gravity.CENTER
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setTextColor(if (frozen) textMuted else textPrimary)
-                    setPadding(0, (6 * dp).toInt(), 0, 0)
+                    setPadding(0, labelTopPad, 0, 0)
                 })
 
                 card.addView(inner)
@@ -328,7 +347,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
             if (trailing < columns) {
                 repeat(trailing) {
                     currentRow?.addView(View(context).apply {
-                        layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, cardHeight, 1f).apply {
                             setMargins(gap, gap, gap, gap)
                         }
                     })
