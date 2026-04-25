@@ -105,7 +105,6 @@
 
     <!-- Sub-gesture Configuration -->
     <string name="header_sub_gesture">Sub-gesture</string>
-    <string name="sub_gesture_description">Hold finger after the trigger gesture, then swipe in a direction to activate the matching action. Release without swiping to trigger Hold.</string>
     <string name="sub_gesture_hold">Hold (no swipe)</string>
 
     <!-- Shell Command Configuration -->

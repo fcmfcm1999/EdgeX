@@ -63,14 +63,6 @@
             android:padding="16dp"
             android:paddingBottom="42dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/sub_gesture_description"
-                android:textColor="@color/ui_text_secondary"
-                android:textSize="13sp"
-                android:layout_marginBottom="16dp" />
-
             <include
                 android:id="@+id/row_sub_hold"
                 layout="@layout/item_gesture_action"
