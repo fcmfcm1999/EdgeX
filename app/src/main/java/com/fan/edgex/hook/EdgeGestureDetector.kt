@@ -209,9 +209,13 @@ internal class EdgeGestureDetector(
             val subDirection = when {
                 distSq >= SUB_GESTURE_SLOP_SQ -> resolveSwipeGesture(dx, dy)
                 else -> {
-                    val fdx = event.rawX - session.subGestureFixedAnchorX
-                    val fdy = event.rawY - session.subGestureFixedAnchorY
-                    if (fdx * fdx + fdy * fdy >= SUB_GESTURE_SLOP_SQ) resolveSwipeGesture(fdx, fdy) else "hold"
+                    // Finger lifted near the advancing anchor. Check how far the advancing anchor
+                    // itself moved from the fixed activation point: if it traveled enough, the user
+                    // kept going in the primary direction → fire that direction; otherwise they
+                    // barely moved at all → hold.
+                    val adx = session.subGestureAnchorX - session.subGestureFixedAnchorX
+                    val ady = session.subGestureAnchorY - session.subGestureFixedAnchorY
+                    if (adx * adx + ady * ady >= SUB_GESTURE_SLOP_SQ) session.primaryGesture else "hold"
                 }
             }
             val subGestureType = "${session.primaryGesture}_sub_${subDirection}"
