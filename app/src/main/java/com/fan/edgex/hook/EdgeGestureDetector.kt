@@ -139,6 +139,7 @@ internal class EdgeGestureDetector(
         updateTargetPoint(session, event.rawX, event.rawY)
 
         if (session.subGestureMode) {
+            advanceSubGestureAnchor(session, event.rawX, event.rawY)
             return session.handoff.consumeStream
         }
 
@@ -443,6 +444,18 @@ internal class EdgeGestureDetector(
             }
         }
         session.lastAdjustCoord += steps * CONTINUOUS_STEP_PX * (if (rawDelta > 0) 1 else -1)
+    }
+
+    // Slide the sub-gesture anchor forward while the finger keeps going in the primary swipe
+    // direction, so direction is always measured from the "turning point" rather than from
+    // wherever the slop threshold happened to fire.
+    private fun advanceSubGestureAnchor(session: GestureSession, x: Float, y: Float) {
+        when (session.primaryGesture) {
+            "swipe_down"  -> if (y > session.subGestureAnchorY) { session.subGestureAnchorX = x; session.subGestureAnchorY = y }
+            "swipe_up"    -> if (y < session.subGestureAnchorY) { session.subGestureAnchorX = x; session.subGestureAnchorY = y }
+            "swipe_left"  -> if (x < session.subGestureAnchorX) { session.subGestureAnchorX = x; session.subGestureAnchorY = y }
+            "swipe_right" -> if (x > session.subGestureAnchorX) { session.subGestureAnchorX = x; session.subGestureAnchorY = y }
+        }
     }
 
     private companion object {
