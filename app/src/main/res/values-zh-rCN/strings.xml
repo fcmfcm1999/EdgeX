@@ -104,7 +104,7 @@
 
     <!-- 子手势配置 -->
     <string name="header_sub_gesture">子手势</string>
-    <string name="sub_gesture_hold">悬停（不划动）</string>
+    <string name="sub_gesture_hold">悬停</string>
 
     <!-- Shell 命令配置 -->
     <string name="header_shell_command">Shell 命令</string>
