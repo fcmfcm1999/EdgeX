@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -57,11 +58,27 @@ internal class HookConfigRepository(
         lastConfigLoad = 0L
     }
 
+    fun updateFromBroadcast(keys: Array<String>, values: Array<String>) {
+        if (keys.size != values.size) {
+            log("Ignoring malformed config broadcast: keys=${keys.size} values=${values.size}")
+            return
+        }
+
+        keys.forEachIndexed { index, key ->
+            configCache[key] = values[index]
+        }
+        updateKeyConfig(configCache)
+        lastConfigLoad = System.currentTimeMillis()
+        log("Config broadcast applied: ${keys.joinToString()}")
+    }
+
     fun reloadAsync(onLoaded: (() -> Unit)? = null) {
         if (System.currentTimeMillis() - lastConfigLoad < CONFIG_CACHE_TTL) return
         configExecutor.execute {
             try {
-                loadConfigKeys()
+                if (!loadSnapshot()) {
+                    loadConfigKeys()
+                }
                 lastConfigLoad = System.currentTimeMillis()
                 onLoaded?.let { Handler(Looper.getMainLooper()).post(it) }
             } catch (e: Exception) {
@@ -87,6 +104,10 @@ internal class HookConfigRepository(
         query(AppConfig.GESTURES_ENABLED)
         query(AppConfig.DEBUG_MATRIX)
         query(AppConfig.KEYS_ENABLED)
+        query(AppConfig.FREEZER_ARC_DRAWER)
+        query(AppConfig.FREEZER_APP_LIST)
+        query(AppConfig.THEME_PRESET)
+        query(AppConfig.THEME_CUSTOM_COLOR)
 
         for (zone in AppConfig.ZONES) {
             query(AppConfig.zoneEnabled(zone))
@@ -109,6 +130,17 @@ internal class HookConfigRepository(
         }
 
         updateKeyConfig(configCache)
+    }
+
+    private fun loadSnapshot(): Boolean {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.isEmpty()) return false
+
+        configCache.clear()
+        configCache.putAll(snapshot)
+        updateKeyConfig(configCache)
+        log("Config snapshot loaded: ${snapshot.size} keys")
+        return true
     }
 
     private fun queryConfigProvider(key: String): String {

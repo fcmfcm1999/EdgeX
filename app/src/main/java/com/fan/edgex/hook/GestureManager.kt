@@ -11,6 +11,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -31,6 +32,8 @@ object GestureManager {
 
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
+    private var systemConfigReceiverRegistered = false
+    private var systemUiConfigReceiverRegistered = false
     private var keyManagerInitialized = false
 
     private var mHandler: Handler? = null
@@ -127,6 +130,7 @@ object GestureManager {
             configRepository.attachSystemContext(context)
             configRepository.reloadAsync()
             registerScreenStateReceiver(context)
+            registerConfigChangeReceiver(context, systemUi = false)
             configRepository.ensureObserverRegistered(context) {
                 configRepository.reloadAsync()
             }
@@ -143,6 +147,7 @@ object GestureManager {
         systemUIContext = context
         configRepository.attachSystemUiContext(context)
         registerActionReceiver(context)
+        registerConfigChangeReceiver(context, systemUi = true)
         configRepository.ensureObserverRegistered(context) {
             configRepository.reloadAsync(::refreshDebugOverlay)
         }
@@ -195,6 +200,50 @@ object GestureManager {
         } catch (e: Exception) {
             XposedBridge.log("$TAG: Failed to register screen state receiver: ${e.message}")
             screenStateReceiverRegistered = false
+        }
+    }
+
+    private fun registerConfigChangeReceiver(context: Context, systemUi: Boolean) {
+        if (systemUi) {
+            if (systemUiConfigReceiverRegistered) return
+            systemUiConfigReceiverRegistered = true
+        } else {
+            if (systemConfigReceiverRegistered) return
+            systemConfigReceiverRegistered = true
+        }
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action != HookConfigSnapshot.ACTION_CONFIG_CHANGED) return
+
+                val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
+                val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
+                if (keys != null && values != null) {
+                    configRepository.updateFromBroadcast(keys, values)
+                    refreshDebugOverlay()
+                } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
+                    configRepository.invalidate()
+                    configRepository.reloadAsync(::refreshDebugOverlay)
+                }
+            }
+        }
+
+        try {
+            val filter = IntentFilter(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                context.registerReceiver(receiver, filter)
+            }
+            log("Config broadcast receiver registered in ${if (systemUi) "SystemUI" else "system_server"}")
+        } catch (e: Exception) {
+            if (systemUi) {
+                systemUiConfigReceiverRegistered = false
+            } else {
+                systemConfigReceiverRegistered = false
+            }
+            log("Failed to register config broadcast receiver: ${e.message}")
         }
     }
 

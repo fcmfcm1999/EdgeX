@@ -53,6 +53,7 @@ class ConfigProvider : ContentProvider() {
         context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(key, value).commit()
 
+        HookConfigSnapshot.writeFromPreferences(context)
         notifyObservers(context, key)
         return uriForKey(key)
     }
@@ -65,6 +66,7 @@ class ConfigProvider : ContentProvider() {
         context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(key, value).commit()
 
+        HookConfigSnapshot.writeFromPreferences(context)
         notifyObservers(context, key)
         return 1
     }
@@ -76,6 +78,7 @@ class ConfigProvider : ContentProvider() {
         context.getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().remove(key).commit()
 
+        HookConfigSnapshot.writeFromPreferences(context)
         notifyObservers(context, key)
         return 1
     }

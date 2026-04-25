@@ -8,6 +8,7 @@ import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.FreezerBootstrap
+import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.utils.UpdateChecker
@@ -18,6 +19,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         ThemeManager.applyToActivity(this)
+        HookConfigSnapshot.writeFromPreferences(this)
         
         // Fix for "Header too tall": fitsSystemWindows="true" defaults to applying ALL system insets (Top + Bottom).
         // Since this view is at the top, we only want the Top Inset (Status Bar).

@@ -1,6 +1,7 @@
 package com.fan.edgex.config
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 
 // UI-side config access. All writes go through here so the hook is always notified.
@@ -11,7 +12,7 @@ fun Context.configPrefs(): SharedPreferences =
 
 fun Context.putConfig(key: String, value: String) {
     configPrefs().edit().putString(key, value).apply()
-    notifyConfigChanged(listOf(key))
+    notifyConfigChanged(mapOf(key to value))
 }
 
 fun Context.putConfig(key: String, value: Boolean) = putConfig(key, value.toString())
@@ -26,7 +27,7 @@ fun Context.putConfigsSync(vararg entries: Pair<String, String>): Boolean {
     }.commit()
 
     if (committed) {
-        notifyConfigChanged(entries.map { it.first }.distinct())
+        notifyConfigChanged(entries.toMap())
     }
 
     return committed
@@ -42,9 +43,18 @@ fun Context.getConfigBool(key: String, default: Boolean = false): Boolean =
             ?: runCatching { getBoolean(key, default) }.getOrDefault(default)
     }
 
-private fun Context.notifyConfigChanged(keys: Collection<String>) {
-    keys.forEach { key ->
+private fun Context.notifyConfigChanged(changedValues: Map<String, String>) {
+    HookConfigSnapshot.writeFromPreferences(this)
+
+    changedValues.keys.forEach { key ->
         contentResolver.notifyChange(ConfigProvider.uriForKey(key), null)
     }
     contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
+
+    val keys = changedValues.keys.toTypedArray()
+    val values = keys.map { changedValues.getValue(it) }.toTypedArray()
+    sendBroadcast(Intent(HookConfigSnapshot.ACTION_CONFIG_CHANGED).apply {
+        putExtra(HookConfigSnapshot.EXTRA_KEYS, keys)
+        putExtra(HookConfigSnapshot.EXTRA_VALUES, values)
+    })
 }

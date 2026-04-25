@@ -11,7 +11,6 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -28,6 +27,7 @@ import android.widget.Toast
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 import java.lang.ref.WeakReference
 
@@ -104,12 +104,17 @@ object TextSelectionOverlay {
         }
     }
 
-    private fun queryConfig(context: Context, key: String): String = try {
-        context.contentResolver.query(
-            Uri.withAppendedPath(ConfigProvider.CONTENT_URI, key),
-            null, null, null, null
-        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else "" } ?: ""
-    } catch (_: Exception) { "" }
+    private fun queryConfig(context: Context, key: String): String {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.containsKey(key)) return snapshot.getValue(key)
+
+        return try {
+            context.contentResolver.query(
+                ConfigProvider.uriForKey(key),
+                null, null, null, null
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else "" } ?: ""
+        } catch (_: Exception) { "" }
+    }
 
     private fun addOverlay(context: Context, blocks: List<SelectableBlock>) {
         val density = context.resources.displayMetrics.density

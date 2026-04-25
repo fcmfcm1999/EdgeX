@@ -17,6 +17,7 @@ import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.hook.ModuleRes
 
 class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
@@ -26,21 +27,31 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     // Left boundary of drawer content area.
     // Taps to the left of this X coordinate dismiss the drawer.
     private var contentLeftBound = 0
-    
+
+    private fun queryConfig(key: String): String {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.containsKey(key)) return snapshot.getValue(key)
+
+        return try {
+            context.contentResolver.query(
+                ConfigProvider.uriForKey(key),
+                null,
+                null,
+                null,
+                null,
+            )?.use {
+                if (it.moveToFirst()) it.getString(0) else ""
+            } ?: ""
+        } catch (e: Exception) {
+            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config $key: ${e.message}")
+            ""
+        }
+    }
+
     fun show() {
         if (rootView != null) return // Already showing
 
-        var useArcDrawer = false
-        try {
-            context.contentResolver.query(
-                ConfigProvider.uriForKey(AppConfig.FREEZER_ARC_DRAWER),
-                null, null, null, null
-            )?.use {
-                if (it.moveToFirst()) useArcDrawer = it.getString(0).toBoolean()
-            }
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read arc drawer config: ${e.message}")
-        }
+        val useArcDrawer = queryConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
 
         val displayMetrics = context.resources.displayMetrics
         
@@ -82,25 +93,14 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         try {
             val configuredPackages = linkedSetOf<String>()
 
-            // 0. Load Persistent Freezer List from ConfigProvider
-            try {
-                context.contentResolver.query(
-                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
-                    null, null, null, null
-                )?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            configuredPackages.addAll(
-                                listStr.split(",")
-                                    .map { pkg -> pkg.trim() }
-                                    .filter { pkg -> pkg.isNotEmpty() },
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
+            // 0. Load persistent freezer list from hook config snapshot, falling back to ConfigProvider.
+            val listStr = queryConfig(AppConfig.FREEZER_APP_LIST)
+            if (listStr.isNotEmpty()) {
+                configuredPackages.addAll(
+                    listStr.split(",")
+                        .map { pkg -> pkg.trim() }
+                        .filter { pkg -> pkg.isNotEmpty() },
+                )
             }
 
             // Find all launcher activities

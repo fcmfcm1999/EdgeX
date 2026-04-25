@@ -2,7 +2,6 @@ package com.fan.edgex.hook
 
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
@@ -12,6 +11,7 @@ import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.overlay.DrawerManager
 import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
@@ -325,24 +325,13 @@ internal class GestureActionDispatcher(
             try {
                 val pm = context.packageManager
                 val packageSet = linkedSetOf<String>()
-                val cursor: Cursor? = configResolver(context).query(
-                    Uri.withAppendedPath(configUri, AppConfig.FREEZER_APP_LIST),
-                    null,
-                    null,
-                    null,
-                    null,
-                )
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            packageSet.addAll(
-                                listStr.split(",")
-                                    .map { pkg -> pkg.trim() }
-                                    .filter { pkg -> pkg.isNotEmpty() },
-                            )
-                        }
-                    }
+                val listStr = readConfigValue(context, AppConfig.FREEZER_APP_LIST)
+                if (listStr.isNotEmpty()) {
+                    packageSet.addAll(
+                        listStr.split(",")
+                            .map { pkg -> pkg.trim() }
+                            .filter { pkg -> pkg.isNotEmpty() },
+                    )
                 }
 
                 if (packageSet.isEmpty()) {
@@ -519,6 +508,28 @@ internal class GestureActionDispatcher(
         systemContextProvider()?.contentResolver
             ?: systemUiContextProvider()?.contentResolver
             ?: context.contentResolver
+
+    private fun readConfigValue(context: Context, key: String): String {
+        val cached = resolveConfig(key)
+        if (cached.isNotEmpty()) return cached
+
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.containsKey(key)) return snapshot.getValue(key)
+
+        return try {
+            configResolver(context).query(
+                Uri.withAppendedPath(configUri, key),
+                null,
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else ""
+            } ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+    }
 
     private fun performScreenshot(context: Context) {
         val now = SystemClock.uptimeMillis()
