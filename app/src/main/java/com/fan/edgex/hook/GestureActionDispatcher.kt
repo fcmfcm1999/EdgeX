@@ -95,7 +95,11 @@ internal class GestureActionDispatcher(
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
             val direction =
                 if (up) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
-            audioManager.adjustVolume(direction, android.media.AudioManager.FLAG_SHOW_UI)
+            audioManager.adjustStreamVolume(
+                android.media.AudioManager.STREAM_MUSIC,
+                direction,
+                android.media.AudioManager.FLAG_SHOW_UI,
+            )
         } catch (e: Exception) {
             log("adjustVolume failed: ${e.message}")
         }
