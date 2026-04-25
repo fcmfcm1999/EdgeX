@@ -36,6 +36,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     private var rootView: FrameLayout? = null
     private var drawerPanel: View? = null
     private var contentLeftBound = 0
+    private var configReceiver: android.content.BroadcastReceiver? = null
 
     // Set to true to bypass config and load 20 real device apps for UI preview
     private val MOCK_MODE = true
@@ -46,6 +47,8 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
 
     fun show() {
         if (rootView != null) return
+
+        registerConfigReceiver()
 
         var useArcDrawer = false
         try {
@@ -568,7 +571,43 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         }
     }
 
+    private fun registerConfigReceiver() {
+        if (configReceiver != null) return
+        configReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+                    recreateOnRotation()
+                }
+            }
+        }
+        context.registerReceiver(
+            configReceiver,
+            android.content.IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED)
+        )
+    }
+
+    private fun unregisterConfigReceiver() {
+        configReceiver?.let {
+            try { context.unregisterReceiver(it) } catch (_: Exception) {}
+            configReceiver = null
+        }
+    }
+
+    /** Tear down the current window and rebuild with the new orientation config. */
+    private fun recreateOnRotation() {
+        // Remove the window silently — do NOT invoke onDismiss so DrawerManager
+        // keeps its activeDrawer reference pointing at this instance.
+        unregisterConfigReceiver()
+        try { windowManager.removeView(rootView) } catch (_: Exception) {}
+        rootView = null
+        drawerPanel = null
+        // Wait one frame for the system to finish applying the new configuration
+        // so displayMetrics reflects the rotated dimensions when show() runs.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ show() }, 80)
+    }
+
     private fun dismiss() {
+        unregisterConfigReceiver()
         if (rootView != null) {
             try { windowManager.removeView(rootView) } catch (_: Exception) {}
             rootView = null
