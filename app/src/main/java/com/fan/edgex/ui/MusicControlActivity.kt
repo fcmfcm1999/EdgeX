@@ -17,7 +17,6 @@ class MusicControlActivity : AppCompatActivity() {
     data class MusicOption(val label: String, val code: String)
 
     private val options get() = listOf(
-        MusicOption(getString(R.string.action_music_play),       "play"),
         MusicOption(getString(R.string.action_music_play_pause), "play_pause"),
         MusicOption(getString(R.string.action_music_stop),       "stop"),
         MusicOption(getString(R.string.action_music_previous),   "previous"),

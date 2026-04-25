@@ -106,7 +106,6 @@
     <string name="action_clear_background">Clear Background Apps</string>
     <string name="action_launch_app">Launch App</string>
     <string name="action_music_control">Music Control</string>
-    <string name="action_music_play">Play Music</string>
     <string name="action_music_play_pause">Play / Pause</string>
     <string name="action_music_stop">Stop</string>
     <string name="action_music_previous">Previous Track</string>

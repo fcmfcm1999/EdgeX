@@ -483,7 +483,6 @@ internal class GestureActionDispatcher(
     private fun dispatchMediaKey(context: Context, action: String) {
         try {
             val keyCode = when (action.removePrefix("music_control:")) {
-                "play"       -> KeyEvent.KEYCODE_MEDIA_PLAY
                 "play_pause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
                 "stop"       -> KeyEvent.KEYCODE_MEDIA_STOP
                 "next"       -> KeyEvent.KEYCODE_MEDIA_NEXT

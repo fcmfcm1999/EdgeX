@@ -105,7 +105,6 @@
     <string name="action_clear_background">清除后台应用</string>
     <string name="action_launch_app">启动应用</string>
     <string name="action_music_control">音乐控制</string>
-    <string name="action_music_play">播放音乐</string>
     <string name="action_music_play_pause">播放 / 暂停</string>
     <string name="action_music_stop">停止</string>
     <string name="action_music_previous">上一曲</string>
