@@ -69,7 +69,7 @@
     <string name="zone_bottom_mid">Mid-Bottom</string>
     <string name="zone_bottom_right">Right-Bottom</string>
     <string name="zone_bottom_full">Bottom Edge</string>
-    <string name="zone_low_priority_subtitle">Fallback</string>
+    <string name="zone_low_priority_subtitle">Low Priority</string>
     <string name="zone_left_default_title">Left Zone</string>
     <string name="zone_right_default_title">Right Zone</string>
     <string name="zone_top_default_title">Top Zone</string>
