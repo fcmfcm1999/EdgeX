@@ -527,6 +527,17 @@ internal class GestureActionDispatcher(
         val errors = mutableListOf<String>()
 
         try {
+            val result = GlobalActionHelper.performGlobalAction(
+                context,
+                GlobalActionHelper.GLOBAL_ACTION_TAKE_SCREENSHOT,
+            )
+            if (result) return
+            errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: false")
+        } catch (t: Throwable) {
+            errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: ${t.message}")
+        }
+
+        try {
             val inputManager = context.getSystemService(Context.INPUT_SERVICE)
             if (inputManager != null) {
                 val injectMethod = inputManager.javaClass.getMethod(
