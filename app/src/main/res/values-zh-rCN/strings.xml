@@ -101,6 +101,23 @@
     <string name="action_app_shortcut">应用快捷方式</string>
     <string name="action_shell_command">Shell 命令</string>
     <string name="action_sub_gesture">子手势</string>
+    <string name="action_expand_notifications">展开通知栏</string>
+    <string name="action_clear_background">清除后台应用</string>
+    <string name="action_launch_app">启动应用</string>
+    <string name="action_music_control">音乐控制</string>
+    <string name="action_music_play">播放音乐</string>
+    <string name="action_music_play_pause">播放 / 暂停</string>
+    <string name="action_music_stop">停止</string>
+    <string name="action_music_previous">上一曲</string>
+    <string name="action_music_next">下一曲</string>
+
+    <!-- 音乐控制 / 应用选择配置 -->
+    <string name="header_music_control">音乐控制</string>
+    <string name="header_app_selection">选择应用</string>
+    <string name="label_app_prefix">应用：%s</string>
+    <string name="label_music_prefix">音乐：%s</string>
+    <string name="toast_app_not_found">找不到该应用</string>
+    <string name="toast_cleared_background">已清除 %d 个后台应用</string>
 
     <!-- 子手势配置 -->
     <string name="header_sub_gesture">子手势</string>
