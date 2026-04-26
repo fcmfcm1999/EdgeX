@@ -27,7 +27,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(
                 view.paddingLeft,
-                insets.systemWindowInsetTop, // Only apply status bar height
+                insets.getInsets(android.view.WindowInsets.Type.statusBars()).top, // Only apply status bar height
                 view.paddingRight,
                 view.paddingBottom // Keep original bottom padding (0 or defined)
             )

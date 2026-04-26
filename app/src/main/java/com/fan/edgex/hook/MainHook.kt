@@ -195,7 +195,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         if (param.args[0] == null) {
-                            registerFakeInputFilter(param.thisObject, inputManagerService.classLoader)
+                            registerFakeInputFilter(param.thisObject, inputManagerService.classLoader!!)
                         }
                     }
                 }

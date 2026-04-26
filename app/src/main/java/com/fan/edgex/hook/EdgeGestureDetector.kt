@@ -304,12 +304,11 @@ internal class EdgeGestureDetector(
 
     private fun resolveEdgeZone(context: Context, x: Float, y: Float): EdgeZoneMatch? {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val realSize = android.graphics.Point()
-        windowManager.defaultDisplay.getRealSize(realSize)
+        val bounds = windowManager.currentWindowMetrics.bounds
 
         val edgeThreshold = EDGE_THRESHOLD_DP * context.resources.displayMetrics.density
-        val width = realSize.x.toFloat()
-        val height = realSize.y.toFloat()
+        val width = bounds.width().toFloat()
+        val height = bounds.height().toFloat()
 
         val candidates = buildList {
             if (x < edgeThreshold) add(Edge.LEFT to x)

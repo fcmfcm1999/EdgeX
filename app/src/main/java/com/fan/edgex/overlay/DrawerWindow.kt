@@ -99,13 +99,14 @@ class DrawerWindow(
             setupModernLayout(displayApps, pm, panelWidth)
         }
 
+        @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
             // FLAG_DIM_BEHIND (0x2) | FLAG_BLUR_BEHIND (0x4)
-            flags = 0x00000002 or 0x00000004
+            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
             dimAmount = 0.25f
             blurBehindRadius = 36
         }

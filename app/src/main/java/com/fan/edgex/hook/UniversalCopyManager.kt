@@ -189,14 +189,10 @@ object UniversalCopyManager {
                 null
             } ?: return QueryResult(rootAvailable = false, items = emptyList())
 
-            return try {
-                QueryResult(
-                    rootAvailable = true,
-                    items = PageTextCollector.collectAll(root)
-                )
-            } finally {
-                root.recycle()
-            }
+            return QueryResult(
+                rootAvailable = true,
+                items = PageTextCollector.collectAll(root)
+            )
         }
 
         private fun setAccessibilityEnabled(enabled: Boolean) {
@@ -299,11 +295,7 @@ object UniversalCopyManager {
             for (i in 0 until node.childCount) {
                 val child = node.getChild(i) ?: continue
                 val sizeBefore = items.size
-                try {
-                    traverse(child, items)
-                } finally {
-                    child.recycle()
-                }
+                traverse(child, items)
                 if (items.size > sizeBefore) childrenHadText = true
             }
 
