@@ -101,6 +101,11 @@
             </intent-filter>
         </receiver>
 
+        <provider
+            android:name=".config.ShellCommandProvider"
+            android:authorities="com.fan.edgex.shell"
+            android:exported="true" />
+
     </application>
 
 </manifest>

@@ -3,6 +3,8 @@ package com.fan.edgex.hook
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -12,6 +14,7 @@ import android.widget.Toast
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.config.ShellCommandProvider
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -194,22 +197,16 @@ internal class GestureActionDispatcher(
                 }
 
                 log("Executing shell command (root=$runAsRoot): $command")
-
-                val shell = if (runAsRoot) "su" else "sh"
-                val process = ProcessBuilder(shell, "-c", command)
-                    .redirectErrorStream(true)
-                    .start()
-                process.outputStream.close()
-                val output = process.inputStream.bufferedReader().readText()
-                val exitCode = process.waitFor()
-
-                if (exitCode == 0) {
-                    output.trim().takeIf { it.isNotBlank() }?.let {
-                        showToast(context, it.take(200))
-                    }
-                } else {
-                    showToast(context, ModuleRes.getString(R.string.toast_command_failed, output.trim().take(200)))
+                val extras = Bundle().apply {
+                    putBoolean(ShellCommandProvider.EXTRA_ROOT, runAsRoot)
+                    putString(ShellCommandProvider.EXTRA_COMMAND, command)
                 }
+                context.contentResolver.call(
+                    Uri.parse("content://${ShellCommandProvider.AUTHORITY}"),
+                    ShellCommandProvider.METHOD_EXECUTE,
+                    null,
+                    extras,
+                )
             } catch (e: Exception) {
                 log("Shell command exception: ${e.message}")
                 showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
