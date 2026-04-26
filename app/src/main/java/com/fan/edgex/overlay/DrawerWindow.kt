@@ -38,8 +38,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     private var contentLeftBound = 0
     private var configReceiver: android.content.BroadcastReceiver? = null
 
-    // Set to true to bypass config and load 20 real device apps for UI preview
-    private val MOCK_MODE = true
+    private val MOCK_MODE = false
 
     private val isDarkMode: Boolean
         get() = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
