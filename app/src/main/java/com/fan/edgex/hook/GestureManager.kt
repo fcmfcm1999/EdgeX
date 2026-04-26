@@ -194,12 +194,7 @@ object GestureManager {
 
         try {
             val filter = IntentFilter(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            } else {
-                @Suppress("DEPRECATION")
-                context.registerReceiver(receiver, filter)
-            }
+            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } catch (e: Exception) {
             systemConfigReceiverRegistered = false
             log("Failed to register config broadcast receiver: ${e.message}")

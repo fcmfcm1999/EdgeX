@@ -128,11 +128,6 @@ object UniversalCopyManager {
         }
 
         fun collectAll(onResult: (CollectResult) -> Unit) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                onResult(CollectResult(CollectStatus.UNAVAILABLE))
-                return
-            }
-
             try {
                 if (!accessibilityManager.isEnabled) {
                     setAccessibilityEnabled(true)
@@ -220,7 +215,6 @@ object UniversalCopyManager {
         }
 
         private fun updateUiAutomationFlags(enabled: Boolean) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
             try {
                 val uiAutomationManager = XposedHelpers.getObjectField(managerService, "mUiAutomationManager")
                 val flagsField = XposedHelpers.findField(uiAutomationManager.javaClass, "mUiAutomationFlags")

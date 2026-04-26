@@ -1,7 +1,6 @@
 package com.fan.edgex.hook
 
 import android.content.Context
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -44,8 +43,7 @@ object KeyManager {
     private const val STATE_PRESSED = 1
     private const val STATE_WAITING_DOUBLE = 2
     
-    // Android 10+ requires copying KeyEvent (like Xposed Edge Pro's z.E flag)
-    private val needsCopyEvent = Build.VERSION.SDK_INT > Build.VERSION_CODES.Q
+    private val needsCopyEvent = true
 
     // Current state per key
     private val keyStates = mutableMapOf<Int, Int>()

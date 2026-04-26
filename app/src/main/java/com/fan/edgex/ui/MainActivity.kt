@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
         // Fix for "Header too tall": fitsSystemWindows="true" defaults to applying ALL system insets (Top + Bottom).
         // Since this view is at the top, we only want the Top Inset (Status Bar).
         // The Bottom Inset (Nav Bar) was erroneously adding huge padding to the bottom of the header.
-        findViewById<android.view.View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
+        findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(
                 view.paddingLeft,
                 insets.getInsets(android.view.WindowInsets.Type.statusBars()).top, // Only apply status bar height

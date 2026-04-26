@@ -14,23 +14,3 @@ private fun getPid(line: String): String? {
         if (it.isEmpty()) null else it[1]
     }
 }
-
-fun executeShellCommand(
-    command: String,
-    su: Boolean,
-    outAction: ((List<String>) -> Unit)? = null,
-    errorAction: ((List<String>) -> Unit)? = null,
-): Boolean {
-    if (su) {
-        val result = Shell.cmd(command).exec()
-        outAction?.invoke(result.out)
-        errorAction?.invoke(result.err)
-        return result.isSuccess
-    } else {
-        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-        process.outputStream.close()
-        outAction?.invoke(process.inputStream.bufferedReader().readLines())
-        errorAction?.invoke(process.errorStream.bufferedReader().readLines())
-        return process.waitFor() == 0
-    }
-}

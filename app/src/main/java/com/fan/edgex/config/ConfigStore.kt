@@ -3,6 +3,7 @@ package com.fan.edgex.config
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 // UI-side config access. All writes go through here so the hook is always notified.
 // Values are stored as strings to keep the hook snapshot schema stable across releases.
@@ -11,7 +12,7 @@ fun Context.configPrefs(): SharedPreferences =
     getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
 
 fun Context.putConfig(key: String, value: String) {
-    configPrefs().edit().putString(key, value).apply()
+    configPrefs().edit { putString(key, value) }
     notifyConfigChanged(mapOf(key to value))
 }
 

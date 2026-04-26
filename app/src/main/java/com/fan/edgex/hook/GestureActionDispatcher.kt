@@ -289,33 +289,29 @@ internal class GestureActionDispatcher(
             val packageName = parts[1]
             val shortcutId = parts[2]
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
-                val launcherApps =
-                    context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+            val launcherApps =
+                context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+            try {
+                launcherApps.startShortcut(
+                    packageName,
+                    shortcutId,
+                    null,
+                    null,
+                    currentUserHandle(),
+                )
+            } catch (e: Exception) {
+                log("Failed to launch shortcut: ${e.message}")
                 try {
-                    launcherApps.startShortcut(
-                        packageName,
-                        shortcutId,
-                        null,
-                        null,
-                        currentUserHandle(),
-                    )
-                } catch (e: Exception) {
-                    log("Failed to launch shortcut: ${e.message}")
-                    try {
-                        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-                        if (intent != null) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } else {
-                            showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
-                        }
-                    } catch (_: Exception) {
-                        showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
+                    val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    } else {
+                        showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
                     }
+                } catch (_: Exception) {
+                    showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
                 }
-            } else {
-                showToast(context, ModuleRes.getString(R.string.toast_requires_android_71))
             }
         } catch (e: Exception) {
             e.printStackTrace()
