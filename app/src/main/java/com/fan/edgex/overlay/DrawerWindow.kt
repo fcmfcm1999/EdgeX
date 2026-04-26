@@ -25,10 +25,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.hook.ModuleRes
 
-class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
+class DrawerWindow(
+    private val context: Context,
+    private val resolveConfig: (String) -> String,
+    private val onDismiss: (() -> Unit)? = null,
+) {
 
     private data class AppEntry(val resolveInfo: android.content.pm.ResolveInfo, val isFrozen: Boolean)
 
@@ -49,17 +52,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
 
         registerConfigReceiver()
 
-        var useArcDrawer = false
-        try {
-            context.contentResolver.query(
-                ConfigProvider.uriForKey(AppConfig.FREEZER_ARC_DRAWER),
-                null, null, null, null
-            )?.use {
-                if (it.moveToFirst()) useArcDrawer = it.getString(0).toBoolean()
-            }
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read arc drawer config: ${e.message}")
-        }
+        val useArcDrawer = resolveConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
 
         val displayMetrics = context.resources.displayMetrics
 
@@ -106,7 +99,7 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         }
 
         val params = WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT

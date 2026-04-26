@@ -153,7 +153,7 @@ object KeyManager {
      */
     private fun injectKeyEvent(event: KeyEvent, context: Context) {
         // Mark this event as injected by us (using eventTime as identifier)
-        injectedEventTimes.add(event.eventTime)
+        markInjectedEvent(event)
         
         // Volume key passthrough: if we inject a volume key, it means we didn't consume it
         // and it's falling back to the system behavior (bringing up the volume UI).
@@ -200,6 +200,10 @@ object KeyManager {
         }
         
         XposedBridge.log("$TAG: Failed to inject key event - no method worked")
+    }
+
+    fun markInjectedEvent(event: KeyEvent) {
+        injectedEventTimes.add(event.eventTime)
     }
     
     /**

@@ -1,17 +1,18 @@
 package com.fan.edgex.config
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 
 // UI-side config access. All writes go through here so the hook is always notified.
-// Values are stored as strings so the ContentProvider never needs type hints.
+// Values are stored as strings to keep the hook snapshot schema stable across releases.
 
 fun Context.configPrefs(): SharedPreferences =
     getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
 
 fun Context.putConfig(key: String, value: String) {
     configPrefs().edit().putString(key, value).apply()
-    notifyConfigChanged(listOf(key))
+    notifyConfigChanged(mapOf(key to value))
 }
 
 fun Context.putConfig(key: String, value: Boolean) = putConfig(key, value.toString())
@@ -26,10 +27,18 @@ fun Context.putConfigsSync(vararg entries: Pair<String, String>): Boolean {
     }.commit()
 
     if (committed) {
-        notifyConfigChanged(entries.map { it.first }.distinct())
+        notifyConfigChanged(entries.toMap())
     }
 
     return committed
+}
+
+fun Context.broadcastFullConfigSnapshot() {
+    HookConfigSnapshot.writeFromPreferences(this)
+    val values = configPrefs().all
+        .mapValues { (_, value) -> value?.toString() ?: "" }
+        .filterKeys(HookConfigSnapshot::isHookRuntimeKey)
+    sendConfigBroadcast(values, fullSnapshot = true)
 }
 
 // Reads for UI. Includes a legacy fallback for values previously stored as native booleans.
@@ -42,9 +51,20 @@ fun Context.getConfigBool(key: String, default: Boolean = false): Boolean =
             ?: runCatching { getBoolean(key, default) }.getOrDefault(default)
     }
 
-private fun Context.notifyConfigChanged(keys: Collection<String>) {
-    keys.forEach { key ->
-        contentResolver.notifyChange(ConfigProvider.uriForKey(key), null)
-    }
-    contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
+private fun Context.notifyConfigChanged(changedValues: Map<String, String>) {
+    HookConfigSnapshot.writeFromPreferences(this)
+    sendConfigBroadcast(changedValues, fullSnapshot = false)
+}
+
+private fun Context.sendConfigBroadcast(valuesByKey: Map<String, String>, fullSnapshot: Boolean) {
+    val hookValues = valuesByKey.filterKeys(HookConfigSnapshot::isHookRuntimeKey)
+    if (hookValues.isEmpty() && !fullSnapshot) return
+
+    val keys = hookValues.keys.toTypedArray()
+    val values = keys.map { hookValues.getValue(it) }.toTypedArray()
+    sendBroadcast(Intent(HookConfigSnapshot.ACTION_CONFIG_CHANGED).apply {
+        putExtra(HookConfigSnapshot.EXTRA_KEYS, keys)
+        putExtra(HookConfigSnapshot.EXTRA_VALUES, values)
+        putExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, fullSnapshot)
+    })
 }

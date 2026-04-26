@@ -1,32 +1,100 @@
 package com.fan.edgex.hook
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
+import android.content.ServiceConnection
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import android.os.UserHandle
 import android.view.KeyEvent
 import android.widget.Toast
+import com.fan.edgex.BuildConfig
+import com.fan.edgex.IShellCallback
+import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.overlay.DrawerManager
-import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 
 internal class GestureActionDispatcher(
-    private val configUri: Uri,
-    private val actionBroadcast: String,
-    private val actionExtra: String,
     private val resolveConfig: (String) -> String,
-    private val systemContextProvider: () -> Context?,
-    private val systemUiContextProvider: () -> Context?,
     private val handlerProvider: () -> Handler,
     private val log: (String) -> Unit,
 ) {
+    @Volatile private var shellExecutor: IShellExecutor? = null
+    @Volatile private var serviceBound = false
+    private var serviceContext: Context? = null
+    private val pendingCommands = ArrayDeque<Pair<String, Context>>()
+    private var idleUnbindRunnable: Runnable? = null
+    private val SHELL_SERVICE_IDLE_TIMEOUT_MS = 5 * 60 * 1000L
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            shellExecutor = IShellExecutor.Stub.asInterface(binder)
+            log("ShellExecutorService connected")
+            drainPendingCommands()
+        }
+        override fun onServiceDisconnected(name: ComponentName) {
+            shellExecutor = null
+            serviceBound = false
+            log("ShellExecutorService disconnected unexpectedly, rebinding...")
+            serviceContext?.let {
+                handlerProvider().postDelayed({ bindShellService(it) }, 2000)
+            }
+        }
+    }
+
+    private fun drainPendingCommands() {
+        while (pendingCommands.isNotEmpty()) {
+            val (action, ctx) = pendingCommands.removeFirst()
+            doExecuteShellCommand(action, ctx)
+        }
+    }
+
+    private fun scheduleIdleUnbind() {
+        val handler = handlerProvider()
+        idleUnbindRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            idleUnbindRunnable = null
+            unbindShellService()
+        }
+        idleUnbindRunnable = runnable
+        handler.postDelayed(runnable, SHELL_SERVICE_IDLE_TIMEOUT_MS)
+    }
+
+    private fun unbindShellService() {
+        val ctx = serviceContext ?: return
+        if (!serviceBound) return
+        try {
+            ctx.unbindService(serviceConnection)
+            log("ShellExecutorService unbound after idle timeout")
+        } catch (e: Exception) {
+            log("ShellExecutorService unbind failed: ${e.message}")
+        }
+        shellExecutor = null
+        serviceBound = false
+    }
+
+    fun bindShellService(context: Context) {
+        if (serviceBound) return
+        serviceContext = context
+        val intent = Intent().apply {
+            component = ComponentName(
+                BuildConfig.APPLICATION_ID,
+                "${BuildConfig.APPLICATION_ID}.config.ShellExecutorService",
+            )
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        }
+        val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        if (bound) serviceBound = true
+        log("ShellExecutorService bindService=$bound")
+    }
     fun triggerGestureAction(
         zone: String,
         gestureType: String,
@@ -48,32 +116,6 @@ internal class GestureActionDispatcher(
     fun executeKeyAction(action: String, context: Context) {
         handlerProvider().post {
             performAction(action, context, 0f, 0f)
-        }
-    }
-
-    fun handleSystemUiAction(action: String, context: Context) {
-        val ctx = systemUiContextProvider() ?: context
-        when {
-            action.startsWith("app_shortcut:") -> {
-                handlerProvider().post { launchShortcut(ctx, action) }
-            }
-            action.startsWith("launch_app:") -> {
-                handlerProvider().post { launchApp(ctx, action) }
-            }
-            action.startsWith("shell:") -> {
-                doExecuteShellCommand(action, ctx)
-            }
-            action == "freezer_drawer" -> {
-                handlerProvider().post { DrawerManager.showDrawer(ctx) }
-            }
-            action == "refreeze" -> {
-                performRefreeze(ctx)
-            }
-            else -> {
-                handlerProvider().post {
-                    showToast(ctx, ModuleRes.getString(R.string.toast_unknown_action, action))
-                }
-            }
         }
     }
 
@@ -160,6 +202,9 @@ internal class GestureActionDispatcher(
             action == "screenshot" -> {
                 performScreenshot(context)
             }
+            action == "refreeze" -> {
+                performRefreeze(context)
+            }
             action == "universal_copy" -> {
                 UniversalCopyManager.collectAllTexts(context) { result ->
                     when (result.status) {
@@ -176,10 +221,16 @@ internal class GestureActionDispatcher(
                 }
             }
             action.startsWith("shell:") -> {
-                sendActionToSystemUI(action, context)
+                doExecuteShellCommand(action, context)
             }
-            else -> {
-                sendActionToSystemUI(action, context)
+            action.startsWith("app_shortcut:") -> {
+                launchShortcut(context, action)
+            }
+            action.startsWith("launch_app:") -> {
+                launchApp(context, action)
+            }
+            action == "freezer_drawer" -> {
+                DrawerManager.showDrawer(context, resolveConfig)
             }
         }
     }
@@ -200,69 +251,41 @@ internal class GestureActionDispatcher(
     }
 
     private fun doExecuteShellCommand(action: String, context: Context) {
-        Thread {
-            try {
-                val content = action.removePrefix("shell:")
-                val parts = content.split(":", limit = 2)
-                if (parts.size != 2) {
-                    showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
-                    return@Thread
-                }
+        val content = action.removePrefix("shell:")
+        val parts = content.split(":", limit = 2)
+        if (parts.size != 2) {
+            showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
+            return
+        }
+        val runAsRoot = parts[0] == "true"
+        val command = parts[1]
+        if (command.isBlank()) {
+            showToast(context, ModuleRes.getString(R.string.toast_empty_command))
+            return
+        }
 
-                val runAsRoot = parts[0] == "true"
-                val command = parts[1]
-                if (command.isBlank()) {
-                    showToast(context, ModuleRes.getString(R.string.toast_empty_command))
-                    return@Thread
-                }
+        val executor = shellExecutor
+        if (executor == null) {
+            pendingCommands.addLast(action to context)
+            bindShellService(context)
+            log("ShellExecutorService not ready, queued command: $command")
+            return
+        }
 
-                log("Executing shell command (root=$runAsRoot): $command")
-                if (runAsRoot) {
-                    val result = Shell.cmd(command).exec()
-                    if (!result.isSuccess) {
-                        val errorMsg = result.err.joinToString("\n")
-                        log("Shell command failed: $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = result.out.joinToString("\n")
-                        log("Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
+        log("Dispatching shell command (root=$runAsRoot): $command")
+        scheduleIdleUnbind()
+        executor.execute(command, runAsRoot, object : IShellCallback.Stub() {
+            override fun onResult(success: Boolean, output: String?) {
+                log("Shell result: success=$success output='$output'")
+                if (success) {
+                    output?.trim()?.takeIf { it.isNotBlank() }?.let {
+                        showToast(context, it.take(200))
                     }
                 } else {
-                    val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-                    process.outputStream.close()
-                    val exitCode = process.waitFor()
-                    if (exitCode != 0) {
-                        val errorMsg = process.errorStream.bufferedReader().readText()
-                        log("Shell command failed (exit=$exitCode): $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = process.inputStream.bufferedReader().readText()
-                        log("Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
-                    }
+                    showToast(context, ModuleRes.getString(R.string.toast_command_failed, output?.trim()?.take(200).orEmpty()))
                 }
-            } catch (e: Exception) {
-                log("Shell command exception: ${e.message}")
-                e.printStackTrace()
-                showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
             }
-        }.start()
-    }
-
-    private fun sendActionToSystemUI(action: String, context: Context) {
-        try {
-            val intent = Intent(actionBroadcast).apply {
-                putExtra(actionExtra, action)
-                setPackage("com.android.systemui")
-            }
-            val userHandle = android.os.UserHandle::class.java
-                .getField("CURRENT").get(null) as android.os.UserHandle
-            context.sendBroadcastAsUser(intent, userHandle)
-        } catch (e: Exception) {
-            log("Failed to send broadcast: ${e.message}")
-            e.printStackTrace()
-        }
+        })
     }
 
     private fun showToast(context: Context, text: String) {
@@ -276,7 +299,7 @@ internal class GestureActionDispatcher(
 
     private fun launchShortcut(context: Context, action: String) {
         try {
-            val parts = action.split(":")
+            val parts = action.split(":", limit = 3)
             if (parts.size != 3) {
                 showToast(context, ModuleRes.getString(R.string.toast_shortcut_format_error))
                 return
@@ -294,8 +317,9 @@ internal class GestureActionDispatcher(
                         shortcutId,
                         null,
                         null,
-                        android.os.Process.myUserHandle(),
+                        currentUserHandle(),
                     )
+                    log("Launched shortcut: $packageName/$shortcutId")
                 } catch (e: Exception) {
                     log("Failed to launch shortcut: ${e.message}")
                     try {
@@ -319,30 +343,31 @@ internal class GestureActionDispatcher(
         }
     }
 
+    private fun currentUserHandle(): UserHandle {
+        val currentUserId = runCatching {
+            XposedHelpers.callStaticMethod(
+                android.app.ActivityManager::class.java,
+                "getCurrentUser",
+            ) as Int
+        }.getOrDefault(0)
+        return runCatching {
+            XposedHelpers.callStaticMethod(UserHandle::class.java, "of", currentUserId) as UserHandle
+        }.getOrDefault(android.os.Process.myUserHandle())
+    }
+
     private fun performRefreeze(context: Context) {
         val handler = Handler(Looper.getMainLooper())
         Thread {
             try {
                 val pm = context.packageManager
                 val packageSet = linkedSetOf<String>()
-                val cursor: Cursor? = configResolver(context).query(
-                    Uri.withAppendedPath(configUri, AppConfig.FREEZER_APP_LIST),
-                    null,
-                    null,
-                    null,
-                    null,
-                )
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            packageSet.addAll(
-                                listStr.split(",")
-                                    .map { pkg -> pkg.trim() }
-                                    .filter { pkg -> pkg.isNotEmpty() },
-                            )
-                        }
-                    }
+                val listStr = readConfigValue(context, AppConfig.FREEZER_APP_LIST)
+                if (listStr.isNotEmpty()) {
+                    packageSet.addAll(
+                        listStr.split(",")
+                            .map { pkg -> pkg.trim() }
+                            .filter { pkg -> pkg.isNotEmpty() },
+                    )
                 }
 
                 if (packageSet.isEmpty()) {
@@ -515,27 +540,39 @@ internal class GestureActionDispatcher(
         }
     }
 
-    private fun configResolver(context: Context) =
-        systemContextProvider()?.contentResolver
-            ?: systemUiContextProvider()?.contentResolver
-            ?: context.contentResolver
+    private fun readConfigValue(context: Context, key: String): String {
+        val cached = resolveConfig(key)
+        if (cached.isNotEmpty()) return cached
+
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.containsKey(key)) return snapshot.getValue(key)
+
+        log("Config value missing without Provider fallback: $key")
+        return ""
+    }
 
     private fun performScreenshot(context: Context) {
-        val now = SystemClock.uptimeMillis()
-        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
-        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
         val errors = mutableListOf<String>()
+
+        if (injectScreenshotChord(context, errors)) return
 
         try {
             val result = GlobalActionHelper.performGlobalAction(
                 context,
                 GlobalActionHelper.GLOBAL_ACTION_TAKE_SCREENSHOT,
             )
-            if (result) return
+            if (result) {
+                log("screenshot via GLOBAL_ACTION_TAKE_SCREENSHOT")
+                return
+            }
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: false")
         } catch (t: Throwable) {
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: ${t.message}")
         }
+
+        val now = SystemClock.uptimeMillis()
+        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
+        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
 
         try {
             val inputManager = context.getSystemService(Context.INPUT_SERVICE)
@@ -547,6 +584,7 @@ internal class GestureActionDispatcher(
                 )
                 injectMethod.invoke(inputManager, down, 0)
                 injectMethod.invoke(inputManager, up, 0)
+                log("screenshot via INPUT_SERVICE SYSRQ")
                 return
             }
         } catch (t: Throwable) {
@@ -564,6 +602,7 @@ internal class GestureActionDispatcher(
             )
             injectMethod.invoke(global, down, 0)
             injectMethod.invoke(global, up, 0)
+            log("screenshot via InputManagerGlobal SYSRQ")
             return
         } catch (t: Throwable) {
             errors.add("InputManagerGlobal: ${t.message}")
@@ -571,9 +610,43 @@ internal class GestureActionDispatcher(
 
         try {
             Runtime.getRuntime().exec("input keyevent 120")
+            log("screenshot via shell input SYSRQ")
         } catch (e: Exception) {
             errors.add("shell: ${e.message}")
             log("screenshot failed -> ${errors.joinToString(" | ")}")
+        }
+    }
+
+    private fun injectScreenshotChord(context: Context, errors: MutableList<String>): Boolean {
+        val now = SystemClock.uptimeMillis()
+        val events = arrayOf(
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN, 0),
+            KeyEvent(now, now + 30, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_POWER, 0),
+            KeyEvent(now, now + 160, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_POWER, 0),
+            KeyEvent(now, now + 170, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_DOWN, 0),
+        )
+
+        return try {
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
+            if (inputManager != null) {
+                val injectMethod = inputManager.javaClass.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType,
+                )
+                events.forEach { event ->
+                    KeyManager.markInjectedEvent(event)
+                    injectMethod.invoke(inputManager, event, 0)
+                }
+                log("screenshot via injected power+volume chord")
+                true
+            } else {
+                errors.add("screenshot chord: INPUT_SERVICE null")
+                false
+            }
+        } catch (t: Throwable) {
+            errors.add("screenshot chord: ${t.message}")
+            false
         }
     }
 }
