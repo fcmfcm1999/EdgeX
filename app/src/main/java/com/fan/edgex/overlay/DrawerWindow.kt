@@ -16,31 +16,24 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.hook.ModuleRes
 
-class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
+class DrawerWindow(
+    private val context: Context,
+    private val resolveConfig: (String) -> String,
+    private val onDismiss: (() -> Unit)? = null,
+) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
     // Left boundary of drawer content area.
     // Taps to the left of this X coordinate dismiss the drawer.
     private var contentLeftBound = 0
-    
+
     fun show() {
         if (rootView != null) return // Already showing
 
-        var useArcDrawer = false
-        try {
-            context.contentResolver.query(
-                ConfigProvider.uriForKey(AppConfig.FREEZER_ARC_DRAWER),
-                null, null, null, null
-            )?.use {
-                if (it.moveToFirst()) useArcDrawer = it.getString(0).toBoolean()
-            }
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read arc drawer config: ${e.message}")
-        }
+        val useArcDrawer = resolveConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
 
         val displayMetrics = context.resources.displayMetrics
         
@@ -82,25 +75,14 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         try {
             val configuredPackages = linkedSetOf<String>()
 
-            // 0. Load Persistent Freezer List from ConfigProvider
-            try {
-                context.contentResolver.query(
-                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
-                    null, null, null, null
-                )?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            configuredPackages.addAll(
-                                listStr.split(",")
-                                    .map { pkg -> pkg.trim() }
-                                    .filter { pkg -> pkg.isNotEmpty() },
-                            )
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
+            // 0. Load persistent freezer list from hook-side memory cache.
+            val listStr = resolveConfig(AppConfig.FREEZER_APP_LIST)
+            if (listStr.isNotEmpty()) {
+                configuredPackages.addAll(
+                    listStr.split(",")
+                        .map { pkg -> pkg.trim() }
+                        .filter { pkg -> pkg.isNotEmpty() },
+                )
             }
 
             // Find all launcher activities
@@ -144,8 +126,9 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         contentLeftBound = displayMetrics.widthPixels - drawerWidth
 
         // --- Window Layout Params ---
+        @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
             // Always full-width so taps on the left dim area are within
             // window bounds and properly trigger dismiss.

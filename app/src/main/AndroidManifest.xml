@@ -4,8 +4,10 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
+        android:name=".App"
         android:allowBackup="true"
             android:dataExtractionRules="@xml/data_extraction_rules"
             android:fullBackupContent="@xml/backup_rules"
@@ -27,7 +29,7 @@
                 android:value="82" />
         <meta-data
                 android:name="xposedscope"
-                android:value="android;com.android.systemui" />
+                android:value="android;system" />
 
         <activity
                 android:name=".ui.MainActivity"
@@ -90,11 +92,18 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
-        <provider
-                android:name=".config.ConfigProvider"
-                android:authorities="com.fan.edgex.provider"
-                android:exported="true"
-                android:enabled="true" />
+        <receiver
+            android:name=".config.ConfigSnapshotReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".config.ShellExecutorService"
+            android:exported="true" />
 
     </application>
 

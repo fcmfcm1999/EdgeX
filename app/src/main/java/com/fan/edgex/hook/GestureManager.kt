@@ -10,7 +10,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -18,19 +18,10 @@ object GestureManager {
 
     private const val TAG = "EdgeX"
 
-    // system_server context (from filterInputEvent hook, for config queries)
     private var systemContext: Context? = null
-    // SystemUI context (for overlay windows like DrawerWindow)
-    private var systemUIContext: Context? = null
 
-    private val CONFIG_URI = ConfigProvider.CONTENT_URI
-
-    // Broadcast action for cross-process communication (system_server -> SystemUI)
-    private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
-    private const val EXTRA_ACTION = "action"
-
-    // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
+    private var systemConfigReceiverRegistered = false
     private var keyManagerInitialized = false
 
     private var mHandler: Handler? = null
@@ -39,20 +30,12 @@ object GestureManager {
         log(message)
     }
     private val configRepository = HookConfigRepository(
-        contentUri = CONFIG_URI,
-        supportedKeysProvider = { KeyManager.SUPPORTED_KEYS.keys },
-        keyTriggersProvider = { AppConfig.KEY_TRIGGERS },
         updateKeyConfig = KeyManager::updateConfig,
         log = ::log,
     )
     private val actionDispatcher by lazy {
         GestureActionDispatcher(
-            configUri = CONFIG_URI,
-            actionBroadcast = ACTION_PERFORM,
-            actionExtra = EXTRA_ACTION,
             resolveConfig = configRepository::get,
-            systemContextProvider = { systemContext },
-            systemUiContextProvider = { systemUIContext },
             handlerProvider = ::mainHandler,
             log = ::log,
         )
@@ -127,9 +110,12 @@ object GestureManager {
             configRepository.attachSystemContext(context)
             configRepository.reloadAsync()
             registerScreenStateReceiver(context)
-            configRepository.ensureObserverRegistered(context) {
-                configRepository.reloadAsync()
+            registerConfigChangeReceiver(context)
+            mainHandler().post {
+                debugOverlayController.initialize(context)
+                configRepository.reloadAsync(::refreshDebugOverlay)
             }
+            actionDispatcher.bindShellService(context)
         }
         if (initializeKeys && !keyManagerInitialized) {
             KeyManager.init(context)
@@ -137,18 +123,8 @@ object GestureManager {
         }
     }
 
-    private fun ensureSystemUiInitialized(context: Context) {
-        if (systemUIContext != null) return
-
-        systemUIContext = context
-        configRepository.attachSystemUiContext(context)
-        registerActionReceiver(context)
-        configRepository.ensureObserverRegistered(context) {
-            configRepository.reloadAsync(::refreshDebugOverlay)
-        }
-        debugOverlayController.initialize(context)
-        configRepository.reloadAsync(::refreshDebugOverlay)
-        log("SystemUI overlay initialized with broadcast receiver")
+    fun initSystemServer(context: Context) {
+        ensureSystemServerInitialized(context, initializeKeys = false)
     }
 
     private fun refreshDebugOverlay() {
@@ -198,6 +174,45 @@ object GestureManager {
         }
     }
 
+    private fun registerConfigChangeReceiver(context: Context) {
+        if (systemConfigReceiverRegistered) return
+        systemConfigReceiverRegistered = true
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action != HookConfigSnapshot.ACTION_CONFIG_CHANGED) return
+
+                val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
+                val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
+                if (keys != null && values != null) {
+                    configRepository.updateFromBroadcast(
+                        keys,
+                        values,
+                        intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
+                    )
+                    refreshDebugOverlay()
+                } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
+                    configRepository.invalidate()
+                    configRepository.reloadAsync(::refreshDebugOverlay)
+                }
+            }
+        }
+
+        try {
+            val filter = IntentFilter(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                context.registerReceiver(receiver, filter)
+            }
+            log("Config broadcast receiver registered in system_server")
+        } catch (e: Exception) {
+            systemConfigReceiverRegistered = false
+            log("Failed to register config broadcast receiver: ${e.message}")
+        }
+    }
+
     /**
      * Called from system_server (filterInputEvent hook).
      * Handles MotionEvent at the input pipeline level and consumes touches
@@ -227,47 +242,8 @@ object GestureManager {
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }
 
-    /**
-     * Execute an action triggered by a key press (called from KeyManager).
-     */
     fun executeKeyAction(action: String, context: Context) {
         actionDispatcher.executeKeyAction(action, context)
-    }
-
-    /**
-     * Called from SystemUI process to initialize overlay windows and broadcast receiver.
-     * Used for debug visualization and DrawerWindow.
-     */
-    fun initSystemUI(ctx: Context) {
-        ensureSystemUiInitialized(ctx)
-    }
-
-    /**
-     * Register a BroadcastReceiver in SystemUI to handle action commands
-     * sent from system_server via filterInputEvent hook.
-     */
-    private fun registerActionReceiver(ctx: Context) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-                actionDispatcher.handleSystemUiAction(action, context)
-            }
-        }
-
-        try {
-            val filter = IntentFilter(ACTION_PERFORM)
-            // Must use RECEIVER_EXPORTED so system_server (different UID) can reach us
-            ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            log("Action BroadcastReceiver registered in SystemUI")
-        } catch (e: Exception) {
-            try {
-                val filter = IntentFilter(ACTION_PERFORM)
-                ctx.registerReceiver(receiver, filter)
-                log("Action BroadcastReceiver registered (legacy) in SystemUI")
-            } catch (e2: Exception) {
-                log("Failed to register BroadcastReceiver: ${e2.message}")
-            }
-        }
     }
 
 }

@@ -5,9 +5,9 @@ import android.content.Context
 object DrawerManager {
     private var activeDrawer: DrawerWindow? = null
 
-    fun showDrawer(context: Context) {
+    fun showDrawer(context: Context, resolveConfig: (String) -> String) {
         if (activeDrawer?.isShowing() == true) return
-        val drawer = DrawerWindow(context) { activeDrawer = null }
+        val drawer = DrawerWindow(context, resolveConfig) { activeDrawer = null }
         activeDrawer = drawer
         drawer.show()
     }
