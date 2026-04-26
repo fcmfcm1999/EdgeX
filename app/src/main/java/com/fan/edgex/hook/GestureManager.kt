@@ -125,8 +125,10 @@ object GestureManager {
             configRepository.ensureObserverRegistered(context) {
                 configRepository.reloadAsync(::refreshDebugOverlay)
             }
-            debugOverlayController.initialize(context)
-            configRepository.reloadAsync(::refreshDebugOverlay)
+            mainHandler().post {
+                debugOverlayController.initialize(context)
+                configRepository.reloadAsync(::refreshDebugOverlay)
+            }
         }
         if (initializeKeys && !keyManagerInitialized) {
             KeyManager.init(context)
@@ -211,7 +213,11 @@ object GestureManager {
                 val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
                 val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
                 if (keys != null && values != null) {
-                    configRepository.updateFromBroadcast(keys, values)
+                    configRepository.updateFromBroadcast(
+                        keys,
+                        values,
+                        intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
+                    )
                     refreshDebugOverlay()
                 } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
                     configRepository.invalidate()

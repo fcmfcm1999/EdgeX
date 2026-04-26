@@ -22,6 +22,7 @@ internal class HookConfigRepository(
     private var lastConfigLoad = 0L
     private var systemContext: Context? = null
     private var systemUiContext: Context? = null
+    private var missingSnapshotLogged = false
 
     private val configExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "EdgeX-Config").apply { isDaemon = true }
@@ -58,18 +59,22 @@ internal class HookConfigRepository(
         lastConfigLoad = 0L
     }
 
-    fun updateFromBroadcast(keys: Array<String>, values: Array<String>) {
+    fun updateFromBroadcast(keys: Array<String>, values: Array<String>, fullSnapshot: Boolean) {
         if (keys.size != values.size) {
             log("Ignoring malformed config broadcast: keys=${keys.size} values=${values.size}")
             return
         }
 
+        if (fullSnapshot) {
+            configCache.clear()
+        }
         keys.forEachIndexed { index, key ->
             configCache[key] = values[index]
         }
         updateKeyConfig(configCache)
+        HookConfigSnapshot.writeForHook(configCache)
         lastConfigLoad = System.currentTimeMillis()
-        log("Config broadcast applied: ${keys.joinToString()}")
+        log("Config broadcast applied: ${keys.size} keys full=$fullSnapshot")
     }
 
     fun reloadAsync(onLoaded: (() -> Unit)? = null) {
@@ -134,8 +139,15 @@ internal class HookConfigRepository(
 
     private fun loadSnapshot(): Boolean {
         val snapshot = HookConfigSnapshot.readFromHookFile()
-        if (snapshot.isEmpty()) return false
+        if (snapshot.isEmpty()) {
+            if (!missingSnapshotLogged) {
+                missingSnapshotLogged = true
+                log("Config snapshot unavailable; waiting for UI full snapshot broadcast")
+            }
+            return false
+        }
 
+        missingSnapshotLogged = false
         configCache.clear()
         configCache.putAll(snapshot)
         updateKeyConfig(configCache)
@@ -144,7 +156,6 @@ internal class HookConfigRepository(
     }
 
     private fun queryConfigProvider(key: String): String {
-        log("Skipping ConfigProvider fallback for key=$key")
         return ""
     }
 

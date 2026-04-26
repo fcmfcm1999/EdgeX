@@ -20,7 +20,8 @@ object HookConfigSnapshot {
     private const val VERSION = "1"
 
     fun snapshotFileForHook(): File =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        systemSnapshotFile().takeIf { it.isFile && it.canRead() }
+            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             File("/data/user_de/0/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
         } else {
             File("/data/data/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
@@ -38,9 +39,15 @@ object HookConfigSnapshot {
     fun readFromContext(context: Context): Map<String, String> =
         read(snapshotFile(context))
 
+    fun writeForHook(values: Map<String, String>): Boolean =
+        write(systemSnapshotFile(), values)
+
     private fun write(context: Context, values: Map<String, String>): Boolean {
+        return write(snapshotFile(context), values)
+    }
+
+    private fun write(file: File, values: Map<String, String>): Boolean {
         return runCatching {
-            val file = snapshotFile(context)
             file.parentFile?.mkdirs()
 
             val properties = Properties()
@@ -83,6 +90,9 @@ object HookConfigSnapshot {
             }
         return File(storageContext.filesDir, SNAPSHOT_FILE)
     }
+
+    private fun systemSnapshotFile(): File =
+        File("/data/system/edgex/$SNAPSHOT_FILE")
 
     private fun makeHookReadable(file: File) {
         file.setReadable(true, false)

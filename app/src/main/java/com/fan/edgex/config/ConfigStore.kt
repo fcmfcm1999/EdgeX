@@ -33,6 +33,12 @@ fun Context.putConfigsSync(vararg entries: Pair<String, String>): Boolean {
     return committed
 }
 
+fun Context.broadcastFullConfigSnapshot() {
+    HookConfigSnapshot.writeFromPreferences(this)
+    val values = configPrefs().all.mapValues { (_, value) -> value?.toString() ?: "" }
+    sendConfigBroadcast(values, fullSnapshot = true)
+}
+
 // Reads for UI. Includes a legacy fallback for values previously stored as native booleans.
 fun Context.getConfigString(key: String, default: String = ""): String =
     configPrefs().run { getString(key, null) ?: default }
@@ -51,10 +57,15 @@ private fun Context.notifyConfigChanged(changedValues: Map<String, String>) {
     }
     contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
 
-    val keys = changedValues.keys.toTypedArray()
-    val values = keys.map { changedValues.getValue(it) }.toTypedArray()
+    sendConfigBroadcast(changedValues, fullSnapshot = false)
+}
+
+private fun Context.sendConfigBroadcast(valuesByKey: Map<String, String>, fullSnapshot: Boolean) {
+    val keys = valuesByKey.keys.toTypedArray()
+    val values = keys.map { valuesByKey.getValue(it) }.toTypedArray()
     sendBroadcast(Intent(HookConfigSnapshot.ACTION_CONFIG_CHANGED).apply {
         putExtra(HookConfigSnapshot.EXTRA_KEYS, keys)
         putExtra(HookConfigSnapshot.EXTRA_VALUES, values)
+        putExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, fullSnapshot)
     })
 }

@@ -27,7 +27,7 @@
                 android:value="82" />
         <meta-data
                 android:name="xposedscope"
-                android:value="android" />
+                android:value="android;system" />
 
         <activity
                 android:name=".ui.MainActivity"
