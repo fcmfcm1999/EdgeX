@@ -25,6 +25,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.hook.ModuleRes
 
 class DrawerWindow(
@@ -532,18 +533,11 @@ class DrawerWindow(
         return try {
             val configuredPackages = linkedSetOf<String>()
             try {
-                context.contentResolver.query(
-                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
-                    null, null, null, null
-                )?.use {
-                    if (it.moveToFirst()) {
-                        val listStr = it.getString(0)
-                        if (!listStr.isNullOrEmpty()) {
-                            configuredPackages.addAll(
-                                listStr.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
-                            )
-                        }
-                    }
+                val listStr = HookConfigSnapshot.readFromHookFile()[AppConfig.FREEZER_APP_LIST] ?: ""
+                if (listStr.isNotEmpty()) {
+                    configuredPackages.addAll(
+                        listStr.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                    )
                 }
             } catch (e: Exception) {
                 de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
