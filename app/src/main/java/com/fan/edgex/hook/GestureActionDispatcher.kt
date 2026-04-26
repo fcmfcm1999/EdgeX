@@ -10,10 +10,9 @@ import android.os.UserHandle
 import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.R
-import com.fan.edgex.BuildConfig
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
-import com.fan.edgex.config.ShellActionReceiver
+import com.fan.edgex.config.ShellCommandProvider
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -196,16 +195,16 @@ internal class GestureActionDispatcher(
                 }
 
                 log("Executing shell command (root=$runAsRoot): $command")
-                context.sendBroadcast(Intent(ShellActionReceiver.ACTION_EXECUTE_SHELL).apply {
-                    component = android.content.ComponentName(
-                        BuildConfig.APPLICATION_ID,
-                        "${BuildConfig.APPLICATION_ID}.config.ShellActionReceiver",
-                    )
-                    setPackage(BuildConfig.APPLICATION_ID)
-                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-                    putExtra(ShellActionReceiver.EXTRA_ROOT, runAsRoot)
-                    putExtra(ShellActionReceiver.EXTRA_COMMAND, command)
-                })
+                val extras = android.os.Bundle().apply {
+                    putBoolean(ShellCommandProvider.EXTRA_ROOT, runAsRoot)
+                    putString(ShellCommandProvider.EXTRA_COMMAND, command)
+                }
+                context.contentResolver.call(
+                    android.net.Uri.parse("content://${ShellCommandProvider.AUTHORITY}"),
+                    ShellCommandProvider.METHOD_EXECUTE,
+                    null,
+                    extras,
+                )
             } catch (e: Exception) {
                 log("Shell command exception: ${e.message}")
                 e.printStackTrace()

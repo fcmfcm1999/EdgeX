@@ -105,6 +105,11 @@
             android:name=".config.ShellActionReceiver"
             android:exported="false" />
 
+        <provider
+            android:name=".config.ShellCommandProvider"
+            android:authorities="com.fan.edgex.shell"
+            android:exported="false" />
+
     </application>
 
 </manifest>
