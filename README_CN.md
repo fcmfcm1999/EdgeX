@@ -1,9 +1,9 @@
 # EdgeX
 
-> 向 `Xposed Edge` 致敬。`EdgeX` 是一个基于 LSPosed/Xposed 的 Android 手势增强模块，用于在屏幕边缘提供自定义手势触发、快捷动作和应用冷冻抽屉能力。
+> 向 Xposed Edge致敬。EdgeX 是一个面向 Android 15+ 的 LSPosed/Xposed 边缘手势增强模块，通过系统级输入 Hook，把屏幕边缘手势、硬件按键和常用系统动作连接起来。
 
 <p align="center">
-  <img src="docs/icon/logo.png" alt="EdgeX Banner" width="240" />
+  <img src="docs/icon/logo.png" alt="EdgeX Logo" width="220" />
 </p>
 
 <p align="center">
@@ -16,81 +16,83 @@
   <strong><a href="README.md">English</a></strong>
 </p>
 
-## 项目简介
+## 简介
 
-`EdgeX` 通过 Hook `android` 与 `com.android.systemui` 进程，在系统输入链路中接管屏幕边缘手势，并把这些手势映射到系统动作、快捷方式或应用冷冻抽屉。
+EdgeX 不是一个普通的悬浮窗工具，而是一个需要在 LSPosed/Xposed 中启用的系统增强模块。应用本体负责配置，实际的手势识别、按键拦截和浮层展示运行在被注入的系统进程中：
 
-它不是普通意义上的独立 App。桌面图标仅用于配置模块行为，真正的手势识别和浮层能力运行在 LSPosed/Xposed 注入后的系统进程中。
+- `android` / `system_server`：处理边缘触摸、硬件按键和系统动作。
+- `com.android.systemui`：处理冰箱抽屉、全局复制选择层等 SystemUI 浮层。
+- `com.fan.edgex`：提供配置界面和跨进程设置存储。
 
-## 当前特性
+适合希望用边缘手势完成返回、回到桌面、截屏、启动应用、执行 Shell 命令、打开冰箱抽屉等操作的 Root / LSPosed 用户。
 
-- **边缘手势**: 6 个自定义触控区，支持点击、双击、长按及四向滑动。
-- **系统动作**: 快速触发返回、桌面、最近任务、截屏、电源菜单等功能。
-- **全局复制**: 任意界面一键提取文字，告别无法复制的烦恼。
-- **应用冻结**: 灵活管理「冷冻」应用，通过内置抽屉实现秒开。
-- **应用快捷方式**: 支持 Activity 快捷方式、支付宝/微信快捷支付及系统工具。
-- **shell 命令**: 支持用户自定义的shell命令
+## 功能
+
+- **边缘手势**：支持左、右、上、下四条屏幕边缘的分段区域和全边缘低优先级区域。
+- **手势类型**：支持单击、双击、长按和方向滑动，不同边缘会展示适合该方向的滑动动作。
+- **硬件按键**：支持音量加、音量减、电源键的单击、双击、长按动作配置。
+- **系统动作**：返回、主页、最近任务、展开通知栏、锁屏、截屏、音量、亮度等。
+- **应用与快捷方式**：启动指定应用，触发应用快捷方式，支持受限场景下通过 Root 读取快捷方式。
+- **冰箱抽屉**：管理冻结应用，从边缘抽屉快速解冻并启动，支持重新冻结。
+- **全局复制**：从当前界面提取可访问文本，弹出选择层后复制需要的内容。
+- **Shell 命令**：为手势或按键绑定自定义 Shell 命令，可选择普通执行或通过 `su` 执行。
+- **音乐控制**：播放/暂停、停止、上一曲、下一曲等媒体按键动作。
+- **调试与主题**：提供手势区域调试显示、SystemUI 重启入口和主题色配置。
 
 ## 环境要求
 
-### 必需条件
+- Android 15 及以上。
+- LSPosed / Xposed 环境，最低 Xposed API 82。
+- 当前构建配置：`minSdk 35`、`targetSdk 36`、`compileSdk 36`。
+- LSPosed 作用域至少勾选：
+  - `android` / System Framework
+  - `com.android.systemui` / System UI
 
-- Android 15 及以上
-  - 当前构建配置：`minSdk = 35`
-  - `compileSdk = 36`
-  - `targetSdk = 36`
-- 支持 Xposed API 82 的 LSPosed / Xposed 环境
-- 已正确授予模块在 LSPosed 中的作用域：
-  - `android`
-  - `com.android.systemui`
+### Root 相关说明
 
-### 与权限/Root 相关的说明
+- 冰箱冻结/解冻通常需要 Root，模块会通过系统接口或 `su` 执行相关操作。
+- 应用快捷方式优先通过 Android API 读取；如果系统限制访问，会尝试通过 `dumpsys shortcut` 读取，这通常也需要 Root。
+- Shell 命令是否需要 Root 取决于你绑定的命令本身。
+- 不同 ROM、SELinux 策略和 LSPosed 版本可能影响部分动作的可用性。
 
-- `Freezer` 的冻结与解冻依赖 `su` 执行 `pm disable/enable`，通常需要 Root。
-- 应用快捷方式读取优先走系统接口；若系统限制读取，模块会尝试通过 `dumpsys shortcut` 方式加载，这同样依赖 Root 能力。
-- 部分动作是否可用，取决于系统 ROM、SELinux 策略以及 LSPosed 运行环境。
+## 安装与启用
 
-## 已测试环境
+1. 安装 EdgeX APK。
+2. 打开 LSPosed，启用 EdgeX 模块。
+3. 在作用域中勾选 `android` 和 `com.android.systemui`。
+4. 重启设备。至少需要重启 SystemUI；首次启用或修改作用域后建议完整重启。
+5. 打开 EdgeX，开启手势或按键总开关并配置动作。
 
-- Device: Pixel 9
-- Android: 16
-- LSPosed: `1.9.2-it(7455)`
+## 使用建议
 
-这只是当前已验证环境，不代表仅支持这一组合。
+- 第一次配置时，可以先在主页面打开调试模式，确认触发区域是否符合预期。
+- 手势无效时，优先检查 LSPosed 作用域、模块是否已启用、设备是否已重启。
+- 冰箱和 Root 快捷方式异常时，检查 `su` 授权以及 Root 管理器日志。
+- 修改 SystemUI 相关功能后，可以使用应用内的「重启 SystemUI」入口让配置更快生效。
 
-## 安装与配置
+## 已验证环境
 
-### 1. 安装模块
+| 设备 | Android | Xposed 环境 | Root 方案 |
+| --- | --- | --- | --- |
+| Pixel 9 | 16 | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
+| Android Virtual Device | 16 | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector) | [Magisk](https://github.com/topjohnwu/Magisk) |
 
-可直接安装已编译 APK，或自行从源码构建后安装。
+以上只是当前开发验证环境，不代表唯一支持组合。其他设备和 ROM 可能需要额外适配。
 
-### 2. 在 LSPosed 中启用
+## 反馈
 
-启用 `EdgeX` 模块，并将作用域至少勾选为：
+提交 Issue 时建议附上：
 
-- `System Framework`（对应包名 `android`）
-- `System UI`（对应包名 `com.android.systemui`）
+- 设备型号、Android 版本、ROM 名称。
+- LSPosed / Xposed 版本。
+- 已勾选的作用域。
+- 触发方式，例如「右侧中部，左划」。
+- Xposed 日志或复现步骤。
 
-### 3. 重启相关进程
+## 致谢
 
-推荐完整重启设备；如果只是调整配置，通常也可以：
-
-- 使用 App 内的 `Restart SystemUI`
-- 或手动重启 `SystemUI`
-
-### 4. 配置手势
-
-打开 `EdgeX` App 后，可以：
-
-- 在主页面总开关中启用或禁用手势识别
-- 进入 `Gestures` 页面配置六个分区
-- 为每个手势事件选择具体动作
-- 在 `Freezer` 页面管理冷冻应用列表
+EdgeX 的功能参考了 Xposed Edge / Xposed Edge Pro 的交互模式，并针对 Android 15+ 和当前 LSPosed 环境重新实现。
 
 ## License
 
 本项目基于 [GNU General Public License v3.0](LICENSE) 开源。
-
----
-
-如果这个项目对你有帮助，欢迎提 Issue 或 PR 来一起完善它。
