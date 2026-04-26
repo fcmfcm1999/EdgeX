@@ -1,15 +1,24 @@
 package com.fan.edgex.overlay
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
-import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -24,375 +33,438 @@ class DrawerWindow(
     private val onDismiss: (() -> Unit)? = null,
 ) {
 
+    private data class AppEntry(val resolveInfo: android.content.pm.ResolveInfo, val isFrozen: Boolean)
+
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
-    // Left boundary of drawer content area.
-    // Taps to the left of this X coordinate dismiss the drawer.
+    private var drawerPanel: View? = null
     private var contentLeftBound = 0
+    private var configReceiver: android.content.BroadcastReceiver? = null
+
+    private val MOCK_MODE = false
+
+    private val isDarkMode: Boolean
+        get() = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
 
     fun show() {
-        if (rootView != null) return // Already showing
+        if (rootView != null) return
+
+        registerConfigReceiver()
 
         val useArcDrawer = resolveConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
 
         val displayMetrics = context.resources.displayMetrics
-        
+
         rootView = object : FrameLayout(context) {
             override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-                if (ev.action == android.view.MotionEvent.ACTION_DOWN) {
-                    // If tap is LEFT of the drawer content, dismiss immediately
-                    if (ev.x < contentLeftBound) {
-                        dismiss()
-                        return true
-                    }
+                if (ev.action == android.view.MotionEvent.ACTION_DOWN && ev.x < contentLeftBound) {
+                    animateOut()
+                    return true
                 }
                 return super.dispatchTouchEvent(ev)
             }
 
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                 if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
-                    dismiss()
+                    animateOut()
                     return true
                 }
                 return super.dispatchKeyEvent(event)
             }
         }.apply {
-            // Always transparent - drawer content has its own background
             setBackgroundColor(Color.TRANSPARENT)
-
-            // Focusable for key events (back key).
-            // We set isFocusableInTouchMode = true to prevent Android from 
-            // swallowing the first touch event during touch mode transition.
             isFocusable = true
             isFocusableInTouchMode = true
         }
 
-        // --- Content Loading ---
-        // Load Apps (Common)
         val pm = context.packageManager
-        val displayApps = mutableListOf<android.content.pm.ResolveInfo>()
-
-        try {
-            val configuredPackages = linkedSetOf<String>()
-
-            // 0. Load persistent freezer list from hook-side memory cache.
-            val listStr = resolveConfig(AppConfig.FREEZER_APP_LIST)
-            if (listStr.isNotEmpty()) {
-                configuredPackages.addAll(
-                    listStr.split(",")
-                        .map { pkg -> pkg.trim() }
-                        .filter { pkg -> pkg.isNotEmpty() },
-                )
-            }
-
-            // Find all launcher activities
-            val mainIntent = Intent(Intent.ACTION_MAIN, null)
-            mainIntent.addCategory(Intent.CATEGORY_LAUNCHER)
-
-            val allActivities = pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
-
-            for (resolveInfo in allActivities) {
-                val appInfo = resolveInfo.activityInfo.applicationInfo
-                if (configuredPackages.contains(appInfo.packageName)) {
-                    displayApps.add(resolveInfo)
-                }
-            }
-
-            // Sort by Name (Stable)
-            displayApps.sortWith(Comparator { o1, o2 ->
-                val label1 = o1.loadLabel(pm).toString()
-                val label2 = o2.loadLabel(pm).toString()
-                label1.compareTo(label2, ignoreCase = true)
-            })
-            
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: " + e.message)
+        val displayApps: List<AppEntry> = if (MOCK_MODE) {
+            loadMockApps(pm)
+        } else {
+            loadConfiguredApps(pm)
         }
 
-        // --- View Generation ---
         if (useArcDrawer) {
             setupArcLayout(displayApps, pm, displayMetrics)
+            contentLeftBound = displayMetrics.widthPixels - (200 * displayMetrics.density).toInt()
         } else {
-            setupLegacyLayout(displayApps, pm)
+            val isLandscape = context.resources.configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            // Portrait needs a wider panel (70%) to comfortably fit 3 columns
+            val panelFraction = if (isLandscape) 0.62f else 0.70f
+            val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
+            contentLeftBound = displayMetrics.widthPixels - panelWidth
+            setupModernLayout(displayApps, pm, panelWidth)
         }
 
-        // Set the content left boundary for dismiss-on-tap detection
-        val drawerWidth = if (useArcDrawer) {
-            // Arc items occupy roughly the right 200dp
-            (200 * displayMetrics.density).toInt()
-        } else {
-            displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt()
-        }
-        contentLeftBound = displayMetrics.widthPixels - drawerWidth
-
-        // --- Window Layout Params ---
-        @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
-            // Always full-width so taps on the left dim area are within
-            // window bounds and properly trigger dismiss.
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
-            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND
-            dimAmount = 0.5f
+            // FLAG_DIM_BEHIND (0x2) | FLAG_BLUR_BEHIND (0x4)
+            flags = 0x00000002 or 0x00000004
+            dimAmount = 0.25f
+            blurBehindRadius = 36
         }
-        
+
         try {
             windowManager.addView(rootView, params)
+            if (!useArcDrawer) {
+                drawerPanel?.let { panel ->
+                    val panelWidth = (displayMetrics.widthPixels * 0.62f).toInt()
+                    panel.translationX = panelWidth.toFloat()
+                    ValueAnimator.ofFloat(panelWidth.toFloat(), 0f).apply {
+                        duration = 340
+                        interpolator = DecelerateInterpolator(2.2f)
+                        addUpdateListener { panel.translationX = it.animatedValue as Float }
+                        start()
+                    }
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun setupArcLayout(displayApps: List<android.content.pm.ResolveInfo>, pm: android.content.pm.PackageManager, displayMetrics: android.util.DisplayMetrics) {
-        val drawerContent = FrameLayout(context).apply {
-            // Transparent background - no white panel
-            setBackgroundColor(Color.TRANSPARENT)
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, // Take half width from parent
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ).apply {
-                gravity = Gravity.RIGHT // Align to right side
-            }
-            
-            // Prevent clicks on drawer passing through to dismiss
-            isClickable = false // Allow clicks to pass through empty areas
+    private fun setupModernLayout(
+        displayApps: List<AppEntry>,
+        pm: android.content.pm.PackageManager,
+        panelWidth: Int
+    ) {
+        val dp = context.resources.displayMetrics.density
+        val dark = isDarkMode
 
-            // Arc Layout for Apps
-            val arcLayout = ArcLayoutView(context).apply {
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-                )
-                onEmptySpaceClick = {
-                    dismiss()
+        val surfaceBg     = if (dark) Color.argb(238, 20, 19, 30)    else Color.argb(238, 250, 248, 255)
+        val textPrimary   = if (dark) Color.WHITE                     else Color.parseColor("#1C1B1F")
+        val textMuted     = if (dark) Color.parseColor("#9A97AA")     else Color.parseColor("#6B6880")
+        val cardBg        = if (dark) Color.argb(160, 42, 40, 58)    else Color.argb(170, 230, 226, 244)
+        val dividerColor  = if (dark) Color.argb(35, 255, 255, 255)  else Color.argb(40, 0, 0, 0)
+        val frozenBadgeBg = Color.argb(210, 12, 18, 52)
+        val cornerRad     = 28f * dp
+
+        val panel = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(panelWidth, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+                gravity = Gravity.END
+            }
+            background = GradientDrawable().apply {
+                setColor(surfaceBg)
+                // Only left corners rounded; right edge is off-screen
+                cornerRadii = floatArrayOf(cornerRad, cornerRad, 0f, 0f, 0f, 0f, cornerRad, cornerRad)
+            }
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width + cornerRad.toInt(), view.height, cornerRad)
                 }
             }
-            
-            if (displayApps.isEmpty()) {
-                val emptyMsg = TextView(context).apply {
-                    text = ModuleRes.getString(R.string.label_empty_drawer)
-                    textSize = 16f
-                    setPadding(40, 40, 40, 40)
-                    setTextColor(Color.DKGRAY)
-                    gravity = Gravity.CENTER
-                }
-                addView(emptyMsg)
-            } else {
-                val shownPackages = mutableSetOf<String>()
-                
-                // Reusable Grayscale Filter
-                val matrix = android.graphics.ColorMatrix()
-                matrix.setSaturation(0f)
-                val grayscaleFilter = android.graphics.ColorMatrixColorFilter(matrix)
-
-                for (resolveInfo in displayApps) {
-                    val appInfo = resolveInfo.activityInfo.applicationInfo
-                    val packageName = appInfo.packageName
-                    val isFrozen = !appInfo.enabled
-                    
-                    if (shownPackages.contains(packageName)) continue
-                    shownPackages.add(packageName)
-
-                    try {
-                        val appItem = LinearLayout(context).apply {
-                            orientation = LinearLayout.VERTICAL
-                            gravity = Gravity.CENTER
-                            setPadding(12, 12, 12, 12) // Smaller padding
-                            
-                            // Add opaque rounded background for better visibility
-                            background = android.graphics.drawable.GradientDrawable().apply {
-                                setColor(Color.parseColor("#F0F0F0")) // Opaque light gray-white
-                                cornerRadius = 24f
-                            }
-                            
-                            val icon = ImageView(context).apply {
-                                setImageDrawable(resolveInfo.loadIcon(pm)) 
-                                layoutParams = LinearLayout.LayoutParams(55, 55) // Smaller icons
-                                
-                                if (isFrozen) {
-                                    colorFilter = grayscaleFilter
-                                    alpha = 0.5f
-                                } else {
-                                    colorFilter = null
-                                    alpha = 1.0f
-                                }
-                            }
-                            val label = TextView(context).apply {
-                                text = resolveInfo.loadLabel(pm)
-                                textSize = 9f // Smaller text
-                                gravity = Gravity.CENTER
-                                maxLines = 1
-                                setTextColor(if (isFrozen) Color.GRAY else Color.DKGRAY)
-                            }
-                            
-                            addView(icon)
-                            addView(label)
-                            
-                            setOnClickListener {
-                                if (isFrozen) {
-                                    threadUnfreeze(packageName, resolveInfo.loadLabel(pm).toString(), pm)
-                                } else {
-                                    // === STANDARD LAUNCH ===
-                                    launchApp(context, pm, packageName)
-                                }
-                            }
-                        }
-                        arcLayout.addItem(appItem)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-            
-            addView(arcLayout)
-        }
-
-        rootView?.addView(drawerContent)
-    }
-
-    private fun setupLegacyLayout(displayApps: List<android.content.pm.ResolveInfo>, pm: android.content.pm.PackageManager) {
-        val displayMetrics = context.resources.displayMetrics
-        val drawerWidth = displayMetrics.widthPixels / 2 + (7 * displayMetrics.density).toInt()
-
-        // Right-aligned container to hold the legacy drawer content
-        val drawerContainer = FrameLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                drawerWidth,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ).apply {
-                gravity = Gravity.RIGHT
-            }
-            setBackgroundColor(Color.parseColor("#99000000"))
-            // Prevent taps on drawer content from propagating to rootView's dismiss
+            clipToOutline = true
+            elevation = 20f * dp
             isClickable = true
         }
+        drawerPanel = panel
 
-        val scrollView = ScrollView(context).apply {
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
-        
-        val grid = GridLayout(context).apply {
-            columnCount = 4
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+
+        // Header
+        root.addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (52 * dp).toInt(), (16 * dp).toInt(), (14 * dp).toInt())
+            addView(TextView(context).apply {
+                text = "Freezer"
+                textSize = 22f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(textPrimary)
+                letterSpacing = -0.02f
+            })
+            val frozenCount = displayApps.count { it.isFrozen }
+            addView(TextView(context).apply {
+                text = "${displayApps.size} apps · $frozenCount frozen"
+                textSize = 12.5f
+                setTextColor(textMuted)
+                setPadding(0, (4 * dp).toInt(), 0, 0)
+            })
+        })
+
+        root.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+            setBackgroundColor(dividerColor)
+        })
+
+        val scrollView = ScrollView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
         }
 
         if (displayApps.isEmpty()) {
-            val emptyMsg = TextView(context).apply {
+            scrollView.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, (240 * dp).toInt()
+                )
+                addView(TextView(context).apply {
+                    text = ModuleRes.getString(R.string.label_empty_drawer)
+                    textSize = 14f
+                    setTextColor(textMuted)
+                    gravity = Gravity.CENTER
+                })
+            })
+        } else {
+            val isLandscape = context.resources.configuration.orientation ==
+                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val columns = if (isLandscape) 4 else 3
+            val gap = (8 * dp).toInt()
+            val hPad = (12 * dp).toInt()
+
+            // Pre-compute card dimensions so content never overflows the card boundary
+            val cardWidth = (panelWidth - 2 * hPad - columns * 2 * gap) / columns
+            // Icon occupies at most 56% of card width, hard-capped at 52dp
+            val iconSize = (cardWidth * 0.56f).toInt().coerceIn((32 * dp).toInt(), (52 * dp).toInt())
+            // Equal horizontal padding so icon is centered with room to spare
+            val innerPadH = ((cardWidth - iconSize) / 2).coerceAtLeast((4 * dp).toInt())
+            // Vertical: fixed padding values, card height = icon + label row + padding
+            val innerPadTop = (10 * dp).toInt()
+            val innerPadBot = (8 * dp).toInt()
+            val labelTopPad = (5 * dp).toInt()
+            val labelHeightPx = (18 * dp).toInt()
+            val cardHeight = iconSize + innerPadTop + labelTopPad + labelHeightPx + innerPadBot
+            val cardCorner = (cardWidth * 0.22f).coerceAtMost(20f * dp)
+
+            val gridContainer = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(hPad, (8 * dp).toInt(), hPad, (28 * dp).toInt())
+            }
+
+            val grayscaleFilter = android.graphics.ColorMatrixColorFilter(
+                android.graphics.ColorMatrix().apply { setSaturation(0f) }
+            )
+            val shownPackages = mutableSetOf<String>()
+            var currentRow: LinearLayout? = null
+            var col = 0
+
+            for ((ri, frozen) in displayApps) {
+                val pkg = ri.activityInfo.applicationInfo.packageName
+                if (!shownPackages.add(pkg)) continue
+
+                if (col % columns == 0) {
+                    currentRow = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                    }
+                    gridContainer.addView(currentRow)
+                }
+
+                val card = FrameLayout(context).apply {
+                    // Use explicit cardHeight so card is always square-ish regardless of orientation
+                    layoutParams = LinearLayout.LayoutParams(0, cardHeight, 1f).apply {
+                        setMargins(gap, gap, gap, gap)
+                    }
+                    background = GradientDrawable().apply {
+                        setColor(cardBg)
+                        cornerRadius = cardCorner
+                    }
+                    outlineProvider = object : ViewOutlineProvider() {
+                        override fun getOutline(view: View, outline: Outline) {
+                            outline.setRoundRect(0, 0, view.width, view.height, cardCorner)
+                        }
+                    }
+                    clipToOutline = true
+                    elevation = 3f * dp
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        if (frozen) threadUnfreeze(pkg, ri.loadLabel(pm).toString(), pm)
+                        else launchApp(context, pm, pkg)
+                    }
+                }
+
+                // inner fills the card and centers content vertically
+                val inner = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(innerPadH, innerPadTop, innerPadH, innerPadBot)
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
+
+                val iconFrame = FrameLayout(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    }
+                }
+                iconFrame.addView(ImageView(context).apply {
+                    setImageDrawable(ri.loadIcon(pm))
+                    layoutParams = FrameLayout.LayoutParams(iconSize, iconSize)
+                    if (frozen) { colorFilter = grayscaleFilter; alpha = 0.55f }
+                })
+                if (frozen) {
+                    val badgeSize = (iconSize * 0.38f).toInt()
+                    iconFrame.addView(TextView(context).apply {
+                        text = "❄"
+                        textSize = (badgeSize / dp * 0.62f)
+                        gravity = Gravity.CENTER
+                        setTextColor(Color.parseColor("#90CAF9"))
+                        background = GradientDrawable().apply {
+                            setColor(frozenBadgeBg)
+                            cornerRadius = badgeSize * 0.38f
+                        }
+                        setPadding((2 * dp).toInt(), (1 * dp).toInt(), (2 * dp).toInt(), (1 * dp).toInt())
+                        layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply { gravity = Gravity.BOTTOM or Gravity.END }
+                    })
+                }
+
+                inner.addView(iconFrame)
+                inner.addView(TextView(context).apply {
+                    text = ri.loadLabel(pm)
+                    textSize = (iconSize / dp * 0.22f).coerceIn(9f, 12f)
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextColor(if (frozen) textMuted else textPrimary)
+                    setPadding(0, labelTopPad, 0, 0)
+                })
+
+                card.addView(inner)
+                currentRow?.addView(card)
+                col++
+            }
+
+            // Pad trailing cells so last row aligns left
+            val trailing = columns - (col % columns)
+            if (trailing < columns) {
+                repeat(trailing) {
+                    currentRow?.addView(View(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, cardHeight, 1f).apply {
+                            setMargins(gap, gap, gap, gap)
+                        }
+                    })
+                }
+            }
+
+            scrollView.addView(gridContainer)
+        }
+
+        root.addView(scrollView)
+        panel.addView(root)
+        rootView?.addView(panel)
+    }
+
+    private fun setupArcLayout(
+        displayApps: List<AppEntry>,
+        pm: android.content.pm.PackageManager,
+        displayMetrics: android.util.DisplayMetrics
+    ) {
+        val drawerContent = FrameLayout(context).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+            ).apply { gravity = Gravity.RIGHT }
+            isClickable = false
+        }
+
+        val arcLayout = ArcLayoutView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            onEmptySpaceClick = { animateOut() }
+        }
+
+        if (displayApps.isEmpty()) {
+            drawerContent.addView(TextView(context).apply {
                 text = ModuleRes.getString(R.string.label_empty_drawer)
                 textSize = 16f
                 setPadding(40, 40, 40, 40)
                 setTextColor(Color.DKGRAY)
                 gravity = Gravity.CENTER
-            }
-            scrollView.addView(emptyMsg)
+            })
         } else {
+            val grayscaleFilter = android.graphics.ColorMatrixColorFilter(
+                android.graphics.ColorMatrix().apply { setSaturation(0f) }
+            )
             val shownPackages = mutableSetOf<String>()
-            val matrix = android.graphics.ColorMatrix()
-            matrix.setSaturation(0f)
-            val grayscaleFilter = android.graphics.ColorMatrixColorFilter(matrix)
 
-            for (resolveInfo in displayApps) {
-                val appInfo = resolveInfo.activityInfo.applicationInfo
-                val packageName = appInfo.packageName
-                if (shownPackages.contains(packageName)) continue
-                shownPackages.add(packageName)
+            for ((ri, frozen) in displayApps) {
+                val pkg = ri.activityInfo.applicationInfo.packageName
+                if (!shownPackages.add(pkg)) continue
 
-                val isFrozen = !appInfo.enabled
-
-                val appItem = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    setPadding(20, 20, 20, 20)
-                    
-                    val icon = ImageView(context).apply {
-                        setImageDrawable(resolveInfo.loadIcon(pm))
-                        layoutParams = LinearLayout.LayoutParams(100, 100)
-                         if (isFrozen) {
-                            colorFilter = grayscaleFilter
-                            alpha = 0.5f
-                        } else {
-                            colorFilter = null
-                            alpha = 1.0f
-                        }
-                    }
-                    val label = TextView(context).apply {
-                        text = resolveInfo.loadLabel(pm)
-                        textSize = 12f
+                try {
+                    arcLayout.addItem(LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
                         gravity = Gravity.CENTER
-                        maxLines = 1
-                        setTextColor(if (isFrozen) Color.GRAY else Color.BLACK)
-                    }
-                    
-                    addView(icon)
-                    addView(label)
-                    
-                    setOnClickListener {
-                        if (isFrozen) {
-                             threadUnfreeze(packageName, resolveInfo.loadLabel(pm).toString(), pm)
-                        } else {
-                            launchApp(context, pm, packageName)
+                        setPadding(12, 12, 12, 12)
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor("#F0F0F0"))
+                            cornerRadius = 24f
                         }
-                    }
+                        addView(ImageView(context).apply {
+                            setImageDrawable(ri.loadIcon(pm))
+                            layoutParams = LinearLayout.LayoutParams(55, 55)
+                            if (frozen) { colorFilter = grayscaleFilter; alpha = 0.5f }
+                        })
+                        addView(TextView(context).apply {
+                            text = ri.loadLabel(pm)
+                            textSize = 9f
+                            gravity = Gravity.CENTER
+                            maxLines = 1
+                            setTextColor(if (frozen) Color.GRAY else Color.DKGRAY)
+                        })
+                        setOnClickListener {
+                            if (frozen) threadUnfreeze(pkg, ri.loadLabel(pm).toString(), pm)
+                            else launchApp(context, pm, pkg)
+                        }
+                    })
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                grid.addView(appItem)
             }
         }
-        
-        scrollView.addView(grid)
-        drawerContainer.addView(scrollView)
-        rootView?.addView(drawerContainer)
+
+        drawerContent.addView(arcLayout)
+        rootView?.addView(drawerContent)
     }
-    
-    // Extract unfreeze logic to avoid duplication
+
     private fun threadUnfreeze(packageName: String, label: String, pm: android.content.pm.PackageManager) {
         de.robv.android.xposed.XposedBridge.log("EdgeX: DrawerWindow.threadUnfreeze - packageName: $packageName")
         Thread {
             var success = false
             try {
                 pm.setApplicationEnabledSetting(
-                    packageName, 
-                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, 
+                    packageName,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                     0
                 )
                 success = true
                 de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze SUCCESS for $packageName")
             } catch (e: Exception) {
                 de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze FAILED for $packageName: ${e.message}")
-                // DO NOT fallback to su in SystemUI process - it causes system crashes
             }
 
-            val handler = android.os.Handler(android.os.Looper.getMainLooper())
-            if (success) {
-                handler.post {
-                    // Silent on success - user will see the app launch
-                    launchApp(context, pm, packageName)
-                }
-            } else {
-               handler.post {
-                    android.widget.Toast.makeText(
-                        context, 
-                        ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-               }
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                if (success) launchApp(context, pm, packageName)
+                else android.widget.Toast.makeText(
+                    context, ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
-        }.start() 
+        }.start()
     }
 
     private fun launchApp(context: Context, pm: android.content.pm.PackageManager, packageName: String) {
-         // Retry launching a few times to allow system to update state
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        var task: Runnable? = null
         var retries = 0
-        
+        var task: Runnable? = null
         task = Runnable {
             try {
                 val intent = pm.getLaunchIntentForPackage(packageName)
@@ -400,24 +472,19 @@ class DrawerWindow(
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     context.startActivity(intent)
                     dismiss()
+                } else if (++retries < 10) {
+                    handler.postDelayed(task!!, 200)
                 } else {
-                    retries++
-                    if (retries < 10) { 
-                        handler.postDelayed(task!!, 200)
-                    } else {
-                        android.widget.Toast.makeText(
-                            context, 
-                            ModuleRes.getString(R.string.toast_launch_timeout),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                    android.widget.Toast.makeText(
+                        context, ModuleRes.getString(R.string.toast_launch_timeout),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
                 }
             } catch (e: Exception) {
-                 android.widget.Toast.makeText(
-                     context, 
-                     ModuleRes.getString(R.string.toast_launch_error, e.message),
-                     android.widget.Toast.LENGTH_SHORT
-                 ).show()
+                android.widget.Toast.makeText(
+                    context, ModuleRes.getString(R.string.toast_launch_error, e.message),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         }
         task.run()
@@ -425,21 +492,118 @@ class DrawerWindow(
 
     fun isShowing() = rootView != null
 
-    /**
-     * Force-dismiss the drawer from external callers (e.g. SCREEN_OFF handler).
-     */
-    fun forceDismiss() {
-        dismiss()
+    fun forceDismiss() = dismiss()
+
+    private fun animateOut() {
+        val panel = drawerPanel
+        if (panel != null) {
+            val panelWidth = panel.width.takeIf { it > 0 }
+                ?: (context.resources.displayMetrics.widthPixels * 0.62f).toInt()
+            ValueAnimator.ofFloat(0f, panelWidth.toFloat()).apply {
+                duration = 260
+                interpolator = DecelerateInterpolator(1.8f)
+                addUpdateListener { panel.translationX = it.animatedValue as Float }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) { dismiss() }
+                })
+                start()
+            }
+        } else {
+            dismiss()
+        }
+    }
+
+    private fun loadMockApps(pm: android.content.pm.PackageManager): List<AppEntry> {
+        return try {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+            pm.queryIntentActivities(mainIntent, 0)
+                .sortedWith { a, b ->
+                    a.loadLabel(pm).toString().compareTo(b.loadLabel(pm).toString(), ignoreCase = true)
+                }
+                .distinctBy { it.activityInfo.applicationInfo.packageName }
+                .take(20)
+                .mapIndexed { index, ri -> AppEntry(ri, isFrozen = index % 4 == 3) }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun loadConfiguredApps(pm: android.content.pm.PackageManager): List<AppEntry> {
+        return try {
+            val configuredPackages = linkedSetOf<String>()
+            try {
+                context.contentResolver.query(
+                    ConfigProvider.uriForKey(AppConfig.FREEZER_APP_LIST),
+                    null, null, null, null
+                )?.use {
+                    if (it.moveToFirst()) {
+                        val listStr = it.getString(0)
+                        if (!listStr.isNullOrEmpty()) {
+                            configuredPackages.addAll(
+                                listStr.split(",").map { s -> s.trim() }.filter { s -> s.isNotEmpty() }
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config: ${e.message}")
+            }
+
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+            pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+                .filter { configuredPackages.contains(it.activityInfo.applicationInfo.packageName) }
+                .sortedWith { a, b ->
+                    a.loadLabel(pm).toString().compareTo(b.loadLabel(pm).toString(), ignoreCase = true)
+                }
+                .distinctBy { it.activityInfo.applicationInfo.packageName }
+                .map { ri -> AppEntry(ri, isFrozen = !ri.activityInfo.applicationInfo.enabled) }
+        } catch (e: Exception) {
+            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to load apps: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun registerConfigReceiver() {
+        if (configReceiver != null) return
+        configReceiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                if (intent.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+                    recreateOnRotation()
+                }
+            }
+        }
+        context.registerReceiver(
+            configReceiver,
+            android.content.IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED)
+        )
+    }
+
+    private fun unregisterConfigReceiver() {
+        configReceiver?.let {
+            try { context.unregisterReceiver(it) } catch (_: Exception) {}
+            configReceiver = null
+        }
+    }
+
+    /** Tear down the current window and rebuild with the new orientation config. */
+    private fun recreateOnRotation() {
+        // Remove the window silently — do NOT invoke onDismiss so DrawerManager
+        // keeps its activeDrawer reference pointing at this instance.
+        unregisterConfigReceiver()
+        try { windowManager.removeView(rootView) } catch (_: Exception) {}
+        rootView = null
+        drawerPanel = null
+        // Wait one frame for the system to finish applying the new configuration
+        // so displayMetrics reflects the rotated dimensions when show() runs.
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ show() }, 80)
     }
 
     private fun dismiss() {
+        unregisterConfigReceiver()
         if (rootView != null) {
-            try {
-                windowManager.removeView(rootView)
-            } catch (e: Exception) {
-                // Ignore if already removed
-            }
+            try { windowManager.removeView(rootView) } catch (_: Exception) {}
             rootView = null
+            drawerPanel = null
             onDismiss?.invoke()
         }
     }
