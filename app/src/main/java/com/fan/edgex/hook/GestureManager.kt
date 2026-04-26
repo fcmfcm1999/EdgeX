@@ -18,15 +18,10 @@ object GestureManager {
 
     private const val TAG = "EdgeX"
 
-    // system_server context (from filterInputEvent hook, for config queries)
     private var systemContext: Context? = null
-    // Legacy SystemUI context. Runtime overlays now run from system_server.
-    private var systemUIContext: Context? = null
 
-    // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
     private var systemConfigReceiverRegistered = false
-    private var systemUiConfigReceiverRegistered = false
     private var keyManagerInitialized = false
 
     private var mHandler: Handler? = null
@@ -115,7 +110,7 @@ object GestureManager {
             configRepository.attachSystemContext(context)
             configRepository.reloadAsync()
             registerScreenStateReceiver(context)
-            registerConfigChangeReceiver(context, systemUi = false)
+            registerConfigChangeReceiver(context)
             mainHandler().post {
                 debugOverlayController.initialize(context)
                 configRepository.reloadAsync(::refreshDebugOverlay)
@@ -130,16 +125,6 @@ object GestureManager {
 
     fun initSystemServer(context: Context) {
         ensureSystemServerInitialized(context, initializeKeys = false)
-    }
-
-    private fun ensureSystemUiInitialized(context: Context) {
-        if (systemUIContext != null) return
-
-        systemUIContext = context
-        registerConfigChangeReceiver(context, systemUi = true)
-        debugOverlayController.initialize(context)
-        configRepository.reloadAsync(::refreshDebugOverlay)
-        log("SystemUI overlay initialized with broadcast receiver")
     }
 
     private fun refreshDebugOverlay() {
@@ -189,14 +174,9 @@ object GestureManager {
         }
     }
 
-    private fun registerConfigChangeReceiver(context: Context, systemUi: Boolean) {
-        if (systemUi) {
-            if (systemUiConfigReceiverRegistered) return
-            systemUiConfigReceiverRegistered = true
-        } else {
-            if (systemConfigReceiverRegistered) return
-            systemConfigReceiverRegistered = true
-        }
+    private fun registerConfigChangeReceiver(context: Context) {
+        if (systemConfigReceiverRegistered) return
+        systemConfigReceiverRegistered = true
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
@@ -226,13 +206,9 @@ object GestureManager {
                 @Suppress("DEPRECATION")
                 context.registerReceiver(receiver, filter)
             }
-            log("Config broadcast receiver registered in ${if (systemUi) "SystemUI" else "system_server"}")
+            log("Config broadcast receiver registered in system_server")
         } catch (e: Exception) {
-            if (systemUi) {
-                systemUiConfigReceiverRegistered = false
-            } else {
-                systemConfigReceiverRegistered = false
-            }
+            systemConfigReceiverRegistered = false
             log("Failed to register config broadcast receiver: ${e.message}")
         }
     }
@@ -266,19 +242,8 @@ object GestureManager {
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }
 
-    /**
-     * Execute an action triggered by a key press (called from KeyManager).
-     */
     fun executeKeyAction(action: String, context: Context) {
         actionDispatcher.executeKeyAction(action, context)
-    }
-
-    /**
-     * Legacy entry point kept for older scoped installs. New runtime overlays
-     * initialize from system_server.
-     */
-    fun initSystemUI(ctx: Context) {
-        ensureSystemUiInitialized(ctx)
     }
 
 }

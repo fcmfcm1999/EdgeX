@@ -28,24 +28,61 @@ internal class GestureActionDispatcher(
     private val log: (String) -> Unit,
 ) {
     @Volatile private var shellExecutor: IShellExecutor? = null
+    @Volatile private var serviceBound = false
     private var serviceContext: Context? = null
+    private val pendingCommands = ArrayDeque<Pair<String, Context>>()
+    private var idleUnbindRunnable: Runnable? = null
+    private val SHELL_SERVICE_IDLE_TIMEOUT_MS = 5 * 60 * 1000L
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             shellExecutor = IShellExecutor.Stub.asInterface(binder)
             log("ShellExecutorService connected")
+            drainPendingCommands()
         }
         override fun onServiceDisconnected(name: ComponentName) {
             shellExecutor = null
-            log("ShellExecutorService disconnected, rebinding...")
+            serviceBound = false
+            log("ShellExecutorService disconnected unexpectedly, rebinding...")
             serviceContext?.let {
                 handlerProvider().postDelayed({ bindShellService(it) }, 2000)
             }
         }
     }
 
+    private fun drainPendingCommands() {
+        while (pendingCommands.isNotEmpty()) {
+            val (action, ctx) = pendingCommands.removeFirst()
+            doExecuteShellCommand(action, ctx)
+        }
+    }
+
+    private fun scheduleIdleUnbind() {
+        val handler = handlerProvider()
+        idleUnbindRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            idleUnbindRunnable = null
+            unbindShellService()
+        }
+        idleUnbindRunnable = runnable
+        handler.postDelayed(runnable, SHELL_SERVICE_IDLE_TIMEOUT_MS)
+    }
+
+    private fun unbindShellService() {
+        val ctx = serviceContext ?: return
+        if (!serviceBound) return
+        try {
+            ctx.unbindService(serviceConnection)
+            log("ShellExecutorService unbound after idle timeout")
+        } catch (e: Exception) {
+            log("ShellExecutorService unbind failed: ${e.message}")
+        }
+        shellExecutor = null
+        serviceBound = false
+    }
+
     fun bindShellService(context: Context) {
-        if (shellExecutor != null) return
+        if (serviceBound) return
         serviceContext = context
         val intent = Intent().apply {
             component = ComponentName(
@@ -55,6 +92,7 @@ internal class GestureActionDispatcher(
             addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
         }
         val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        if (bound) serviceBound = true
         log("ShellExecutorService bindService=$bound")
     }
     fun triggerGestureAction(
@@ -228,12 +266,14 @@ internal class GestureActionDispatcher(
 
         val executor = shellExecutor
         if (executor == null) {
-            showToast(context, ModuleRes.getString(R.string.toast_command_error, "service not ready"))
+            pendingCommands.addLast(action to context)
             bindShellService(context)
+            log("ShellExecutorService not ready, queued command: $command")
             return
         }
 
         log("Dispatching shell command (root=$runAsRoot): $command")
+        scheduleIdleUnbind()
         executor.execute(command, runAsRoot, object : IShellCallback.Stub() {
             override fun onResult(success: Boolean, output: String?) {
                 log("Shell result: success=$success output='$output'")

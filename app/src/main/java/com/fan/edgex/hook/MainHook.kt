@@ -61,37 +61,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
-            // Debug: list all filter-related methods
-            val methods = inputManagerService.declaredMethods
-            XposedBridge.log("$TAG: InputManagerService filter methods:")
-            methods.filter { it.name.contains("filter", ignoreCase = true) }
-                .forEach { XposedBridge.log("$TAG:   ${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})") }
-            
-            // Debug: also list inject-related methods
-            XposedBridge.log("$TAG: InputManagerService inject/dispatch methods:")
-            methods.filter { it.name.contains("inject", ignoreCase = true) || it.name.contains("dispatch", ignoreCase = true) }
-                .forEach { XposedBridge.log("$TAG:   ${it.name}(${it.parameterTypes.joinToString { t -> t.simpleName }})") }
-            
-            // Debug: Hook filterPointerMotion to see if it's being called
-            try {
-                XposedHelpers.findAndHookMethod(
-                    inputManagerService, "filterPointerMotion",
-                    Float::class.javaPrimitiveType,
-                    Float::class.javaPrimitiveType,
-                    Float::class.javaPrimitiveType,
-                    Float::class.javaPrimitiveType,
-                    Int::class.javaPrimitiveType,
-                    object : XC_MethodHook() {
-                        override fun beforeHookedMethod(param: MethodHookParam) {
-                            XposedBridge.log("$TAG: filterPointerMotion called: x=${param.args[0]}, y=${param.args[1]}")
-                        }
-                    }
-                )
-                XposedBridge.log("$TAG: Hooked filterPointerMotion")
-            } catch (t: Throwable) {
-                XposedBridge.log("$TAG: filterPointerMotion hook failed: ${t.message}")
-            }
-
             // Hook interceptKeyBeforeDispatching for key event interception
             // This is the primary method called by the input dispatcher for key events
             try {
@@ -125,45 +94,29 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             }
 
             // 2) Hook filterInputEvent to intercept touch and key events
-            // This is called when InputFilter is enabled and receives all input events
             val hook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
-                    // Check if this event was injected by us (call stack check)
-                    // Following Xposed Edge Pro's approach
-                    if (isCalledByUs()) {
-                        XposedBridge.log("$TAG: Skipping event from our own injection (call stack)")
-                        return  // Let original method handle it
-                    }
-                    
+                    if (isCalledByUs()) return
+
                     val event = param.args[0] as InputEvent
                     val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
                         as android.content.Context
-                    
+
                     when (event) {
                         is MotionEvent -> {
-                            val consumed = GestureManager.handleMotionEvent(event, context)
-                            if (consumed) {
+                            if (GestureManager.handleMotionEvent(event, context)) {
                                 param.setResult(false)
                             }
                         }
                         is KeyEvent -> {
-                            // Get policyFlags (second parameter if available)
                             val policyFlags = if (param.args.size > 1 && param.args[1] is Int) {
                                 param.args[1] as Int
                             } else {
                                 0
                             }
-                            val consumed = GestureManager.handleKeyEvent(event, context, param, policyFlags)
-                            XposedBridge.log("$TAG: filterInputEvent KeyEvent keyCode=${event.keyCode} action=${event.action} consumed=$consumed")
-                            if (consumed) {
-                                // Consume the event (don't let system handle it)
-                                XposedBridge.log("$TAG: Setting result=false to drop event")
+                            if (GestureManager.handleKeyEvent(event, context, param, policyFlags)) {
                                 param.setResult(false)
-                            } else {
-                                XposedBridge.log("$TAG: Letting original filterInputEvent handle the event")
                             }
-                            // If not consumed (including injected events we're skipping):
-                            // Do nothing - let original filterInputEvent run
                         }
                     }
                 }
@@ -443,31 +396,4 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
         }
     }
 
-    /**
-     * Hook SystemUI to initialize overlay windows (DrawerWindow, debug views, etc.)
-     * These need to run in the SystemUI process context for window management.
-     */
-    private fun hookSystemUI(lpparam: XC_LoadPackage.LoadPackageParam) {
-        XposedBridge.log("$TAG: Initializing SystemUI hook for overlay windows")
-
-        try {
-            XposedHelpers.findAndHookMethod(
-                android.app.Application::class.java,
-                "onCreate",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        try {
-                            val context = param.thisObject as android.content.Context
-                            GestureManager.initSystemUI(context)
-                        } catch (t: Throwable) {
-                            XposedBridge.log("$TAG: Error in SystemUI initSystemUI: ${t.message}")
-                            t.printStackTrace()
-                        }
-                    }
-                }
-            )
-        } catch (t: Throwable) {
-            XposedBridge.log("$TAG: Failed to hook SystemUI Application.onCreate: ${t.message}")
-        }
-    }
 }
