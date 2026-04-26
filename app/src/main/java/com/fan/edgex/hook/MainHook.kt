@@ -298,6 +298,14 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         try {
+                            val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
+                                as android.content.Context
+                            GestureManager.initSystemServer(context)
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to initialize GestureManager in start(): ${t.message}")
+                        }
+
+                        try {
                             val native = mNativeInstance
                             if (native != null) {
                                 XposedHelpers.callMethod(native, "setInputFilterEnabled", true)
@@ -353,6 +361,14 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             XposedHelpers.findAndHookMethod(inputManagerService, "start",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
+                        try {
+                            val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
+                                as android.content.Context
+                            GestureManager.initSystemServer(context)
+                        } catch (t: Throwable) {
+                            XposedBridge.log("$TAG: Failed to initialize GestureManager in start(): ${t.message}")
+                        }
+
                         try {
                             val ptr = XposedHelpers.getLongField(param.thisObject, "mPtr")
                             nativeMethod.invoke(null, ptr, true)

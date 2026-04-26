@@ -127,6 +127,10 @@ object GestureManager {
         }
     }
 
+    fun initSystemServer(context: Context) {
+        ensureSystemServerInitialized(context, initializeKeys = false)
+    }
+
     private fun ensureSystemUiInitialized(context: Context) {
         if (systemUIContext != null) return
 
