@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.util.TypedValue
@@ -46,7 +47,7 @@ object DonateDialog {
         TextView(context).apply {
             text = context.getString(R.string.donate_subtitle)
             textSize = 13f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor("#666666".toColorInt())
             root.addView(this, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -64,14 +65,14 @@ object DonateDialog {
         }
 
         // Alipay button
-        val alipayBtn = makeButton(context, context.getString(R.string.donate_alipay), Color.parseColor("#1677FF"))
+        val alipayBtn = makeButton(context, context.getString(R.string.donate_alipay), "#1677FF".toColorInt())
         buttonRow1.addView(alipayBtn, buttonParams)
 
         // WeChat button
         val wechatParams = LinearLayout.LayoutParams(0, dp(44f), 1f).also {
             it.marginStart = dp(8f)
         }
-        val wechatBtn = makeButton(context, context.getString(R.string.donate_wechat), Color.parseColor("#07C160"))
+        val wechatBtn = makeButton(context, context.getString(R.string.donate_wechat), "#07C160".toColorInt())
         buttonRow1.addView(wechatBtn, wechatParams)
 
         root.addView(buttonRow1, LinearLayout.LayoutParams(
@@ -80,14 +81,14 @@ object DonateDialog {
         ).also { it.bottomMargin = dp(8f) })
 
         // Buttons row 2 (Crypto)
-        val cryptoBtn = makeButton(context, context.getString(R.string.donate_crypto), Color.parseColor("#F7931A"))
+        val cryptoBtn = makeButton(context, context.getString(R.string.donate_crypto), "#F7931A".toColorInt())
         root.addView(cryptoBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(44f)
         ).also { it.bottomMargin = dp(4f) })
 
         val shape = GradientDrawable().apply {
-            setColor(Color.parseColor("#F5F5F5"))
+            setColor("#F5F5F5".toColorInt())
             cornerRadius = dp(12f).toFloat()
         }
         val bg = InsetDrawable(shape, dp(24f))
@@ -158,7 +159,7 @@ object DonateDialog {
         container.addView(qrImageView, LinearLayout.LayoutParams(dp(200f), dp(200f)))
 
         val shape = GradientDrawable().apply {
-            setColor(Color.parseColor("#F5F5F5"))
+            setColor("#F5F5F5".toColorInt())
             cornerRadius = dp(12f).toFloat()
         }
 
@@ -205,7 +206,7 @@ object DonateDialog {
         container.addView(qrImageView, LinearLayout.LayoutParams(dp(200f), dp(200f)))
 
         val shape = GradientDrawable().apply {
-            setColor(Color.parseColor("#F5F5F5"))
+            setColor("#F5F5F5".toColorInt())
             cornerRadius = dp(12f).toFloat()
         }
 
@@ -245,7 +246,7 @@ object DonateDialog {
         addCryptoRow(context, container, context.getString(R.string.donate_crypto_sol), SOL_ADDRESS, dp)
 
         val shape = GradientDrawable().apply {
-            setColor(Color.parseColor("#F5F5F5"))
+            setColor("#F5F5F5".toColorInt())
             cornerRadius = dp(12f).toFloat()
         }
 
@@ -263,7 +264,7 @@ object DonateDialog {
         TextView(context).apply {
             text = label
             textSize = 14f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor("#333333".toColorInt())
             setTypeface(null, android.graphics.Typeface.BOLD)
             container.addView(this, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -275,9 +276,9 @@ object DonateDialog {
         TextView(context).apply {
             text = address
             textSize = 12f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor("#666666".toColorInt())
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#EEEEEE"))
+                setColor("#EEEEEE".toColorInt())
                 cornerRadius = dp(6f).toFloat()
             }
             setPadding(dp(12f), dp(10f), dp(12f), dp(10f))

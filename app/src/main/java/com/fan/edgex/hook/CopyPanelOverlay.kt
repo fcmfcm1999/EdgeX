@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -93,13 +94,13 @@ object TextSelectionOverlay {
         return when (presetId) {
             "custom" -> {
                 val hex = queryConfig(context, AppConfig.THEME_CUSTOM_COLOR)
-                runCatching { Color.parseColor(hex) }.getOrElse { Color.parseColor("#326D32") }
+                runCatching { hex.toColorInt() }.getOrElse { "#326D32".toColorInt() }
             }
-            "classic" -> Color.parseColor("#00796B")
-            "cedar"   -> Color.parseColor("#496B3D")
-            "ocean"   -> Color.parseColor("#2F6F8F")
-            "ember"   -> Color.parseColor("#C56B2A")
-            else      -> Color.parseColor("#326D32")
+            "classic" -> "#00796B".toColorInt()
+            "cedar"   -> "#496B3D".toColorInt()
+            "ocean"   -> "#2F6F8F".toColorInt()
+            "ember"   -> "#C56B2A".toColorInt()
+            else      -> "#326D32".toColorInt()
         }
     }
 
@@ -181,7 +182,7 @@ object TextSelectionOverlay {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#E8222222"))
+                setColor("#E8222222".toColorInt())
                 cornerRadius = dp(28).toFloat()
             }
             setPadding(dp(16), dp(10), dp(8), dp(10))
@@ -193,7 +194,7 @@ object TextSelectionOverlay {
         // Hint / selected count
         val hint = TextView(context).apply {
             text = ModuleRes.getString(R.string.copy_tap_to_select)
-            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextColor("#AAAAAA".toColorInt())
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         }
         hintView = WeakReference(hint)
@@ -204,8 +205,8 @@ object TextSelectionOverlay {
         // Select All button
         val selectAll = createToolbarButton(context, density,
             ModuleRes.getString(R.string.copy_select_all),
-            Color.parseColor("#3A3A3A"),
-            Color.parseColor("#CCCCCC")
+            "#3A3A3A".toColorInt(),
+            "#CCCCCC".toColorInt()
         ) {
             val allSelected = blocks.all { it.selected }
             blocks.forEach { it.selected = !allSelected }
@@ -242,8 +243,8 @@ object TextSelectionOverlay {
         // Close button
         val close = createToolbarButton(context, density,
             "×",
-            Color.parseColor("#3A3A3A"),
-            Color.parseColor("#CCCCCC")
+            "#3A3A3A".toColorInt(),
+            "#CCCCCC".toColorInt()
         ) { dismiss() }
         close.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         toolbar.addView(close, LinearLayout.LayoutParams(dp(34), dp(34)))
@@ -319,17 +320,17 @@ object TextSelectionOverlay {
         private val tapSlopSq = (24 * density * 24 * density)
 
         private val scrimPaint = Paint().apply {
-            color = Color.parseColor("#28000000")
+            color = "#28000000".toColorInt()
             style = Paint.Style.FILL
         }
 
         private val normalFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#18FFFFFF")
+            color = "#18FFFFFF".toColorInt()
             style = Paint.Style.FILL
         }
 
         private val normalStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#44FFFFFF")
+            color = "#44FFFFFF".toColorInt()
             style = Paint.Style.STROKE
             strokeWidth = 1f * density
         }
