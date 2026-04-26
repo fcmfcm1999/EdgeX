@@ -30,7 +30,7 @@ object HookConfigSnapshot {
     fun writeFromPreferences(context: Context): Boolean {
         val prefs = context.configPrefs()
         val values = prefs.all.mapValues { (_, value) -> value?.toString() ?: "" }
-        return write(context, values)
+        return write(context, valuesForHook(values))
     }
 
     fun readFromHookFile(): Map<String, String> =
@@ -40,7 +40,10 @@ object HookConfigSnapshot {
         read(snapshotFile(context))
 
     fun writeForHook(values: Map<String, String>): Boolean =
-        write(systemSnapshotFile(), values)
+        write(systemSnapshotFile(), valuesForHook(values))
+
+    fun isHookRuntimeKey(key: String): Boolean =
+        key != KEY_VERSION && !key.endsWith("_label")
 
     private fun write(context: Context, values: Map<String, String>): Boolean {
         return write(snapshotFile(context), values)
@@ -76,10 +79,13 @@ object HookConfigSnapshot {
             val properties = Properties()
             FileInputStream(file).use(properties::load)
             properties.stringPropertyNames()
-                .filter { it != KEY_VERSION }
+                .filter(::isHookRuntimeKey)
                 .associateWith { properties.getProperty(it, "") }
         }.getOrDefault(emptyMap())
     }
+
+    private fun valuesForHook(values: Map<String, String>): Map<String, String> =
+        values.filterKeys(::isHookRuntimeKey)
 
     private fun snapshotFile(context: Context): File {
         val storageContext =

@@ -35,7 +35,9 @@ fun Context.putConfigsSync(vararg entries: Pair<String, String>): Boolean {
 
 fun Context.broadcastFullConfigSnapshot() {
     HookConfigSnapshot.writeFromPreferences(this)
-    val values = configPrefs().all.mapValues { (_, value) -> value?.toString() ?: "" }
+    val values = configPrefs().all
+        .mapValues { (_, value) -> value?.toString() ?: "" }
+        .filterKeys(HookConfigSnapshot::isHookRuntimeKey)
     sendConfigBroadcast(values, fullSnapshot = true)
 }
 
@@ -61,8 +63,11 @@ private fun Context.notifyConfigChanged(changedValues: Map<String, String>) {
 }
 
 private fun Context.sendConfigBroadcast(valuesByKey: Map<String, String>, fullSnapshot: Boolean) {
-    val keys = valuesByKey.keys.toTypedArray()
-    val values = keys.map { valuesByKey.getValue(it) }.toTypedArray()
+    val hookValues = valuesByKey.filterKeys(HookConfigSnapshot::isHookRuntimeKey)
+    if (hookValues.isEmpty() && !fullSnapshot) return
+
+    val keys = hookValues.keys.toTypedArray()
+    val values = keys.map { hookValues.getValue(it) }.toTypedArray()
     sendBroadcast(Intent(HookConfigSnapshot.ACTION_CONFIG_CHANGED).apply {
         putExtra(HookConfigSnapshot.EXTRA_KEYS, keys)
         putExtra(HookConfigSnapshot.EXTRA_VALUES, values)

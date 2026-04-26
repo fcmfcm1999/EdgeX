@@ -68,13 +68,17 @@ internal class HookConfigRepository(
         if (fullSnapshot) {
             configCache.clear()
         }
+        var appliedCount = 0
         keys.forEachIndexed { index, key ->
-            configCache[key] = values[index]
+            if (HookConfigSnapshot.isHookRuntimeKey(key)) {
+                configCache[key] = values[index]
+                appliedCount++
+            }
         }
         updateKeyConfig(configCache)
         HookConfigSnapshot.writeForHook(configCache)
         lastConfigLoad = System.currentTimeMillis()
-        log("Config broadcast applied: ${keys.size} keys full=$fullSnapshot")
+        log("Config broadcast applied: $appliedCount/${keys.size} keys full=$fullSnapshot")
     }
 
     fun reloadAsync(onLoaded: (() -> Unit)? = null) {
