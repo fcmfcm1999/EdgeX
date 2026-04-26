@@ -201,12 +201,27 @@ internal class GestureActionDispatcher(
                     putBoolean(ShellCommandProvider.EXTRA_ROOT, runAsRoot)
                     putString(ShellCommandProvider.EXTRA_COMMAND, command)
                 }
-                context.contentResolver.call(
+                val result = context.contentResolver.call(
                     Uri.parse("content://${ShellCommandProvider.AUTHORITY}"),
                     ShellCommandProvider.METHOD_EXECUTE,
                     null,
                     extras,
                 )
+                if (result == null) {
+                    log("Shell: provider returned null (not running?)")
+                    showToast(context, ModuleRes.getString(R.string.toast_command_error, "provider unavailable"))
+                } else {
+                    val success = result.getBoolean(ShellCommandProvider.RESULT_SUCCESS)
+                    val output = result.getString(ShellCommandProvider.RESULT_OUTPUT).orEmpty().trim()
+                    val error = result.getString(ShellCommandProvider.RESULT_ERROR).orEmpty().trim()
+                    log("Shell result: success=$success output='$output' error='$error'")
+                    if (success) {
+                        output.takeIf { it.isNotBlank() }?.let { showToast(context, it.take(200)) }
+                    } else {
+                        val msg = error.ifBlank { output }.take(200)
+                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, msg))
+                    }
+                }
             } catch (e: Exception) {
                 log("Shell command exception: ${e.message}")
                 showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
