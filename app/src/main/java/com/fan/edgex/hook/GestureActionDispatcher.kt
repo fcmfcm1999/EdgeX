@@ -1,20 +1,23 @@
 package com.fan.edgex.hook
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.media.AudioManager
-import android.net.Uri
-import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.os.UserHandle
 import android.view.KeyEvent
 import android.widget.Toast
+import com.fan.edgex.BuildConfig
+import com.fan.edgex.IShellCallback
+import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
-import com.fan.edgex.config.ShellCommandProvider
 import com.fan.edgex.overlay.DrawerManager
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
@@ -24,6 +27,36 @@ internal class GestureActionDispatcher(
     private val handlerProvider: () -> Handler,
     private val log: (String) -> Unit,
 ) {
+    @Volatile private var shellExecutor: IShellExecutor? = null
+    private var serviceContext: Context? = null
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+            shellExecutor = IShellExecutor.Stub.asInterface(binder)
+            log("ShellExecutorService connected")
+        }
+        override fun onServiceDisconnected(name: ComponentName) {
+            shellExecutor = null
+            log("ShellExecutorService disconnected, rebinding...")
+            serviceContext?.let {
+                handlerProvider().postDelayed({ bindShellService(it) }, 2000)
+            }
+        }
+    }
+
+    fun bindShellService(context: Context) {
+        if (shellExecutor != null) return
+        serviceContext = context
+        val intent = Intent().apply {
+            component = ComponentName(
+                BuildConfig.APPLICATION_ID,
+                "${BuildConfig.APPLICATION_ID}.config.ShellExecutorService",
+            )
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        }
+        val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        log("ShellExecutorService bindService=$bound")
+    }
     fun triggerGestureAction(
         zone: String,
         gestureType: String,
@@ -180,53 +213,39 @@ internal class GestureActionDispatcher(
     }
 
     private fun doExecuteShellCommand(action: String, context: Context) {
-        Thread {
-            try {
-                val content = action.removePrefix("shell:")
-                val parts = content.split(":", limit = 2)
-                if (parts.size != 2) {
-                    showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
-                    return@Thread
-                }
+        val content = action.removePrefix("shell:")
+        val parts = content.split(":", limit = 2)
+        if (parts.size != 2) {
+            showToast(context, ModuleRes.getString(R.string.toast_shell_invalid_format))
+            return
+        }
+        val runAsRoot = parts[0] == "true"
+        val command = parts[1]
+        if (command.isBlank()) {
+            showToast(context, ModuleRes.getString(R.string.toast_empty_command))
+            return
+        }
 
-                val runAsRoot = parts[0] == "true"
-                val command = parts[1]
-                if (command.isBlank()) {
-                    showToast(context, ModuleRes.getString(R.string.toast_empty_command))
-                    return@Thread
-                }
+        val executor = shellExecutor
+        if (executor == null) {
+            showToast(context, ModuleRes.getString(R.string.toast_command_error, "service not ready"))
+            bindShellService(context)
+            return
+        }
 
-                log("Executing shell command (root=$runAsRoot): $command")
-                val extras = Bundle().apply {
-                    putBoolean(ShellCommandProvider.EXTRA_ROOT, runAsRoot)
-                    putString(ShellCommandProvider.EXTRA_COMMAND, command)
-                }
-                val result = context.contentResolver.call(
-                    Uri.parse("content://${ShellCommandProvider.AUTHORITY}"),
-                    ShellCommandProvider.METHOD_EXECUTE,
-                    null,
-                    extras,
-                )
-                if (result == null) {
-                    log("Shell: provider returned null (not running?)")
-                    showToast(context, ModuleRes.getString(R.string.toast_command_error, "provider unavailable"))
-                } else {
-                    val success = result.getBoolean(ShellCommandProvider.RESULT_SUCCESS)
-                    val output = result.getString(ShellCommandProvider.RESULT_OUTPUT).orEmpty().trim()
-                    val error = result.getString(ShellCommandProvider.RESULT_ERROR).orEmpty().trim()
-                    log("Shell result: success=$success output='$output' error='$error'")
-                    if (success) {
-                        output.takeIf { it.isNotBlank() }?.let { showToast(context, it.take(200)) }
-                    } else {
-                        val msg = error.ifBlank { output }.take(200)
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, msg))
+        log("Dispatching shell command (root=$runAsRoot): $command")
+        executor.execute(command, runAsRoot, object : IShellCallback.Stub() {
+            override fun onResult(success: Boolean, output: String?) {
+                log("Shell result: success=$success output='$output'")
+                if (success) {
+                    output?.trim()?.takeIf { it.isNotBlank() }?.let {
+                        showToast(context, it.take(200))
                     }
+                } else {
+                    showToast(context, ModuleRes.getString(R.string.toast_command_failed, output?.trim()?.take(200).orEmpty()))
                 }
-            } catch (e: Exception) {
-                log("Shell command exception: ${e.message}")
-                showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
             }
-        }.start()
+        })
     }
 
     private fun showToast(context: Context, text: String) {

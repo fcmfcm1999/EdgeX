@@ -120,6 +120,7 @@ object GestureManager {
                 debugOverlayController.initialize(context)
                 configRepository.reloadAsync(::refreshDebugOverlay)
             }
+            actionDispatcher.bindShellService(context)
         }
         if (initializeKeys && !keyManagerInitialized) {
             KeyManager.init(context)
