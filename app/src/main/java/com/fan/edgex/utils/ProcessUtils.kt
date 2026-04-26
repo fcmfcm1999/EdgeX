@@ -27,7 +27,7 @@ fun executeShellCommand(
         errorAction?.invoke(result.err)
         return result.isSuccess
     } else {
-        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+        val process = Runtime.getRuntime().exec(arrayOf("/system/bin/sh", "-c", command))
         process.outputStream.close()
         outAction?.invoke(process.inputStream.bufferedReader().readLines())
         errorAction?.invoke(process.errorStream.bufferedReader().readLines())
