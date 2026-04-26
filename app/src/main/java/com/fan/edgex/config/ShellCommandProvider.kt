@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
+import android.os.Process
 import com.topjohnwu.superuser.Shell
 
 class ShellCommandProvider : ContentProvider() {
@@ -14,7 +15,11 @@ class ShellCommandProvider : ContentProvider() {
     // for the full duration. Return result to the caller (system_server) which
     // shows the Toast in its own context.
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
-        if (Binder.getCallingUid() != android.os.Process.SYSTEM_UID) return null
+        // Two-factor: UID must be system (1000) AND package must be "android"
+        // (system_server's package name). This excludes other UID-1000 processes.
+        val callerUid = Binder.getCallingUid()
+        val callerPackages = context?.packageManager?.getPackagesForUid(callerUid)
+        if (callerUid != Process.SYSTEM_UID || callerPackages?.contains("android") != true) return null
         if (method != METHOD_EXECUTE) return null
 
         val command = extras?.getString(EXTRA_COMMAND).orEmpty()
