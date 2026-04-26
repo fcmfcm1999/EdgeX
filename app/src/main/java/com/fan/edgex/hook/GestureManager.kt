@@ -144,15 +144,10 @@ object GestureManager {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
-                        XposedBridge.log("$TAG: SCREEN_OFF — resetting gesture and key state")
                         gestureDetector.reset()
                         KeyManager.reset()
                     }
-                    Intent.ACTION_SCREEN_ON -> {
-                        XposedBridge.log("$TAG: SCREEN_ON — state is clean")
-                    }
                     Intent.ACTION_USER_UNLOCKED -> {
-                        XposedBridge.log("$TAG: USER_UNLOCKED — reloading config post-FBE")
                         configRepository.invalidate()
                         configRepository.reloadAsync()
                     }
@@ -167,7 +162,6 @@ object GestureManager {
                 addAction(Intent.ACTION_USER_UNLOCKED)
             }
             context.registerReceiver(receiver, filter)
-            XposedBridge.log("$TAG: Screen state receiver registered in system_server")
         } catch (e: Exception) {
             XposedBridge.log("$TAG: Failed to register screen state receiver: ${e.message}")
             screenStateReceiverRegistered = false
@@ -206,7 +200,6 @@ object GestureManager {
                 @Suppress("DEPRECATION")
                 context.registerReceiver(receiver, filter)
             }
-            log("Config broadcast receiver registered in system_server")
         } catch (e: Exception) {
             systemConfigReceiverRegistered = false
             log("Failed to register config broadcast receiver: ${e.message}")

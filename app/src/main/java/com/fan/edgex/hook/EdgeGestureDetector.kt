@@ -62,11 +62,7 @@ internal class EdgeGestureDetector(
 
     fun handle(event: MotionEvent, context: Context): Boolean {
         activeSession?.let { session ->
-            val elapsed = nowMillis() - session.startedAtMs
-            if (elapsed > GESTURE_TIMEOUT_MS) {
-                callbacks.log("Safety timeout: session stuck for ${elapsed}ms — resetting")
-                reset()
-            }
+            if (nowMillis() - session.startedAtMs > GESTURE_TIMEOUT_MS) reset()
         }
 
         return when (event.actionMasked) {
@@ -78,14 +74,7 @@ internal class EdgeGestureDetector(
             MotionEvent.ACTION_MOVE -> handleMove(event, context)
             MotionEvent.ACTION_UP -> handleUp(event, context)
             MotionEvent.ACTION_CANCEL -> handleCancel(event, context)
-            else -> {
-                if (activeSession != null) {
-                    callbacks.log(
-                        "unhandled action=${event.actionMasked} pointers=${event.pointerCount} sessionActive=true"
-                    )
-                }
-                false
-            }
+            else -> false
         }
     }
 
@@ -97,24 +86,15 @@ internal class EdgeGestureDetector(
         pendingLongPressRunnable = null
 
         previousSession?.let { handoff.dispose(it.handoff) }
-        if (previousSession != null) {
-            callbacks.log("resetGestureState — cleared stale gesture session")
-        }
     }
 
     private fun handleDown(event: MotionEvent, context: Context): Boolean {
         if (callbacks.isGlobalCopyModeActive()) {
-            if (activeSession != null) {
-                callbacks.log("Global copy mode active on DOWN — clearing stale gesture session")
-                reset()
-            }
+            if (activeSession != null) reset()
             return false
         }
 
         val zoneMatch = resolveEdgeZone(context, event.rawX, event.rawY) ?: run {
-            if (activeSession != null) {
-                callbacks.log("DOWN outside edge while sessionActive=true — resetting state")
-            }
             reset()
             return false
         }
@@ -162,7 +142,6 @@ internal class EdgeGestureDetector(
                         session.subGestureAnchorY = event.rawY
                         session.subGestureAnchorEventTime = event.eventTime
                         session.primaryGesture = gestureType
-                        callbacks.log("Sub-gesture mode via $gestureType at (${event.rawX}, ${event.rawY})")
                     }
                     hasConfiguredAction(action) -> {
                         handoff.cancel(session.handoff, context)
@@ -212,9 +191,6 @@ internal class EdgeGestureDetector(
             val childAction = callbacks.resolveAction(session.zone, subGestureType)
             if (hasConfiguredAction(childAction)) {
                 callbacks.dispatchAction(session.zone, subGestureType, context, session.targetX, session.targetY)
-                callbacks.log("Sub-gesture dispatched: zone=${session.zone} type=$subGestureType")
-            } else {
-                callbacks.log("Sub-gesture $subDirection — no action for $subGestureType")
             }
             return finishSession()
         }
@@ -276,14 +252,12 @@ internal class EdgeGestureDetector(
                     session.subGestureAnchorY = session.targetY
                     session.subGestureAnchorEventTime = nowMillis()
                     session.primaryGesture = "long_press"
-                    callbacks.log("Sub-gesture mode via long_press at (${session.targetX}, ${session.targetY})")
                 }
                 hasConfiguredAction(action) -> {
                     handoff.cancel(session.handoff, context)
                     callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
                 }
                 else -> {
-                    callbacks.log("Long press timeout — no EdgeX action, releasing DOWN")
                     handoff.dispatchSavedDownIfNeeded(session.handoff, context)
                 }
             }
@@ -353,7 +327,6 @@ internal class EdgeGestureDetector(
 
             val fallbackZone = AppConfig.fallbackEdgeZone(zone)
             if (fallbackZone != null && callbacks.isZoneEnabled(fallbackZone)) {
-                callbacks.log("resolveEdgeZone fallback $zone -> $fallbackZone")
                 return EdgeZoneMatch(fallbackZone, edge)
             }
         }
