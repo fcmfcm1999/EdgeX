@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.UserHandle
 import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.R
@@ -128,6 +129,9 @@ internal class GestureActionDispatcher(
             action == "screenshot" -> {
                 performScreenshot(context)
             }
+            action == "refreeze" -> {
+                performRefreeze(context)
+            }
             action == "universal_copy" -> {
                 UniversalCopyManager.collectAllTexts(context) { result ->
                     when (result.status) {
@@ -235,7 +239,7 @@ internal class GestureActionDispatcher(
 
     private fun launchShortcut(context: Context, action: String) {
         try {
-            val parts = action.split(":")
+            val parts = action.split(":", limit = 3)
             if (parts.size != 3) {
                 showToast(context, ModuleRes.getString(R.string.toast_shortcut_format_error))
                 return
@@ -253,8 +257,9 @@ internal class GestureActionDispatcher(
                         shortcutId,
                         null,
                         null,
-                        android.os.Process.myUserHandle(),
+                        currentUserHandle(),
                     )
+                    log("Launched shortcut: $packageName/$shortcutId")
                 } catch (e: Exception) {
                     log("Failed to launch shortcut: ${e.message}")
                     try {
@@ -276,6 +281,18 @@ internal class GestureActionDispatcher(
             e.printStackTrace()
             showToast(context, ModuleRes.getString(R.string.toast_shortcut_launch_failed, e.message))
         }
+    }
+
+    private fun currentUserHandle(): UserHandle {
+        val currentUserId = runCatching {
+            XposedHelpers.callStaticMethod(
+                android.app.ActivityManager::class.java,
+                "getCurrentUser",
+            ) as Int
+        }.getOrDefault(0)
+        return runCatching {
+            XposedHelpers.callStaticMethod(UserHandle::class.java, "of", currentUserId) as UserHandle
+        }.getOrDefault(android.os.Process.myUserHandle())
     }
 
     private fun performRefreeze(context: Context) {
