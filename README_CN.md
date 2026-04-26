@@ -20,7 +20,7 @@
 
 EdgeX 不是一个普通的悬浮窗工具，而是一个需要在 LSPosed/Xposed 中启用的系统增强模块。应用本体负责配置，实际的手势识别、按键拦截和浮层展示运行在被注入的系统进程中：
 
-- `android` / `system_server`：处理边缘触摸、硬件按键和系统动作。
+- `system`：处理边缘触摸、硬件按键和系统动作。
 - `com.android.systemui`：处理冰箱抽屉、全局复制选择层等 SystemUI 浮层。
 - `com.fan.edgex`：提供配置界面和跨进程设置存储。
 
@@ -45,7 +45,7 @@ EdgeX 不是一个普通的悬浮窗工具，而是一个需要在 LSPosed/Xpose
 - LSPosed / Xposed 环境，最低 Xposed API 82。
 - 当前构建配置：`minSdk 35`、`targetSdk 36`、`compileSdk 36`。
 - LSPosed 作用域至少勾选：
-  - `android` / System Framework
+  - `system` / System Framework
   - `com.android.systemui` / System UI
 
 ### Root 相关说明
@@ -59,7 +59,7 @@ EdgeX 不是一个普通的悬浮窗工具，而是一个需要在 LSPosed/Xpose
 
 1. 安装 EdgeX APK。
 2. 打开 LSPosed，启用 EdgeX 模块。
-3. 在作用域中勾选 `android` 和 `com.android.systemui`。
+3. 在作用域中勾选 `system` 和 `com.android.systemui`。
 4. 重启设备。至少需要重启 SystemUI；首次启用或修改作用域后建议完整重启。
 5. 打开 EdgeX，开启手势或按键总开关并配置动作。
 
@@ -72,10 +72,10 @@ EdgeX 不是一个普通的悬浮窗工具，而是一个需要在 LSPosed/Xpose
 
 ## 已验证环境
 
-| 设备 | Android | Xposed 环境 | Root 方案 |
-| --- | --- | --- | --- |
-| Pixel 9 | 16 | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
-| Android Virtual Device | 16 | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector) | [Magisk](https://github.com/topjohnwu/Magisk) |
+| 设备                     | Android | Xposed 环境                                                      | Root 方案                                       |
+|------------------------|---------|----------------------------------------------------------------|-----------------------------------------------|
+| Pixel 9                | 16      | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
+| Android Virtual Device | 16      | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
 
 以上只是当前开发验证环境，不代表唯一支持组合。其他设备和 ROM 可能需要额外适配。
 

@@ -20,7 +20,7 @@
 
 EdgeX is not a regular floating-window utility. The app process is only the configuration surface; the module logic runs inside LSPosed/Xposed-injected system processes:
 
-- `android` / `system_server`: edge touch handling, hardware key interception, and system actions.
+- `system`: edge touch handling, hardware key interception, and system actions.
 - `com.android.systemui`: freezer drawer, universal copy overlay, and other SystemUI-side surfaces.
 - `com.fan.edgex`: settings UI and cross-process configuration storage.
 
@@ -45,7 +45,7 @@ It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on 
 - LSPosed / Xposed environment with Xposed API 82 or later.
 - Current build config: `minSdk 35`, `targetSdk 36`, `compileSdk 36`.
 - Required LSPosed scopes:
-  - `android` / System Framework
+  - `system` / System Framework
   - `com.android.systemui` / System UI
 
 ### Root Notes
@@ -59,7 +59,7 @@ It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on 
 
 1. Install the EdgeX APK.
 2. Enable EdgeX in LSPosed.
-3. Select at least the `android` and `com.android.systemui` scopes.
+3. Select at least the `system` and `com.android.systemui` scopes.
 4. Reboot the device. Restarting SystemUI may be enough for some changes, but a full reboot is recommended after first activation or scope changes.
 5. Open EdgeX, enable gestures or keys, and assign actions.
 
@@ -72,10 +72,10 @@ It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on 
 
 ## Tested Environment
 
-| Device | Android | Xposed Environment | Root Solution |
-| --- | --- | --- | --- |
-| Pixel 9 | 16 | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
-| Android Virtual Device | 16 | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector) | [Magisk](https://github.com/topjohnwu/Magisk) |
+| Device                 | Android | Xposed Environment                                             | Root Solution                                 |
+|------------------------|---------|----------------------------------------------------------------|-----------------------------------------------|
+| Pixel 9                | 16      | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
+| Android Virtual Device | 16      | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
 
 This is the currently verified development setup, not a strict compatibility limit. Other devices and ROMs may require additional adaptation.
 
