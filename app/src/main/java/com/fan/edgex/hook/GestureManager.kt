@@ -112,6 +112,7 @@ object GestureManager {
     private fun ensureSystemServerInitialized(context: Context, initializeKeys: Boolean) {
         if (systemContext == null) {
             systemContext = context
+            configRepository.attachSystemContext(context)
             configRepository.reloadAsync()
             registerScreenStateReceiver(context)
             registerConfigChangeReceiver(context, systemUi = false)

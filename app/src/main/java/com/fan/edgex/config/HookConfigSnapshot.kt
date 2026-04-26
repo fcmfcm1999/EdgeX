@@ -10,6 +10,7 @@ import java.util.Properties
 
 object HookConfigSnapshot {
     val ACTION_CONFIG_CHANGED = "${BuildConfig.APPLICATION_ID}.ACTION_CONFIG_CHANGED"
+    val ACTION_CONFIG_SNAPSHOT_REQUEST = "${BuildConfig.APPLICATION_ID}.ACTION_CONFIG_SNAPSHOT_REQUEST"
     const val EXTRA_KEYS = "keys"
     const val EXTRA_VALUES = "values"
     const val EXTRA_FULL_SNAPSHOT = "full_snapshot"

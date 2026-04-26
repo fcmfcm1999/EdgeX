@@ -1,7 +1,11 @@
 package com.fan.edgex.hook
 
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
 import java.util.concurrent.ConcurrentHashMap
@@ -14,9 +18,15 @@ internal class HookConfigRepository(
     private val configCache = ConcurrentHashMap<String, String>()
     private var lastConfigLoad = 0L
     private var missingSnapshotLogged = false
+    private var lastSnapshotRequest = 0L
+    private var systemContext: Context? = null
 
     private val configExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "EdgeX-Config").apply { isDaemon = true }
+    }
+
+    fun attachSystemContext(context: Context) {
+        systemContext = context
     }
 
     fun invalidate() {
@@ -72,8 +82,9 @@ internal class HookConfigRepository(
         if (snapshot.isEmpty()) {
             if (!missingSnapshotLogged) {
                 missingSnapshotLogged = true
-                log("Config snapshot unavailable; open EdgeX once after upgrade to publish hook config")
+                log("Config snapshot unavailable; requesting EdgeX to publish hook config")
             }
+            requestSnapshotFromApp()
             return false
         }
 
@@ -85,7 +96,28 @@ internal class HookConfigRepository(
         return true
     }
 
+    private fun requestSnapshotFromApp() {
+        val now = System.currentTimeMillis()
+        if (now - lastSnapshotRequest < SNAPSHOT_REQUEST_THROTTLE) return
+        lastSnapshotRequest = now
+
+        val context = systemContext ?: return
+        try {
+            context.sendBroadcast(Intent(HookConfigSnapshot.ACTION_CONFIG_SNAPSHOT_REQUEST).apply {
+                component = ComponentName(
+                    BuildConfig.APPLICATION_ID,
+                    "${BuildConfig.APPLICATION_ID}.config.ConfigSnapshotReceiver",
+                )
+                setPackage(BuildConfig.APPLICATION_ID)
+                addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            })
+        } catch (e: Exception) {
+            log("Failed to request config snapshot: ${e.message}")
+        }
+    }
+
     private companion object {
         const val CONFIG_CACHE_TTL = 2000L
+        const val SNAPSHOT_REQUEST_THROTTLE = 30_000L
     }
 }
