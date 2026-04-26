@@ -64,7 +64,7 @@ internal class GestureActionDispatcher(
                 doExecuteShellCommand(action, ctx)
             }
             action == "freezer_drawer" -> {
-                handlerProvider().post { DrawerManager.showDrawer(ctx) }
+                handlerProvider().post { DrawerManager.showDrawer(ctx, resolveConfig) }
             }
             action == "refreeze" -> {
                 performRefreeze(ctx)
@@ -532,10 +532,9 @@ internal class GestureActionDispatcher(
     }
 
     private fun performScreenshot(context: Context) {
-        val now = SystemClock.uptimeMillis()
-        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
-        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
         val errors = mutableListOf<String>()
+
+        if (injectScreenshotChord(context, errors)) return
 
         try {
             val result = GlobalActionHelper.performGlobalAction(
@@ -547,6 +546,10 @@ internal class GestureActionDispatcher(
         } catch (t: Throwable) {
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: ${t.message}")
         }
+
+        val now = SystemClock.uptimeMillis()
+        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SYSRQ, 0)
+        val up = KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SYSRQ, 0)
 
         try {
             val inputManager = context.getSystemService(Context.INPUT_SERVICE)
@@ -585,6 +588,35 @@ internal class GestureActionDispatcher(
         } catch (e: Exception) {
             errors.add("shell: ${e.message}")
             log("screenshot failed -> ${errors.joinToString(" | ")}")
+        }
+    }
+
+    private fun injectScreenshotChord(context: Context, errors: MutableList<String>): Boolean {
+        val now = SystemClock.uptimeMillis()
+        val events = arrayOf(
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN, 0),
+            KeyEvent(now, now + 30, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_POWER, 0),
+            KeyEvent(now, now + 160, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_POWER, 0),
+            KeyEvent(now, now + 170, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_DOWN, 0),
+        )
+
+        return try {
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
+            if (inputManager != null) {
+                val injectMethod = inputManager.javaClass.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType,
+                )
+                events.forEach { event -> injectMethod.invoke(inputManager, event, 0) }
+                true
+            } else {
+                errors.add("screenshot chord: INPUT_SERVICE null")
+                false
+            }
+        } catch (t: Throwable) {
+            errors.add("screenshot chord: ${t.message}")
+            false
         }
     }
 }

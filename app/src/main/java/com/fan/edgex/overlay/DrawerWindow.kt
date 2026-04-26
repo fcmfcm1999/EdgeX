@@ -16,11 +16,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
-import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.hook.ModuleRes
 
-class DrawerWindow(private val context: Context, private val onDismiss: (() -> Unit)? = null) {
+class DrawerWindow(
+    private val context: Context,
+    private val resolveConfig: (String) -> String,
+    private val onDismiss: (() -> Unit)? = null,
+) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
@@ -28,30 +30,10 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
     // Taps to the left of this X coordinate dismiss the drawer.
     private var contentLeftBound = 0
 
-    private fun queryConfig(key: String): String {
-        val snapshot = HookConfigSnapshot.readFromHookFile()
-        if (snapshot.containsKey(key)) return snapshot.getValue(key)
-
-        return try {
-            context.contentResolver.query(
-                ConfigProvider.uriForKey(key),
-                null,
-                null,
-                null,
-                null,
-            )?.use {
-                if (it.moveToFirst()) it.getString(0) else ""
-            } ?: ""
-        } catch (e: Exception) {
-            de.robv.android.xposed.XposedBridge.log("EdgeX: Failed to read config $key: ${e.message}")
-            ""
-        }
-    }
-
     fun show() {
         if (rootView != null) return // Already showing
 
-        val useArcDrawer = queryConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
+        val useArcDrawer = resolveConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
 
         val displayMetrics = context.resources.displayMetrics
         
@@ -93,8 +75,8 @@ class DrawerWindow(private val context: Context, private val onDismiss: (() -> U
         try {
             val configuredPackages = linkedSetOf<String>()
 
-            // 0. Load persistent freezer list from hook config snapshot, falling back to ConfigProvider.
-            val listStr = queryConfig(AppConfig.FREEZER_APP_LIST)
+            // 0. Load persistent freezer list from hook-side memory cache.
+            val listStr = resolveConfig(AppConfig.FREEZER_APP_LIST)
             if (listStr.isNotEmpty()) {
                 configuredPackages.addAll(
                     listStr.split(",")
