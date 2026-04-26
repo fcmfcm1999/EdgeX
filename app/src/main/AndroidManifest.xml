@@ -100,6 +100,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".config.ShellActionReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>

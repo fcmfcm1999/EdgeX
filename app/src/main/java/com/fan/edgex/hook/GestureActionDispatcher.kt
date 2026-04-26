@@ -10,10 +10,11 @@ import android.os.UserHandle
 import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.R
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.config.ShellActionReceiver
 import com.fan.edgex.overlay.DrawerManager
-import com.topjohnwu.superuser.Shell
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 
@@ -195,31 +196,16 @@ internal class GestureActionDispatcher(
                 }
 
                 log("Executing shell command (root=$runAsRoot): $command")
-                if (runAsRoot) {
-                    val result = executeRootShell(command)
-                    if (!result.isSuccess) {
-                        val errorMsg = result.err.joinToString("\n")
-                        log("Shell command failed: $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = result.out.joinToString("\n")
-                        log("Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
-                    }
-                } else {
-                    val process = Runtime.getRuntime().exec(arrayOf(SH_PATH, "-c", command))
-                    process.outputStream.close()
-                    val exitCode = process.waitFor()
-                    if (exitCode != 0) {
-                        val errorMsg = process.errorStream.bufferedReader().readText()
-                        log("Shell command failed (exit=$exitCode): $errorMsg")
-                        showToast(context, ModuleRes.getString(R.string.toast_command_failed, errorMsg))
-                    } else {
-                        val output = process.inputStream.bufferedReader().readText()
-                        log("Shell command output: $output")
-                        if (output.isNotBlank()) showToast(context, output.take(100))
-                    }
-                }
+                context.sendBroadcast(Intent(ShellActionReceiver.ACTION_EXECUTE_SHELL).apply {
+                    component = android.content.ComponentName(
+                        BuildConfig.APPLICATION_ID,
+                        "${BuildConfig.APPLICATION_ID}.config.ShellActionReceiver",
+                    )
+                    setPackage(BuildConfig.APPLICATION_ID)
+                    addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                    putExtra(ShellActionReceiver.EXTRA_ROOT, runAsRoot)
+                    putExtra(ShellActionReceiver.EXTRA_COMMAND, command)
+                })
             } catch (e: Exception) {
                 log("Shell command exception: ${e.message}")
                 e.printStackTrace()
@@ -227,34 +213,6 @@ internal class GestureActionDispatcher(
             }
         }.start()
     }
-
-    private fun executeRootShell(command: String): ShellResult {
-        return try {
-            val result = Shell.cmd(command).exec()
-            ShellResult(result.isSuccess, result.out, result.err)
-        } catch (t: Throwable) {
-            log("libsu shell failed, falling back to $SU_PATH: ${t.message}")
-            runShellProcess(arrayOf(SU_PATH, "-c", command))
-        }
-    }
-
-    private fun runShellProcess(command: Array<String>): ShellResult {
-        return try {
-            val process = Runtime.getRuntime().exec(command)
-            process.outputStream.close()
-            val out = process.inputStream.bufferedReader().readLines()
-            val err = process.errorStream.bufferedReader().readLines()
-            ShellResult(process.waitFor() == 0, out, err)
-        } catch (t: Throwable) {
-            ShellResult(false, emptyList(), listOf(t.message ?: t.javaClass.simpleName))
-        }
-    }
-
-    private data class ShellResult(
-        val isSuccess: Boolean,
-        val out: List<String>,
-        val err: List<String>,
-    )
 
     private fun showToast(context: Context, text: String) {
         handlerProvider().post {
@@ -616,10 +574,5 @@ internal class GestureActionDispatcher(
             errors.add("screenshot chord: ${t.message}")
             false
         }
-    }
-
-    private companion object {
-        const val SH_PATH = "/system/bin/sh"
-        const val SU_PATH = "/system/bin/su"
     }
 }
