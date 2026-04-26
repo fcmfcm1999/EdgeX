@@ -10,7 +10,6 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.ConfigProvider
 import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 
@@ -24,8 +23,6 @@ object GestureManager {
     // Legacy SystemUI context. Runtime overlays now run from system_server.
     private var systemUIContext: Context? = null
 
-    private val CONFIG_URI = ConfigProvider.CONTENT_URI
-
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
     private var systemConfigReceiverRegistered = false
@@ -38,9 +35,6 @@ object GestureManager {
         log(message)
     }
     private val configRepository = HookConfigRepository(
-        contentUri = CONFIG_URI,
-        supportedKeysProvider = { KeyManager.SUPPORTED_KEYS.keys },
-        keyTriggersProvider = { AppConfig.KEY_TRIGGERS },
         updateKeyConfig = KeyManager::updateConfig,
         log = ::log,
     )
@@ -118,13 +112,9 @@ object GestureManager {
     private fun ensureSystemServerInitialized(context: Context, initializeKeys: Boolean) {
         if (systemContext == null) {
             systemContext = context
-            configRepository.attachSystemContext(context)
             configRepository.reloadAsync()
             registerScreenStateReceiver(context)
             registerConfigChangeReceiver(context, systemUi = false)
-            configRepository.ensureObserverRegistered(context) {
-                configRepository.reloadAsync(::refreshDebugOverlay)
-            }
             mainHandler().post {
                 debugOverlayController.initialize(context)
                 configRepository.reloadAsync(::refreshDebugOverlay)
@@ -140,11 +130,7 @@ object GestureManager {
         if (systemUIContext != null) return
 
         systemUIContext = context
-        configRepository.attachSystemUiContext(context)
         registerConfigChangeReceiver(context, systemUi = true)
-        configRepository.ensureObserverRegistered(context) {
-            configRepository.reloadAsync(::refreshDebugOverlay)
-        }
         debugOverlayController.initialize(context)
         configRepository.reloadAsync(::refreshDebugOverlay)
         log("SystemUI overlay initialized with broadcast receiver")

@@ -5,7 +5,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 
 // UI-side config access. All writes go through here so the hook is always notified.
-// Values are stored as strings so the ContentProvider never needs type hints.
+// Values are stored as strings to keep the hook snapshot schema stable across releases.
 
 fun Context.configPrefs(): SharedPreferences =
     getSharedPreferences(AppConfig.PREFS_NAME, Context.MODE_PRIVATE)
@@ -53,12 +53,6 @@ fun Context.getConfigBool(key: String, default: Boolean = false): Boolean =
 
 private fun Context.notifyConfigChanged(changedValues: Map<String, String>) {
     HookConfigSnapshot.writeFromPreferences(this)
-
-    changedValues.keys.forEach { key ->
-        contentResolver.notifyChange(ConfigProvider.uriForKey(key), null)
-    }
-    contentResolver.notifyChange(ConfigProvider.CONTENT_URI, null)
-
     sendConfigBroadcast(changedValues, fullSnapshot = false)
 }
 

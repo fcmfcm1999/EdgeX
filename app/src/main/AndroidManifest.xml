@@ -90,12 +90,6 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
-        <provider
-                android:name=".config.ConfigProvider"
-                android:authorities="com.fan.edgex.provider"
-                android:exported="true"
-                android:enabled="true" />
-
     </application>
 
 </manifest>
