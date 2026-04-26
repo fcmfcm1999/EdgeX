@@ -3,6 +3,8 @@ package com.fan.edgex.ui
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -107,10 +109,10 @@ class GesturesActivity : AppCompatActivity() {
             val subtitleRes = spec.subtitleRes
             if (subtitleRes != null) {
                 text = getString(subtitleRes)
-                visibility = View.VISIBLE
+                isVisible = true
             } else {
                 text = ""
-                visibility = View.GONE
+                isGone = true
             }
         }
         root.findViewById<ImageView>(R.id.zone_icon).setImageResource(spec.iconRes)
@@ -131,11 +133,11 @@ class GesturesActivity : AppCompatActivity() {
 
         if (!header.hasOnClickListeners()) {
             header.setOnClickListener {
-                if (body.visibility == View.VISIBLE) {
-                    body.visibility = View.GONE
+                if (body.isVisible) {
+                    body.isGone = true
                     arrow.animate().rotation(0f).start()
                 } else {
-                    body.visibility = View.VISIBLE
+                    body.isVisible = true
                     arrow.animate().rotation(180f).start()
                 }
             }

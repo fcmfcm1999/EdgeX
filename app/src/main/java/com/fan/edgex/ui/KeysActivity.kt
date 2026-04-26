@@ -6,6 +6,8 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.CheckBox
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -98,11 +100,11 @@ class KeysActivity : AppCompatActivity() {
 
         // Expand/Collapse
         header.setOnClickListener {
-            if (body.visibility == View.VISIBLE) {
-                body.visibility = View.GONE
+            if (body.isVisible) {
+                body.isGone = true
                 arrow.animate().rotation(0f).start()
             } else {
-                body.visibility = View.VISIBLE
+                body.isVisible = true
                 arrow.animate().rotation(180f).start()
             }
         }

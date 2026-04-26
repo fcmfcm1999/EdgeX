@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -70,14 +72,14 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         val tvTitle = findViewById<TextView>(R.id.tv_title)
 
         btnSearch.setOnClickListener {
-            if (etSearch.visibility == View.GONE) {
-                tvTitle.visibility = View.GONE
-                etSearch.visibility = View.VISIBLE
+            if (etSearch.isGone) {
+                tvTitle.isGone = true
+                etSearch.isVisible = true
                 etSearch.requestFocus()
             } else {
                 if (etSearch.text.isEmpty()) {
-                    etSearch.visibility = View.GONE
-                    tvTitle.visibility = View.VISIBLE
+                    etSearch.isGone = true
+                    tvTitle.isVisible = true
                 } else {
                     etSearch.text.clear()
                 }
@@ -103,11 +105,6 @@ class ShortcutSelectionActivity : AppCompatActivity() {
     }
 
     private fun loadShortcuts() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
-            Toast.makeText(this, getString(R.string.toast_requires_android_71), Toast.LENGTH_SHORT).show()
-            return
-        }
-
         Thread {
             try {
                 val launcherApps = getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps

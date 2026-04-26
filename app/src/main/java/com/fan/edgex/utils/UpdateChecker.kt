@@ -7,8 +7,9 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
-import android.net.Uri
 import android.text.SpannableStringBuilder
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.BulletSpan
@@ -56,7 +57,7 @@ object UpdateChecker {
 
         fetchLatestRelease { release ->
             if (release == null) return@fetchLatestRelease
-            prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
+            prefs.edit { putLong(KEY_LAST_CHECK, System.currentTimeMillis()) }
             val skipped = prefs.getString(KEY_SKIPPED_VERSION, null)
             if (release.tagName == skipped) return@fetchLatestRelease
             if (!isNewer(release.versionName, BuildConfig.VERSION_NAME)) return@fetchLatestRelease
@@ -160,7 +161,7 @@ object UpdateChecker {
 
         skipButton.setOnClickListener {
             activity.getSharedPreferences(PREF_NAME, Activity.MODE_PRIVATE)
-                .edit().putString(KEY_SKIPPED_VERSION, release.tagName).apply()
+                .edit { putString(KEY_SKIPPED_VERSION, release.tagName) }
             dialog.dismiss()
         }
     }
@@ -177,7 +178,7 @@ object UpdateChecker {
             spannable.setSpan(object : ClickableSpan() {
                 override fun onClick(widget: android.view.View) {
                     try {
-                        activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        activity.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
                     } catch (_: Exception) {
                         android.widget.Toast.makeText(activity,
                             activity.getString(R.string.toast_cannot_open_browser),
