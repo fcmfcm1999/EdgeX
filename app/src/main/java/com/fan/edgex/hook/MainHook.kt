@@ -43,13 +43,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
             "android" -> hookInputManager(lpparam)
-            "com.android.systemui" -> {
-                if (lpparam.processName == "com.android.systemui") {
-                    hookSystemUI(lpparam)
-                } else {
-                    XposedBridge.log("$TAG: Skipping SystemUI hook in process ${lpparam.processName}")
-                }
-            }
         }
     }
 

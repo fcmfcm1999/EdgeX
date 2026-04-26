@@ -126,8 +126,9 @@ class DrawerWindow(
         contentLeftBound = displayMetrics.widthPixels - drawerWidth
 
         // --- Window Layout Params ---
+        @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
             // Always full-width so taps on the left dim area are within
             // window bounds and properly trigger dismiss.

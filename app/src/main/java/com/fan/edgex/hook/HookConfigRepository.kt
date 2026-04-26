@@ -144,26 +144,8 @@ internal class HookConfigRepository(
     }
 
     private fun queryConfigProvider(key: String): String {
-        val context = systemContext ?: run {
-            if (systemUiContext != null) {
-                log("Skipping ConfigProvider fallback in SystemUI for key=$key")
-            }
-            return ""
-        }
-        return try {
-            context.contentResolver.query(
-                Uri.withAppendedPath(contentUri, key),
-                null,
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else ""
-            } ?: ""
-        } catch (e: Exception) {
-            log("ConfigProvider fallback failed for key=$key: ${e.message}")
-            ""
-        }
+        log("Skipping ConfigProvider fallback for key=$key")
+        return ""
     }
 
     private companion object {

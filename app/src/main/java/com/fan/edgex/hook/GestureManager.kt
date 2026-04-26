@@ -21,14 +21,10 @@ object GestureManager {
 
     // system_server context (from filterInputEvent hook, for config queries)
     private var systemContext: Context? = null
-    // SystemUI context (for overlay windows like DrawerWindow)
+    // Legacy SystemUI context. Runtime overlays now run from system_server.
     private var systemUIContext: Context? = null
 
     private val CONFIG_URI = ConfigProvider.CONTENT_URI
-
-    // Broadcast action for cross-process communication (system_server -> SystemUI)
-    private const val ACTION_PERFORM = "com.fan.edgex.ACTION_PERFORM"
-    private const val EXTRA_ACTION = "action"
 
     // Whether we've registered the screen state broadcast receiver (system_server)
     private var screenStateReceiverRegistered = false
@@ -50,12 +46,7 @@ object GestureManager {
     )
     private val actionDispatcher by lazy {
         GestureActionDispatcher(
-            configUri = CONFIG_URI,
-            actionBroadcast = ACTION_PERFORM,
-            actionExtra = EXTRA_ACTION,
             resolveConfig = configRepository::get,
-            systemContextProvider = { systemContext },
-            systemUiContextProvider = { systemUIContext },
             handlerProvider = ::mainHandler,
             log = ::log,
         )
@@ -132,8 +123,10 @@ object GestureManager {
             registerScreenStateReceiver(context)
             registerConfigChangeReceiver(context, systemUi = false)
             configRepository.ensureObserverRegistered(context) {
-                configRepository.reloadAsync()
+                configRepository.reloadAsync(::refreshDebugOverlay)
             }
+            debugOverlayController.initialize(context)
+            configRepository.reloadAsync(::refreshDebugOverlay)
         }
         if (initializeKeys && !keyManagerInitialized) {
             KeyManager.init(context)
@@ -146,7 +139,6 @@ object GestureManager {
 
         systemUIContext = context
         configRepository.attachSystemUiContext(context)
-        registerActionReceiver(context)
         registerConfigChangeReceiver(context, systemUi = true)
         configRepository.ensureObserverRegistered(context) {
             configRepository.reloadAsync(::refreshDebugOverlay)
@@ -284,39 +276,11 @@ object GestureManager {
     }
 
     /**
-     * Called from SystemUI process to initialize overlay windows and broadcast receiver.
-     * Used for debug visualization and DrawerWindow.
+     * Legacy entry point kept for older scoped installs. New runtime overlays
+     * initialize from system_server.
      */
     fun initSystemUI(ctx: Context) {
         ensureSystemUiInitialized(ctx)
-    }
-
-    /**
-     * Register a BroadcastReceiver in SystemUI to handle action commands
-     * sent from system_server via filterInputEvent hook.
-     */
-    private fun registerActionReceiver(ctx: Context) {
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val action = intent.getStringExtra(EXTRA_ACTION) ?: return
-                actionDispatcher.handleSystemUiAction(action, context)
-            }
-        }
-
-        try {
-            val filter = IntentFilter(ACTION_PERFORM)
-            // Must use RECEIVER_EXPORTED so system_server (different UID) can reach us
-            ctx.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-            log("Action BroadcastReceiver registered in SystemUI")
-        } catch (e: Exception) {
-            try {
-                val filter = IntentFilter(ACTION_PERFORM)
-                ctx.registerReceiver(receiver, filter)
-                log("Action BroadcastReceiver registered (legacy) in SystemUI")
-            } catch (e2: Exception) {
-                log("Failed to register BroadcastReceiver: ${e2.message}")
-            }
-        }
     }
 
 }

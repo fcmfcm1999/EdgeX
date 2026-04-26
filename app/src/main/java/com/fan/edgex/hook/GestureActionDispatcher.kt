@@ -3,7 +3,6 @@ package com.fan.edgex.hook
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -18,12 +17,7 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 
 internal class GestureActionDispatcher(
-    private val configUri: Uri,
-    private val actionBroadcast: String,
-    private val actionExtra: String,
     private val resolveConfig: (String) -> String,
-    private val systemContextProvider: () -> Context?,
-    private val systemUiContextProvider: () -> Context?,
     private val handlerProvider: () -> Handler,
     private val log: (String) -> Unit,
 ) {
@@ -48,32 +42,6 @@ internal class GestureActionDispatcher(
     fun executeKeyAction(action: String, context: Context) {
         handlerProvider().post {
             performAction(action, context, 0f, 0f)
-        }
-    }
-
-    fun handleSystemUiAction(action: String, context: Context) {
-        val ctx = systemUiContextProvider() ?: context
-        when {
-            action.startsWith("app_shortcut:") -> {
-                handlerProvider().post { launchShortcut(ctx, action) }
-            }
-            action.startsWith("launch_app:") -> {
-                handlerProvider().post { launchApp(ctx, action) }
-            }
-            action.startsWith("shell:") -> {
-                doExecuteShellCommand(action, ctx)
-            }
-            action == "freezer_drawer" -> {
-                handlerProvider().post { DrawerManager.showDrawer(ctx, resolveConfig) }
-            }
-            action == "refreeze" -> {
-                performRefreeze(ctx)
-            }
-            else -> {
-                handlerProvider().post {
-                    showToast(ctx, ModuleRes.getString(R.string.toast_unknown_action, action))
-                }
-            }
         }
     }
 
@@ -176,10 +144,16 @@ internal class GestureActionDispatcher(
                 }
             }
             action.startsWith("shell:") -> {
-                sendActionToSystemUI(action, context)
+                doExecuteShellCommand(action, context)
             }
-            else -> {
-                sendActionToSystemUI(action, context)
+            action.startsWith("app_shortcut:") -> {
+                launchShortcut(context, action)
+            }
+            action.startsWith("launch_app:") -> {
+                launchApp(context, action)
+            }
+            action == "freezer_drawer" -> {
+                DrawerManager.showDrawer(context, resolveConfig)
             }
         }
     }
@@ -248,21 +222,6 @@ internal class GestureActionDispatcher(
                 showToast(context, ModuleRes.getString(R.string.toast_command_error, e.message))
             }
         }.start()
-    }
-
-    private fun sendActionToSystemUI(action: String, context: Context) {
-        try {
-            val intent = Intent(actionBroadcast).apply {
-                putExtra(actionExtra, action)
-                setPackage("com.android.systemui")
-            }
-            val userHandle = android.os.UserHandle::class.java
-                .getField("CURRENT").get(null) as android.os.UserHandle
-            context.sendBroadcastAsUser(intent, userHandle)
-        } catch (e: Exception) {
-            log("Failed to send broadcast: ${e.message}")
-            e.printStackTrace()
-        }
     }
 
     private fun showToast(context: Context, text: String) {
@@ -504,11 +463,6 @@ internal class GestureActionDispatcher(
         }
     }
 
-    private fun configResolver(context: Context) =
-        systemContextProvider()?.contentResolver
-            ?: systemUiContextProvider()?.contentResolver
-            ?: context.contentResolver
-
     private fun readConfigValue(context: Context, key: String): String {
         val cached = resolveConfig(key)
         if (cached.isNotEmpty()) return cached
@@ -516,19 +470,8 @@ internal class GestureActionDispatcher(
         val snapshot = HookConfigSnapshot.readFromHookFile()
         if (snapshot.containsKey(key)) return snapshot.getValue(key)
 
-        return try {
-            configResolver(context).query(
-                Uri.withAppendedPath(configUri, key),
-                null,
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else ""
-            } ?: ""
-        } catch (_: Exception) {
-            ""
-        }
+        log("Config value missing without Provider fallback: $key")
+        return ""
     }
 
     private fun performScreenshot(context: Context) {
