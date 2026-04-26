@@ -541,7 +541,10 @@ internal class GestureActionDispatcher(
                 context,
                 GlobalActionHelper.GLOBAL_ACTION_TAKE_SCREENSHOT,
             )
-            if (result) return
+            if (result) {
+                log("screenshot via GLOBAL_ACTION_TAKE_SCREENSHOT")
+                return
+            }
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: false")
         } catch (t: Throwable) {
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: ${t.message}")
@@ -561,6 +564,7 @@ internal class GestureActionDispatcher(
                 )
                 injectMethod.invoke(inputManager, down, 0)
                 injectMethod.invoke(inputManager, up, 0)
+                log("screenshot via INPUT_SERVICE SYSRQ")
                 return
             }
         } catch (t: Throwable) {
@@ -578,6 +582,7 @@ internal class GestureActionDispatcher(
             )
             injectMethod.invoke(global, down, 0)
             injectMethod.invoke(global, up, 0)
+            log("screenshot via InputManagerGlobal SYSRQ")
             return
         } catch (t: Throwable) {
             errors.add("InputManagerGlobal: ${t.message}")
@@ -585,6 +590,7 @@ internal class GestureActionDispatcher(
 
         try {
             Runtime.getRuntime().exec("input keyevent 120")
+            log("screenshot via shell input SYSRQ")
         } catch (e: Exception) {
             errors.add("shell: ${e.message}")
             log("screenshot failed -> ${errors.joinToString(" | ")}")
@@ -608,7 +614,11 @@ internal class GestureActionDispatcher(
                     Class.forName("android.view.InputEvent"),
                     Int::class.javaPrimitiveType,
                 )
-                events.forEach { event -> injectMethod.invoke(inputManager, event, 0) }
+                events.forEach { event ->
+                    KeyManager.markInjectedEvent(event)
+                    injectMethod.invoke(inputManager, event, 0)
+                }
+                log("screenshot via injected power+volume chord")
                 true
             } else {
                 errors.add("screenshot chord: INPUT_SERVICE null")
