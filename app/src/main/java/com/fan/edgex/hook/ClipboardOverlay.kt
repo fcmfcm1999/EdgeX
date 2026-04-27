@@ -298,20 +298,10 @@ object ClipboardOverlay {
                 listContainer.addView(
                     buildItemRow(context, text, dp, textPrimary, textMuted, itemBg,
                         onPaste = {
-                            // Write the selected item back to the system clipboard first,
-                            // so GLOBAL_ACTION_PASTE uses the correct text regardless of
-                            // which entry was tapped.
-                            setClipboard(context, text)
                             dismiss()
-                            handler.postDelayed({
-                                try {
-                                    GlobalActionHelper.performGlobalAction(
-                                        context, GlobalActionHelper.GLOBAL_ACTION_PASTE
-                                    )
-                                } catch (t: Throwable) {
-                                    XposedBridge.log("$TAG: paste failed: ${t.message}")
-                                }
-                            }, 150)
+                            // Inject text directly as key events — no clipboard write,
+                            // so the system clipboard-change notification never appears.
+                            handler.postDelayed({ injectText(context, text) }, 150)
                         },
                         onDelete = {
                             deleteEntry(text)
@@ -392,13 +382,54 @@ object ClipboardOverlay {
         return row
     }
 
-    private fun setClipboard(context: Context, text: String) {
+    /**
+     * Inject [text] directly into the focused input field via key events,
+     * mirroring XPE's approach (y0.i0 / KeyCharacterMap.getEvents).
+     *
+     * For ASCII / mappable characters: KeyCharacterMap converts each char to
+     * DOWN+UP key events and we inject them one by one.
+     * For Unicode / non-ASCII that can't be mapped: fall back to the synthetic
+     * ACTION_MULTIPLE + KEYCODE_UNKNOWN "characters" KeyEvent, which Android's
+     * InputDispatcher forwards as commitText on the active input connection.
+     *
+     * Neither path writes to ClipboardManager, so the system clipboard-change
+     * notification (bottom-left toast) is never triggered.
+     */
+    private fun injectText(context: Context, text: String) {
+        if (text.isEmpty()) return
         try {
-            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
-            cm.setPrimaryClip(android.content.ClipData.newPlainText("EdgeX", text))
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE) ?: return
+            val injectMethod = inputManager.javaClass.getMethod(
+                "injectInputEvent",
+                android.view.InputEvent::class.java,
+                Int::class.javaPrimitiveType
+            )
+
+            val charMap = android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD)
+            val events = charMap.getEvents(text.toCharArray())
+
+            if (events != null) {
+                // ASCII / fully mappable — inject each DOWN+UP key event
+                for (event in events) {
+                    val timed = android.view.KeyEvent.changeTimeRepeat(
+                        event, android.os.SystemClock.uptimeMillis(), 0
+                    )
+                    injectMethod.invoke(inputManager, timed, 0)
+                }
+            } else {
+                // Unicode / non-ASCII — synthetic "characters" event
+                // (deprecated API but still processed by InputDispatcher on Android 15)
+                @Suppress("DEPRECATION")
+                val charEvent = android.view.KeyEvent(
+                    android.os.SystemClock.uptimeMillis(),
+                    text,
+                    android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+                    0
+                )
+                injectMethod.invoke(inputManager, charEvent, 0)
+            }
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG: setClipboard failed: ${t.message}")
+            XposedBridge.log("$TAG: injectText failed: ${t.message}")
         }
     }
 
