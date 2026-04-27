@@ -1,14 +1,11 @@
 package com.fan.edgex.hook
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -23,14 +20,11 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.graphics.ColorUtils
-import androidx.core.graphics.toColorInt
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
@@ -38,23 +32,24 @@ import de.robv.android.xposed.XposedBridge
 import java.lang.ref.WeakReference
 
 /**
- * Material 3-style text selection overlay for universal copy.
- * Shows highlighted text blocks in-place; user taps to select, then copies.
+ * Google Lens-style text selection overlay.
+ * Highlights text blocks in-place on the current screen.
+ * User taps blocks to select, then copies selected text.
  */
 object TextSelectionOverlay {
 
     private const val TAG = "EdgeX"
-    private const val AUTO_DISMISS_MS = 30_000L
+    private const val AUTO_DISMISS_MS = 30000L
 
     private val handler = Handler(Looper.getMainLooper())
-    private var overlayRef: WeakReference<View>? = null
-    private var sheetRef: WeakReference<View>? = null
+    private var currentOverlay: WeakReference<View>? = null
+    private var dismissRunnable: Runnable? = null
+
     private var hintView: WeakReference<TextView>? = null
     private var copyButton: WeakReference<TextView>? = null
     private var selectAllButton: WeakReference<TextView>? = null
-    private var autoDismissRunnable: Runnable? = null
 
-    fun isShowing(): Boolean = overlayRef?.get() != null
+    fun isShowing(): Boolean = currentOverlay?.get() != null
 
     private class SelectableBlock(
         val text: String,
@@ -75,41 +70,32 @@ object TextSelectionOverlay {
     }
 
     fun dismiss() {
-        autoDismissRunnable?.let { handler.removeCallbacks(it) }
-        autoDismissRunnable = null
+        val runnable = dismissRunnable
+        if (runnable != null) {
+            handler.removeCallbacks(runnable)
+            dismissRunnable = null
+        }
         hintView = null
         copyButton = null
         selectAllButton = null
-
-        val overlay = overlayRef?.get() ?: return
-        overlayRef = null
-        sheetRef = null
-
-        // Animate out then remove from WM
-        ObjectAnimator.ofFloat(overlay, "alpha", overlay.alpha, 0f).apply {
-            duration = 180
-            addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    try {
-                        val wm = overlay.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                        wm.removeViewImmediate(overlay)
-                    } catch (t: Throwable) {
-                        XposedBridge.log("$TAG: removeView failed: ${t.message}")
-                    }
-                }
-            })
-            start()
+        val overlay = currentOverlay?.get() ?: return
+        try {
+            val wm = overlay.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            wm.removeViewImmediate(overlay)
+            currentOverlay = null
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: TextSelectionOverlay dismiss failed, retrying: ${t.message}")
+            handler.postDelayed({ dismiss() }, 500)
         }
     }
 
-    // ── Color helpers ──────────────────────────────────────────────────────────
-
     private fun readAccentColor(context: Context): Int {
-        val snapshot = HookConfigSnapshot.readFromHookFile()
-        return when (snapshot[AppConfig.THEME_PRESET]) {
-            "custom" -> runCatching {
-                (snapshot[AppConfig.THEME_CUSTOM_COLOR] ?: "").toColorInt()
-            }.getOrElse { "#326D32".toColorInt() }
+        val presetId = queryConfig(context, AppConfig.THEME_PRESET)
+        return when (presetId) {
+            "custom" -> {
+                val hex = queryConfig(context, AppConfig.THEME_CUSTOM_COLOR)
+                runCatching { hex.toColorInt() }.getOrElse { "#326D32".toColorInt() }
+            }
             "classic" -> "#00796B".toColorInt()
             "cedar"   -> "#496B3D".toColorInt()
             "ocean"   -> "#2F6F8F".toColorInt()
@@ -118,15 +104,19 @@ object TextSelectionOverlay {
         }
     }
 
-    private fun onColor(bg: Int): Int =
-        if (ColorUtils.calculateLuminance(bg) > 0.45) Color.BLACK else Color.WHITE
+    private fun queryConfig(context: Context, key: String): String {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        if (snapshot.containsKey(key)) return snapshot.getValue(key)
 
-    // ── Overlay construction ───────────────────────────────────────────────────
+        return ""
+    }
 
     private fun addOverlay(context: Context, blocks: List<SelectableBlock>) {
         val density = context.resources.displayMetrics.density
+        val dp = { value: Int -> (value * density + 0.5f).toInt() }
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val accent = readAccentColor(context)
+
+        val accentColor = readAccentColor(context)
 
         val root = object : FrameLayout(context) {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -139,11 +129,10 @@ object TextSelectionOverlay {
         }.apply {
             isFocusableInTouchMode = true
             isFocusable = true
-            alpha = 0f
         }
 
-        // Text blocks canvas layer
-        val blocksView = TextBlocksView(context, blocks, density, accent,
+        // Custom view for drawing and selecting text blocks
+        val blocksView = TextBlocksView(context, blocks, density, accentColor,
             onEmptyTap = { dismiss() },
             onSelectionChanged = { updateToolbarState(blocks) }
         )
@@ -152,192 +141,136 @@ object TextSelectionOverlay {
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Material 3 bottom sheet
-        val sheet = buildBottomSheet(context, blocks, density, accent)
-        val sheetParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
+        // Bottom toolbar
+        val toolbar = createToolbar(context, blocks, density, accentColor)
+        val toolbarParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = Gravity.BOTTOM }
-        root.addView(sheet, sheetParams)
-        sheetRef = WeakReference(sheet)
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = dp(48)
+        }
+        root.addView(toolbar, toolbarParams)
 
         @Suppress("DEPRECATION")
-        wm.addView(root, WindowManager.LayoutParams(
+        val windowParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
-        ))
-        overlayRef = WeakReference(root)
-
-        // Animate in after first layout
-        sheet.viewTreeObserver.addOnGlobalLayoutListener(
-            object : ViewTreeObserver.OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    sheet.viewTreeObserver.removeOnGlobalLayoutListener(this)
-                    val slideDistance = sheet.height.toFloat().coerceAtLeast(300f) + 40f
-                    sheet.translationY = slideDistance
-                    ObjectAnimator.ofFloat(root, "alpha", 0f, 1f).apply {
-                        duration = 200
-                        start()
-                    }
-                    ObjectAnimator.ofFloat(sheet, "translationY", slideDistance, 0f).apply {
-                        duration = 380
-                        interpolator = OvershootInterpolatorCompat(0.65f)
-                        start()
-                    }
-                }
-            }
         )
 
-        autoDismissRunnable = Runnable { dismiss() }.also {
-            handler.postDelayed(it, AUTO_DISMISS_MS)
-        }
+        wm.addView(root, windowParams)
+        currentOverlay = WeakReference(root)
+
+        val runnable = Runnable { dismiss() }
+        dismissRunnable = runnable
+        handler.postDelayed(runnable, AUTO_DISMISS_MS)
     }
 
-    // ── Bottom sheet (Material 3 style) ────────────────────────────────────────
-
-    private fun buildBottomSheet(
+    private fun createToolbar(
         context: Context,
         blocks: List<SelectableBlock>,
         density: Float,
-        accent: Int
-    ): View {
-        val dp = { v: Int -> (v * density + 0.5f).toInt() }
+        accentColor: Int
+    ): LinearLayout {
+        val dp = { value: Int -> (value * density + 0.5f).toInt() }
 
-        // M3 dark surface tokens
-        val surface      = "#1C1B1F".toColorInt()
-        val surfaceVar   = "#49454F".toColorInt()   // outline-variant for divider/handle
-        val onSurf       = "#E6E1E5".toColorInt()
-        val onSurfVar    = "#CAC4D0".toColorInt()
-        val tonalSurf    = ColorUtils.blendARGB(surface, accent, 0.12f)
-        val onAccent     = onColor(accent)
-
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(surface)
-                // Rounded top corners only
-                cornerRadii = floatArrayOf(
-                    dp(28).toFloat(), dp(28).toFloat(),
-                    dp(28).toFloat(), dp(28).toFloat(),
-                    0f, 0f, 0f, 0f
-                )
-            }
-            elevation = dp(6).toFloat()
-            setPadding(dp(24), dp(12), dp(24), dp(28))
-            setOnTouchListener { _, _ -> true }  // consume touches
-        }
-
-        // Handle pill
-        container.addView(View(context).apply {
-            background = GradientDrawable().apply {
-                setColor(surfaceVar)
-                cornerRadius = dp(2).toFloat()
-            }
-        }, LinearLayout.LayoutParams(dp(32), dp(4)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = dp(20)
-        })
-
-        // Hint / selected-count label
-        val hint = TextView(context).apply {
-            text = ModuleRes.getString(R.string.copy_tap_to_select)
-            setTextColor(onSurfVar)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            gravity = Gravity.CENTER
-            letterSpacing = 0.01f
-        }
-        hintView = WeakReference(hint)
-        container.addView(hint, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = dp(16) })
-
-        // Thin divider
-        container.addView(View(context).apply {
-            setBackgroundColor(ColorUtils.setAlphaComponent(surfaceVar, 80))
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-            bottomMargin = dp(16)
-        })
-
-        // Action row
-        val row = LinearLayout(context).apply {
+        val toolbar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor("#E8222222".toColorInt())
+                cornerRadius = dp(28).toFloat()
+            }
+            setPadding(dp(16), dp(10), dp(8), dp(10))
+            elevation = dp(8).toFloat()
+            // Consume touches so they don't reach the blocks view
+            setOnTouchListener { _, _ -> true }
         }
 
-        // "Select All" — tonal button
-        val selectAllBtn = makeButton(
-            context, density,
-            text = ModuleRes.getString(R.string.copy_select_all),
-            bgColor = tonalSurf,
-            textColor = onSurf
+        // Hint / selected count
+        val hint = TextView(context).apply {
+            text = ModuleRes.getString(R.string.copy_tap_to_select)
+            setTextColor("#AAAAAA".toColorInt())
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        }
+        hintView = WeakReference(hint)
+        toolbar.addView(hint, LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+        ).apply { marginEnd = dp(12) })
+
+        // Select All button
+        val selectAll = createToolbarButton(context, density,
+            ModuleRes.getString(R.string.copy_select_all),
+            "#3A3A3A".toColorInt(),
+            "#CCCCCC".toColorInt()
         ) {
             val allSelected = blocks.all { it.selected }
             blocks.forEach { it.selected = !allSelected }
-            (overlayRef?.get() as? ViewGroup)?.getChildAt(0)?.invalidate()
+            (currentOverlay?.get() as? ViewGroup)?.getChildAt(0)?.invalidate()
             updateToolbarState(blocks)
         }
-        selectAllButton = WeakReference(selectAllBtn)
-        row.addView(selectAllBtn, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            marginEnd = dp(12)
-        })
+        selectAllButton = WeakReference(selectAll)
+        toolbar.addView(selectAll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)
+        ).apply { marginEnd = dp(6) })
 
-        // "Copy" — filled button (accent), disabled initially
-        val copyBtn = makeButton(
-            context, density,
-            text = ModuleRes.getString(R.string.copy_copy),
-            bgColor = accent,
-            textColor = onAccent
+        // Copy button
+        val copy = createToolbarButton(context, density,
+            ModuleRes.getString(R.string.copy_copy),
+            accentColor,
+            Color.WHITE
         ) {
             val selected = blocks.filter { it.selected }
             if (selected.isNotEmpty()) {
                 val text = selected.joinToString("\n") { it.text }
                 copyToClipboard(context, text)
-                Toast.makeText(
-                    context,
-                    ModuleRes.getString(R.string.copy_copied_count, selected.size),
-                    Toast.LENGTH_SHORT
-                ).show()
+                val msg = ModuleRes.getString(R.string.copy_copied_count, selected.size)
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 dismiss()
             }
         }
-        copyBtn.alpha = 0.38f
-        copyBtn.isEnabled = false
-        copyButton = WeakReference(copyBtn)
-        row.addView(copyBtn, LinearLayout.LayoutParams(0, dp(48), 1f))
+        copy.alpha = 0.4f
+        copy.isEnabled = false
+        copyButton = WeakReference(copy)
+        toolbar.addView(copy, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)
+        ).apply { marginEnd = dp(6) })
 
-        container.addView(row, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
+        // Close button
+        val close = createToolbarButton(context, density,
+            "×",
+            "#3A3A3A".toColorInt(),
+            "#CCCCCC".toColorInt()
+        ) { dismiss() }
+        close.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        toolbar.addView(close, LinearLayout.LayoutParams(dp(34), dp(34)))
 
-        return container
+        return toolbar
     }
 
-    private fun makeButton(
+    private fun createToolbarButton(
         context: Context,
         density: Float,
-        text: String,
+        label: String,
         bgColor: Int,
         textColor: Int,
         onClick: () -> Unit
     ): TextView {
-        val dp = { v: Int -> (v * density + 0.5f).toInt() }
+        val dp = { value: Int -> (value * density + 0.5f).toInt() }
         return TextView(context).apply {
-            this.text = text
+            text = label
             setTextColor(textColor)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.01f
             gravity = Gravity.CENTER
-            setPadding(dp(16), 0, dp(16), 0)
+            setPadding(dp(14), 0, dp(14), 0)
             background = GradientDrawable().apply {
                 setColor(bgColor)
-                cornerRadius = dp(12).toFloat()
+                cornerRadius = dp(17).toFloat()
             }
             setOnClickListener { onClick() }
         }
@@ -351,14 +284,8 @@ object TextSelectionOverlay {
             ModuleRes.getString(R.string.copy_tap_to_select)
         }
         copyButton?.get()?.apply {
-            val enabled = count > 0
-            isEnabled = enabled
-            animate().alpha(if (enabled) 1f else 0.38f).setDuration(120).start()
-            text = if (enabled) {
-                "${ModuleRes.getString(R.string.copy_copy)}  ·  $count"
-            } else {
-                ModuleRes.getString(R.string.copy_copy)
-            }
+            alpha = if (count > 0) 1f else 0.4f
+            isEnabled = count > 0
         }
         selectAllButton?.get()?.text = if (blocks.all { it.selected }) {
             ModuleRes.getString(R.string.copy_deselect)
@@ -376,81 +303,82 @@ object TextSelectionOverlay {
         }
     }
 
-    // ── Block canvas view ──────────────────────────────────────────────────────
-
+    /**
+     * Custom view that draws highlight boxes at text positions and handles tap selection.
+     */
     private class TextBlocksView(
         context: Context,
         private val blocks: List<SelectableBlock>,
         private val density: Float,
-        private val accent: Int,
+        accentColor: Int,
         private val onEmptyTap: () -> Unit,
         private val onSelectionChanged: () -> Unit
     ) : View(context) {
 
-        private val cornerRadius = 6f * density
-        private val tapPadding   = (10 * density).toInt()
-        private val tapSlopSq    = 24 * density * 24 * density
+        private val cornerRadius = 4f * density
+        private val tapPadding = (10 * density).toInt()
+        private val tapSlopSq = (24 * density * 24 * density)
 
         private val scrimPaint = Paint().apply {
-            color = "#40000000".toColorInt()
+            color = "#28000000".toColorInt()
             style = Paint.Style.FILL
         }
-        private val normalFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+
+        private val normalFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = "#18FFFFFF".toColorInt()
             style = Paint.Style.FILL
         }
-        private val normalStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+
+        private val normalStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = "#44FFFFFF".toColorInt()
             style = Paint.Style.STROKE
-            strokeWidth = 1.5f * density
-        }
-        private val selFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ColorUtils.setAlphaComponent(accent, 90)
-            style = Paint.Style.FILL
-        }
-        private val selStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ColorUtils.setAlphaComponent(accent, 220)
-            style = Paint.Style.STROKE
-            strokeWidth = 2.5f * density
+            strokeWidth = 1f * density
         }
 
-        private var rippleBlock: SelectableBlock? = null
-        private var rippleAlpha = 0f
+        private val selectedFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = (accentColor and 0x00FFFFFF) or (0x55 shl 24)
+            style = Paint.Style.FILL
+        }
+
+        private val selectedStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = (accentColor and 0x00FFFFFF) or (0xDD.toInt() shl 24)
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * density
+        }
 
         private var downX = 0f
         private var downY = 0f
         private var downBlock: SelectableBlock? = null
         private val tmpRect = RectF()
-        private val screenPos = IntArray(2)
+
+        // Offset between view-local coords and screen coords
+        private var viewOffsetX = 0
+        private var viewOffsetY = 0
+        private val locationOnScreen = IntArray(2)
 
         override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
             super.onLayout(changed, left, top, right, bottom)
-            getLocationOnScreen(screenPos)
+            getLocationOnScreen(locationOnScreen)
+            viewOffsetX = locationOnScreen[0]
+            viewOffsetY = locationOnScreen[1]
         }
 
         override fun onDraw(canvas: Canvas) {
             canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), scrimPaint)
             for (block in blocks) {
+                // Convert screen coords → view-local coords for drawing
                 tmpRect.set(
-                    block.bounds.left.toFloat()  - screenPos[0],
-                    block.bounds.top.toFloat()   - screenPos[1],
-                    block.bounds.right.toFloat() - screenPos[0],
-                    block.bounds.bottom.toFloat()- screenPos[1]
+                    block.bounds.left.toFloat() - viewOffsetX,
+                    block.bounds.top.toFloat() - viewOffsetY,
+                    block.bounds.right.toFloat() - viewOffsetX,
+                    block.bounds.bottom.toFloat() - viewOffsetY
                 )
                 if (block.selected) {
-                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, selFill)
-                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, selStroke)
+                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, selectedFillPaint)
+                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, selectedStrokePaint)
                 } else {
-                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, normalFill)
-                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, normalStroke)
-                    // Ripple flash on tap
-                    if (block === rippleBlock && rippleAlpha > 0f) {
-                        val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                            color = ColorUtils.setAlphaComponent(Color.WHITE, (rippleAlpha * 64).toInt())
-                            style = Paint.Style.FILL
-                        }
-                        canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, ripplePaint)
-                    }
+                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, normalFillPaint)
+                    canvas.drawRoundRect(tmpRect, cornerRadius, cornerRadius, normalStrokePaint)
                 }
             }
         }
@@ -467,38 +395,18 @@ object TextSelectionOverlay {
                     val dy = event.rawY - downY
                     if (dx * dx + dy * dy < tapSlopSq) {
                         val upBlock = findBlockAt(event.rawX, event.rawY)
-                        when {
-                            upBlock != null && upBlock === downBlock -> {
-                                upBlock.selected = !upBlock.selected
-                                playRipple(upBlock)
-                                onSelectionChanged()
-                            }
-                            upBlock == null && downBlock == null -> onEmptyTap()
+                        if (upBlock != null && upBlock === downBlock) {
+                            upBlock.selected = !upBlock.selected
+                            invalidate()
+                            onSelectionChanged()
+                        } else if (upBlock == null && downBlock == null) {
+                            onEmptyTap()
                         }
                     }
                     downBlock = null
                 }
             }
             return true
-        }
-
-        private fun playRipple(block: SelectableBlock) {
-            rippleBlock = block
-            ValueAnimator.ofFloat(1f, 0f).apply {
-                duration = 280
-                addUpdateListener {
-                    rippleAlpha = it.animatedValue as Float
-                    invalidate()
-                }
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        rippleBlock = null
-                        invalidate()
-                    }
-                })
-                start()
-            }
-            invalidate()
         }
 
         private fun findBlockAt(x: Float, y: Float): SelectableBlock? {
@@ -508,8 +416,9 @@ object TextSelectionOverlay {
             var bestArea = Int.MAX_VALUE
             for (block in blocks) {
                 val b = block.bounds
-                if (ix in (b.left - tapPadding)..(b.right + tapPadding) &&
-                    iy in (b.top - tapPadding)..(b.bottom + tapPadding)) {
+                if (ix >= b.left - tapPadding && ix <= b.right + tapPadding &&
+                    iy >= b.top - tapPadding && iy <= b.bottom + tapPadding
+                ) {
                     val area = b.width() * b.height()
                     if (area < bestArea) {
                         best = block
@@ -518,18 +427,6 @@ object TextSelectionOverlay {
                 }
             }
             return best
-        }
-    }
-
-    // ── Interpolator ──────────────────────────────────────────────────────────
-
-    private class OvershootInterpolatorCompat(private val tension: Float) :
-        android.view.animation.Interpolator {
-        override fun getInterpolation(t: Float): Float {
-            // Classic overshoot: f(t) = (tension+1)*t^3 - tension*t^2
-            val s = tension
-            val t1 = t - 1f
-            return t1 * t1 * ((s + 1f) * t1 + s) + 1f
         }
     }
 }
