@@ -136,7 +136,8 @@ object ClipboardOverlay {
                     dismiss()
                     return true
                 }
-                return super.dispatchTouchEvent(ev)
+                super.dispatchTouchEvent(ev)
+                return true
             }
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                 if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
@@ -172,7 +173,8 @@ object ClipboardOverlay {
             width  = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
             flags  = WindowManager.LayoutParams.FLAG_DIM_BEHIND or
-                     WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                     WindowManager.LayoutParams.FLAG_BLUR_BEHIND or
+                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
             dimAmount       = 0.25f
             blurBehindRadius = 36
         })
