@@ -63,6 +63,20 @@ object UniversalCopyManager {
         bridge.collectAll(onResult)
     }
 
+    /**
+     * Insert [text] at the cursor of the currently focused input field via
+     * AccessibilityNodeInfo ACTION_SET_TEXT. Used for Unicode (e.g. Chinese)
+     * where KeyCharacterMap-based key-event injection is not viable.
+     */
+    fun injectIntoFocusedField(context: Context, text: String, onComplete: (Boolean) -> Unit) {
+        val bridge = getOrCreateService(context)
+        if (bridge == null) {
+            onComplete(false)
+            return
+        }
+        bridge.injectIntoFocused(text, onComplete)
+    }
+
     private fun getOrCreateService(context: Context): BridgeAccessibilityService? {
         service?.let { return it }
         return synchronized(this) {
@@ -138,6 +152,70 @@ object UniversalCopyManager {
             } catch (t: Throwable) {
                 XposedBridge.log("$TAG: Universal copy failed: ${t.message}")
                 onResult(CollectResult(CollectStatus.UNAVAILABLE))
+            }
+        }
+
+        fun injectIntoFocused(text: String, onComplete: (Boolean) -> Unit) {
+            try {
+                if (!accessibilityManager.isEnabled) {
+                    setAccessibilityEnabled(true)
+                    handler.postDelayed({
+                        runInjection(text, disableAfter = true, onComplete)
+                    }, RETRY_DELAY_MS)
+                    return
+                }
+                runInjection(text, disableAfter = false, onComplete)
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: text injection failed: ${t.message}")
+                onComplete(false)
+            }
+        }
+
+        private fun runInjection(text: String, disableAfter: Boolean, onComplete: (Boolean) -> Unit) {
+            var success = false
+            try {
+                val root = try { getRootInActiveWindow() } catch (_: Throwable) { null }
+                val focused = try {
+                    root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                } catch (_: Throwable) { null }
+                if (focused != null) {
+                    success = insertAtSelection(focused, text)
+                }
+            } finally {
+                if (disableAfter) setAccessibilityEnabled(false)
+                onComplete(success)
+            }
+        }
+
+        private fun insertAtSelection(node: AccessibilityNodeInfo, text: String): Boolean {
+            return try {
+                val current = node.text?.toString() ?: ""
+                var selStart = node.textSelectionStart
+                var selEnd   = node.textSelectionEnd
+                if (selStart < 0) selStart = current.length
+                if (selEnd   < selStart) selEnd = selStart
+                selStart = selStart.coerceAtMost(current.length)
+                selEnd   = selEnd.coerceAtMost(current.length)
+
+                val newText = current.substring(0, selStart) + text + current.substring(selEnd)
+                val args = android.os.Bundle().apply {
+                    putCharSequence(
+                        AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText
+                    )
+                }
+                if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return false
+
+                // Move cursor to end of inserted text
+                val newCursor = selStart + text.length
+                val selArgs = android.os.Bundle().apply {
+                    putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, newCursor)
+                    putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, newCursor)
+                }
+                node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selArgs)
+                true
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: insertAtSelection failed: ${t.message}")
+                false
             }
         }
 

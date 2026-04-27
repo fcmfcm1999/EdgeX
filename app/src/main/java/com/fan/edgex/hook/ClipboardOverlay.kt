@@ -275,8 +275,9 @@ object ClipboardOverlay {
 
         // ── Scrollable list ──
         val listContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val scrollView = ScrollView(context).apply {
-            isVerticalScrollBarEnabled = false
+        val scrollView = MaxHeightScrollView(context, (screenH * 0.65f).toInt()).apply {
+            isVerticalScrollBarEnabled = true
+            scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
             overScrollMode = View.OVER_SCROLL_NEVER
             addView(listContainer, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -299,9 +300,7 @@ object ClipboardOverlay {
                     buildItemRow(context, text, dp, textPrimary, textMuted, itemBg,
                         onPaste = {
                             dismiss()
-                            // Inject text directly as key events — no clipboard write,
-                            // so the system clipboard-change notification never appears.
-                            handler.postDelayed({ injectText(context, text) }, 150)
+                            handler.postDelayed({ pasteText(context, text) }, 150)
                         },
                         onDelete = {
                             deleteEntry(text)
@@ -321,15 +320,6 @@ object ClipboardOverlay {
                 }
             }
 
-            // Clamp scroll height to 65% of screen after items are laid out
-            scrollView.post {
-                val maxH = (screenH * 0.65f).toInt()
-                if (listContainer.height > maxH) {
-                    scrollView.layoutParams = (scrollView.layoutParams as LinearLayout.LayoutParams)
-                        .also { it.height = maxH }
-                    scrollView.requestLayout()
-                }
-            }
         }
 
         rebuildList(initialItems)
@@ -380,6 +370,29 @@ object ClipboardOverlay {
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         return row
+    }
+
+    private class MaxHeightScrollView(
+        context: Context,
+        private val maxHeight: Int
+    ) : ScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val cappedHeightSpec = MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST)
+            super.onMeasure(widthMeasureSpec, cappedHeightSpec)
+        }
+    }
+
+    /**
+     * Paste [text] without writing to ClipboardManager, avoiding the system
+     * clipboard-change notification. Accessibility insertion handles Unicode
+     * input methods better; key-event injection remains a fallback.
+     */
+    private fun pasteText(context: Context, text: String) {
+        UniversalCopyManager.injectIntoFocusedField(context, text) { inserted ->
+            if (!inserted) {
+                handler.post { injectText(context, text) }
+            }
+        }
     }
 
     /**
