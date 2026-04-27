@@ -30,6 +30,7 @@ object GlobalActionHelper {
     const val GLOBAL_ACTION_POWER_DIALOG = 6
     const val GLOBAL_ACTION_LOCK_SCREEN = 8
     const val GLOBAL_ACTION_TAKE_SCREENSHOT = 9
+    const val GLOBAL_ACTION_PASTE = 11
 
     private var fakeService: FakeAccessibilityService? = null
 
