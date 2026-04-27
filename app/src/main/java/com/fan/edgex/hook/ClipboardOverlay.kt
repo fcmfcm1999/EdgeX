@@ -96,10 +96,6 @@ object ClipboardOverlay {
         handler.post {
             dismiss()
             val items = historySnapshot()
-            if (items.isEmpty()) {
-                showToast(context, ModuleRes.getString(R.string.clipboard_empty))
-                return@post
-            }
             try {
                 addOverlay(context, items)
             } catch (t: Throwable) {
@@ -331,6 +327,20 @@ object ClipboardOverlay {
         fun rebuildList(items: List<String>) {
             listContainer.removeAllViews()
             countView.text = ModuleRes.getString(R.string.clipboard_count, items.size)
+            clearAllBtn.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+
+            if (items.isEmpty()) {
+                listContainer.addView(TextView(context).apply {
+                    text = ModuleRes.getString(R.string.clipboard_empty)
+                    textSize = 14f
+                    setTextColor(textMuted)
+                    gravity = Gravity.CENTER
+                    setPadding(dpi(20), dpi(28), dpi(20), dpi(28))
+                }, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ))
+                return
+            }
 
             items.forEachIndexed { index, text ->
                 listContainer.addView(
@@ -342,7 +352,7 @@ object ClipboardOverlay {
                         onDelete = {
                             deleteEntry(text)
                             val updated = historySnapshot()
-                            if (updated.isEmpty()) dismiss() else rebuildList(updated)
+                            rebuildList(updated)
                         }
                     ),
                     LinearLayout.LayoutParams(
@@ -493,9 +503,4 @@ object ClipboardOverlay {
         }
     }
 
-    private fun showToast(context: Context, text: String) {
-        try {
-            android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT).show()
-        } catch (_: Throwable) { }
-    }
 }
