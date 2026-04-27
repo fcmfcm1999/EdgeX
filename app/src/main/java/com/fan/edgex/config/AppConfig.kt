@@ -12,6 +12,7 @@ object AppConfig {
     const val HAS_MIGRATED_FREEZER_LIST = "has_migrated_freezer_list"
     const val THEME_PRESET = "theme_preset"
     const val THEME_CUSTOM_COLOR = "theme_custom_color"
+    const val HAPTIC_FEEDBACK = "haptic_feedback_enabled"
 
     val ZONES = listOf(
         "left_top",

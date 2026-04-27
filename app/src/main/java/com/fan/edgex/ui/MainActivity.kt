@@ -90,6 +90,12 @@ class MainActivity : AppCompatActivity() {
         cbArcDrawer.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.FREEZER_ARC_DRAWER, isChecked) }
         findViewById<View>(R.id.item_arc_drawer).setOnClickListener { cbArcDrawer.performClick() }
 
+        // 1.6 Haptic Feedback Toggle
+        val cbHaptic = findViewById<android.widget.CheckBox>(R.id.checkbox_haptic_feedback)
+        cbHaptic.isChecked = getConfigBool(AppConfig.HAPTIC_FEEDBACK)
+        cbHaptic.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.HAPTIC_FEEDBACK, isChecked) }
+        findViewById<View>(R.id.item_haptic_feedback).setOnClickListener { cbHaptic.performClick() }
+
         // 2. Restart SystemUI
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
             val result = com.fan.edgex.utils.findProcessAndKill("com.android.systemui")
