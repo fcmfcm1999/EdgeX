@@ -96,9 +96,16 @@ class MainActivity : AppCompatActivity() {
 
         // 1.6 Haptic Feedback Toggle
         val cbHaptic = findViewById<android.widget.CheckBox>(R.id.checkbox_haptic_feedback)
+        val hapticTypeContent = findViewById<View>(R.id.item_haptic_feedback_type)
+        val hapticArrow = findViewById<android.widget.ImageView>(R.id.arrow_haptic_feedback)
+        var isHapticExpanded = false
         cbHaptic.isChecked = getConfigBool(AppConfig.HAPTIC_FEEDBACK)
         cbHaptic.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.HAPTIC_FEEDBACK, isChecked) }
-        findViewById<View>(R.id.item_haptic_feedback).setOnClickListener { cbHaptic.performClick() }
+        findViewById<View>(R.id.item_haptic_feedback).setOnClickListener {
+            isHapticExpanded = !isHapticExpanded
+            hapticTypeContent.visibility = if (isHapticExpanded) View.VISIBLE else View.GONE
+            hapticArrow.rotation = if (isHapticExpanded) 180f else 0f
+        }
         setupHapticFeedbackType()
 
         // 2. Restart SystemUI

@@ -415,6 +415,14 @@
                         android:layout_height="wrap_content"
                         android:checked="false"
                         android:buttonTint="@color/ui_checkbox_tint" />
+
+                    <ImageView
+                        android:id="@+id/arrow_haptic_feedback"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_expand_more"
+                        app:tint="@color/ui_text_secondary" />
                 </LinearLayout>
 
                 <!-- Item 4.7: Haptic Feedback Type -->
@@ -426,7 +434,8 @@
                     android:paddingStart="88dp"
                     android:paddingEnd="16dp"
                     android:paddingTop="0dp"
-                    android:paddingBottom="16dp">
+                    android:paddingBottom="16dp"
+                    android:visibility="gone">
 
                     <TextView
                         android:layout_width="wrap_content"
