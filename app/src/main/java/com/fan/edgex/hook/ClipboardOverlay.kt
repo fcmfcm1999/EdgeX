@@ -22,6 +22,7 @@ import android.widget.TextView
 import androidx.core.graphics.toColorInt
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookClipboardHistoryStore
 import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 import java.lang.ref.WeakReference
@@ -44,18 +45,48 @@ object ClipboardOverlay {
     // ── History ────────────────────────────────────────────────────────────────
 
     private val history = mutableListOf<String>()
+    private var historyLoaded = false
 
     @Synchronized
     fun onClipboardChanged(text: String?) {
         if (text.isNullOrEmpty()) return
+        ensureHistoryLoadedLocked()
         history.remove(text)
         history.add(0, text)
         if (history.size > MAX_HISTORY) history.removeAt(history.lastIndex)
+        persistHistoryLocked()
     }
 
-    @Synchronized private fun historySnapshot() = ArrayList(history)
-    @Synchronized private fun deleteEntry(text: String) { history.remove(text) }
-    @Synchronized private fun clearAll() { history.clear() }
+    @Synchronized private fun historySnapshot(): ArrayList<String> {
+        ensureHistoryLoadedLocked()
+        return ArrayList(history)
+    }
+
+    @Synchronized private fun deleteEntry(text: String) {
+        ensureHistoryLoadedLocked()
+        if (history.remove(text)) {
+            persistHistoryLocked()
+        }
+    }
+
+    @Synchronized private fun clearAll() {
+        ensureHistoryLoadedLocked()
+        history.clear()
+        persistHistoryLocked()
+    }
+
+    private fun ensureHistoryLoadedLocked() {
+        if (historyLoaded) return
+        history.clear()
+        history.addAll(HookClipboardHistoryStore.readForHook(MAX_HISTORY))
+        historyLoaded = true
+    }
+
+    private fun persistHistoryLocked() {
+        if (!HookClipboardHistoryStore.writeForHook(history, MAX_HISTORY)) {
+            XposedBridge.log("$TAG: Clipboard history persist failed")
+        }
+    }
 
     // ── Show / dismiss ─────────────────────────────────────────────────────────
 
