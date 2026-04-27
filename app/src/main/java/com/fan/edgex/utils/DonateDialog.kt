@@ -4,7 +4,9 @@ import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import androidx.core.graphics.toColorInt
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
@@ -18,6 +20,8 @@ import android.widget.Toast
 import com.fan.edgex.R
 
 object DonateDialog {
+
+    private const val KOFI_URL = "https://ko-fi.com/fantasy1999"
 
     // Crypto addresses
     private const val ETH_ADDRESS = "0xf309912220eaba0e7ff7448ada60b509a7b82467"
@@ -80,7 +84,14 @@ object DonateDialog {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).also { it.bottomMargin = dp(8f) })
 
-        // Buttons row 2 (Crypto)
+        // Buttons row 2 (Ko-fi)
+        val kofiBtn = makeButton(context, context.getString(R.string.donate_kofi), "#13C3FF".toColorInt())
+        root.addView(kofiBtn, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(44f)
+        ).also { it.bottomMargin = dp(8f) })
+
+        // Buttons row 3 (Crypto)
         val cryptoBtn = makeButton(context, context.getString(R.string.donate_crypto), "#F7931A".toColorInt())
         root.addView(cryptoBtn, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -106,6 +117,10 @@ object DonateDialog {
         wechatBtn.setOnClickListener {
             dialog.dismiss()
             showWechatQr(context)
+        }
+        kofiBtn.setOnClickListener {
+            dialog.dismiss()
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
         }
         cryptoBtn.setOnClickListener {
             dialog.dismiss()

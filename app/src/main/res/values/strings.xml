@@ -52,6 +52,7 @@
     <string name="donate_subtitle">Buy me more AI token</string>
     <string name="donate_alipay">Alipay</string>
     <string name="donate_wechat">WeChat Pay</string>
+    <string name="donate_kofi">Ko-fi</string>
     <string name="donate_alipay_scan">Scan with Alipay to donate</string>
     <string name="donate_wechat_scan">Scan with WeChat to donate</string>
     <string name="donate_crypto">Crypto</string>
