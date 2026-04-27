@@ -13,6 +13,12 @@ object AppConfig {
     const val THEME_PRESET = "theme_preset"
     const val THEME_CUSTOM_COLOR = "theme_custom_color"
     const val HAPTIC_FEEDBACK = "haptic_feedback_enabled"
+    const val HAPTIC_FEEDBACK_TYPE = "haptic_feedback_type"
+
+    const val HAPTIC_FEEDBACK_TYPE_CLICK = "click"
+    const val HAPTIC_FEEDBACK_TYPE_TICK = "tick"
+    const val HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK = "heavy_click"
+    const val HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK = "double_click"
 
     val ZONES = listOf(
         "left_top",

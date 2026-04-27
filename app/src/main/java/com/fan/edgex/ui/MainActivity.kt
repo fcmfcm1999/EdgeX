@@ -3,14 +3,16 @@ package com.fan.edgex.ui
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
-import androidx.core.net.toUri
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.net.toUri
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.getConfigBool
+import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.utils.UpdateChecker
 
@@ -95,6 +97,8 @@ class MainActivity : AppCompatActivity() {
         cbHaptic.isChecked = getConfigBool(AppConfig.HAPTIC_FEEDBACK)
         cbHaptic.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.HAPTIC_FEEDBACK, isChecked) }
         findViewById<View>(R.id.item_haptic_feedback).setOnClickListener { cbHaptic.performClick() }
+        refreshHapticFeedbackType()
+        findViewById<View>(R.id.item_haptic_feedback_type).setOnClickListener { showHapticFeedbackTypeDialog() }
 
         // 2. Restart SystemUI
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
@@ -152,4 +156,39 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         ThemeManager.applyToActivity(this)
     }
+
+    private fun showHapticFeedbackTypeDialog() {
+        val types = hapticFeedbackTypes()
+        val currentValue = getConfigString(
+            AppConfig.HAPTIC_FEEDBACK_TYPE,
+            AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK
+        )
+        val checkedIndex = types.indexOfFirst { it.first == currentValue }.takeIf { it >= 0 } ?: 0
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.haptic_feedback_type_dialog_title)
+            .setSingleChoiceItems(types.map { getString(it.second) }.toTypedArray(), checkedIndex) { dialog, which ->
+                putConfig(AppConfig.HAPTIC_FEEDBACK_TYPE, types[which].first)
+                refreshHapticFeedbackType()
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun refreshHapticFeedbackType() {
+        val value = getConfigString(
+            AppConfig.HAPTIC_FEEDBACK_TYPE,
+            AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK
+        )
+        val labelRes = hapticFeedbackTypes().firstOrNull { it.first == value }?.second
+            ?: R.string.haptic_feedback_type_click
+        findViewById<TextView>(R.id.text_haptic_feedback_type).text = getString(labelRes)
+    }
+
+    private fun hapticFeedbackTypes(): List<Pair<String, Int>> = listOf(
+        AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK to R.string.haptic_feedback_type_click,
+        AppConfig.HAPTIC_FEEDBACK_TYPE_TICK to R.string.haptic_feedback_type_tick,
+        AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK to R.string.haptic_feedback_type_heavy_click,
+        AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK to R.string.haptic_feedback_type_double_click,
+    )
 }

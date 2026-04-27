@@ -23,6 +23,12 @@
     <string name="menu_arc_drawer_desc">Display app list in arc on right side</string>
     <string name="menu_haptic_feedback">Haptic Feedback</string>
     <string name="menu_haptic_feedback_desc">Vibrate on action trigger</string>
+    <string name="menu_haptic_feedback_type">Haptic Type</string>
+    <string name="haptic_feedback_type_dialog_title">Haptic Type</string>
+    <string name="haptic_feedback_type_click">Click</string>
+    <string name="haptic_feedback_type_tick">Tick</string>
+    <string name="haptic_feedback_type_heavy_click">Heavy click</string>
+    <string name="haptic_feedback_type_double_click">Double click</string>
     <string name="menu_restart_sysui">Restart SystemUI</string>
     <string name="menu_about">About</string>
     <string name="label_author">Author</string>

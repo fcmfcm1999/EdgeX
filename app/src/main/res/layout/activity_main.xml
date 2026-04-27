@@ -417,6 +417,37 @@
                         android:buttonTint="@color/ui_checkbox_tint" />
                 </LinearLayout>
 
+                <!-- Item 4.7: Haptic Feedback Type -->
+                <LinearLayout
+                    android:id="@+id/item_haptic_feedback_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="88dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/menu_haptic_feedback_type"
+                        android:textColor="@color/ui_text_primary"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/text_haptic_feedback_type"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/ui_text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
                 <!-- Item 5: Restart SystemUI -->
                 <LinearLayout
                     android:id="@+id/item_restart_sysui"

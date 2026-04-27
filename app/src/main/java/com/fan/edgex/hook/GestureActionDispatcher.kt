@@ -152,7 +152,13 @@ internal class GestureActionDispatcher(
         if (resolveConfig(AppConfig.HAPTIC_FEEDBACK) != "true") return
         try {
             val vibrator = context.getSystemService(Vibrator::class.java) ?: return
-            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            val effect = when (resolveConfig(AppConfig.HAPTIC_FEEDBACK_TYPE)) {
+                AppConfig.HAPTIC_FEEDBACK_TYPE_TICK -> VibrationEffect.EFFECT_TICK
+                AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK -> VibrationEffect.EFFECT_HEAVY_CLICK
+                AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK -> VibrationEffect.EFFECT_DOUBLE_CLICK
+                else -> VibrationEffect.EFFECT_CLICK
+            }
+            vibrator.vibrate(VibrationEffect.createPredefined(effect))
         } catch (_: Throwable) {
         }
     }
