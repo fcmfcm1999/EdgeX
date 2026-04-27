@@ -1,22 +1,24 @@
 package com.fan.edgex.hook
 
 import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
-import android.util.TypedValue
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.toColorInt
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
@@ -25,10 +27,9 @@ import de.robv.android.xposed.XposedBridge
 import java.lang.ref.WeakReference
 
 /**
- * Clipboard history overlay.
- * ClipboardHook feeds new entries via onClipboardChanged(); this object
- * keeps up to MAX_HISTORY entries (most-recent first, deduped) and shows
- * them in a scrollable bottom sheet. Tap an item to paste it; tap × to delete.
+ * Clipboard history overlay — styled to match DrawerWindow.
+ * ClipboardHook feeds new entries; up to MAX_HISTORY are kept (deduped, most-recent first).
+ * Tap an item → paste; tap × → delete that entry; "清空" → clear all.
  */
 object ClipboardOverlay {
 
@@ -40,30 +41,21 @@ object ClipboardOverlay {
     private var overlayRef: WeakReference<View>? = null
     private var autoDismissRunnable: Runnable? = null
 
-    // ── History storage ────────────────────────────────────────────────────────
+    // ── History ────────────────────────────────────────────────────────────────
 
-    private val history = mutableListOf<String>()   // index 0 = most-recent
+    private val history = mutableListOf<String>()
 
     @Synchronized
     fun onClipboardChanged(text: String?) {
         if (text.isNullOrEmpty()) return
-        history.remove(text)           // deduplicate: move existing to top
+        history.remove(text)
         history.add(0, text)
         if (history.size > MAX_HISTORY) history.removeAt(history.lastIndex)
     }
 
-    @Synchronized
-    private fun historySnapshot() = ArrayList(history)
-
-    @Synchronized
-    private fun deleteEntry(text: String) {
-        history.remove(text)
-    }
-
-    @Synchronized
-    private fun clearAll() {
-        history.clear()
-    }
+    @Synchronized private fun historySnapshot() = ArrayList(history)
+    @Synchronized private fun deleteEntry(text: String) { history.remove(text) }
+    @Synchronized private fun clearAll() { history.clear() }
 
     // ── Show / dismiss ─────────────────────────────────────────────────────────
 
@@ -98,7 +90,11 @@ object ClipboardOverlay {
         }
     }
 
-    // ── Theme ──────────────────────────────────────────────────────────────────
+    // ── Theme (mirrors DrawerWindow) ───────────────────────────────────────────
+
+    private fun isDark(context: Context) =
+        (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
 
     private fun readAccentColor(): Int {
         val snapshot = HookConfigSnapshot.readFromHookFile()
@@ -114,19 +110,34 @@ object ClipboardOverlay {
         }
     }
 
-    private fun onColor(bg: Int): Int =
-        if (ColorUtils.calculateLuminance(bg) > 0.45) "#000000".toColorInt()
-        else "#FFFFFF".toColorInt()
-
     // ── Overlay construction ───────────────────────────────────────────────────
 
     private fun addOverlay(context: Context, items: List<String>) {
-        val density = context.resources.displayMetrics.density
+        val dp = context.resources.displayMetrics.density
         val screenH = context.resources.displayMetrics.heightPixels
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val accent = readAccentColor()
+        val dark = isDark(context)
+
+        // Color tokens — identical to DrawerWindow.setupModernLayout
+        val surfaceBg   = if (dark) Color.argb(238, 20, 19, 30)   else Color.argb(238, 250, 248, 255)
+        val textPrimary = if (dark) Color.WHITE                    else "#1C1B1F".toColorInt()
+        val textMuted   = if (dark) "#9A97AA".toColorInt()         else "#6B6880".toColorInt()
+        val divider     = if (dark) Color.argb(35, 255, 255, 255)  else Color.argb(40, 0, 0, 0)
+        val itemBg      = if (dark) Color.argb(160, 42, 40, 58)    else Color.argb(170, 230, 226, 244)
+        val cornerRad   = 28f * dp
+
+        var sheetTop = 0  // populated after first layout; used by dispatchTouchEvent
 
         val root = object : FrameLayout(context) {
+            override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+                // Single-tap anywhere above the sheet → dismiss immediately on ACTION_DOWN
+                if (ev.action == MotionEvent.ACTION_DOWN && sheetTop > 0 && ev.y < sheetTop) {
+                    dismiss()
+                    return true
+                }
+                return super.dispatchTouchEvent(ev)
+            }
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                 if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                     dismiss()
@@ -135,27 +146,36 @@ object ClipboardOverlay {
                 return super.dispatchKeyEvent(event)
             }
         }.apply {
-            isFocusableInTouchMode = true
+            setBackgroundColor(Color.TRANSPARENT)
             isFocusable = true
-            setBackgroundColor("#80000000".toColorInt())
-            setOnClickListener { dismiss() }
+            isFocusableInTouchMode = true
         }
 
-        val sheet = buildSheet(context, items, density, screenH, accent)
+        val sheet = buildSheet(
+            context, items, dp, screenH,
+            surfaceBg, textPrimary, textMuted, divider, itemBg, cornerRad, accent
+        )
         root.addView(sheet, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply { gravity = Gravity.BOTTOM })
 
+        // Capture sheet top after layout so dispatchTouchEvent can compare y
+        sheet.addOnLayoutChangeListener { _, _, top, _, _, _, _, _, _ ->
+            sheetTop = top
+        }
+
         @Suppress("DEPRECATION")
-        wm.addView(root, WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ))
+        wm.addView(root, WindowManager.LayoutParams().apply {
+            type   = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
+            format = PixelFormat.TRANSLUCENT
+            width  = WindowManager.LayoutParams.MATCH_PARENT
+            height = WindowManager.LayoutParams.MATCH_PARENT
+            flags  = WindowManager.LayoutParams.FLAG_DIM_BEHIND or
+                     WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+            dimAmount       = 0.25f
+            blurBehindRadius = 36
+        })
         overlayRef = WeakReference(root)
 
         autoDismissRunnable = Runnable { dismiss() }.also {
@@ -166,233 +186,204 @@ object ClipboardOverlay {
     private fun buildSheet(
         context: Context,
         initialItems: List<String>,
-        density: Float,
+        dp: Float,
         screenH: Int,
+        surfaceBg: Int,
+        textPrimary: Int,
+        textMuted: Int,
+        dividerColor: Int,
+        itemBg: Int,
+        cornerRad: Float,
         accent: Int
     ): View {
-        val dp = { v: Int -> (v * density + 0.5f).toInt() }
-
-        val surface    = "#1C1B1F".toColorInt()
-        val surfaceVar = "#2B2930".toColorInt()
-        val onSurf     = "#E6E1E5".toColorInt()
-        val onSurfVar  = "#CAC4D0".toColorInt()
-        val outline    = "#49454F".toColorInt()
-        val onAccent   = onColor(accent)
+        val dpi = { v: Int -> (v * dp + 0.5f).toInt() }
 
         val sheet = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                setColor(surface)
+                setColor(surfaceBg)
                 cornerRadii = floatArrayOf(
-                    dp(24).toFloat(), dp(24).toFloat(),
-                    dp(24).toFloat(), dp(24).toFloat(),
-                    0f, 0f, 0f, 0f
+                    cornerRad, cornerRad, cornerRad, cornerRad, 0f, 0f, 0f, 0f
                 )
             }
-            elevation = dp(8).toFloat()
-            setOnClickListener { /* consume */ }
+            elevation = 20f * dp
+            isClickable = true   // block touches from falling through to root behind
         }
 
         // ── Handle ──
         sheet.addView(View(context).apply {
             background = GradientDrawable().apply {
-                setColor(outline)
-                cornerRadius = dp(2).toFloat()
+                setColor(dividerColor)
+                cornerRadius = dpi(2).toFloat()
             }
-        }, LinearLayout.LayoutParams(dp(32), dp(4)).apply {
+        }, LinearLayout.LayoutParams(dpi(32), dpi(4)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            topMargin = dp(12)
-            bottomMargin = dp(4)
+            topMargin = dpi(12)
+            bottomMargin = dpi(6)
         })
 
-        // ── Header: title + count + clear-all ──
+        // ── Header — mirrors DrawerWindow header style ──
         val header = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpi(20), dpi(12), dpi(16), dpi(14))
+        }
+
+        // Top row: title + clear-all
+        val titleRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(12), dp(12), dp(12))
         }
-
-        val titleView = TextView(context).apply {
+        titleRow.addView(TextView(context).apply {
             text = ModuleRes.getString(R.string.clipboard_overlay_title)
-            setTextColor(onSurf)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            textSize = 22f
             typeface = Typeface.DEFAULT_BOLD
-        }
-        header.addView(titleView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-        val countView = TextView(context).apply {
-            text = "${initialItems.size}"
-            setTextColor(onSurfVar)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-        }
-        header.addView(countView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { marginEnd = dp(12) })
+            letterSpacing = -0.02f
+            setTextColor(textPrimary)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
         val clearAllBtn = TextView(context).apply {
             text = ModuleRes.getString(R.string.clipboard_clear_all)
-            setTextColor(accent)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(accent)
             gravity = Gravity.CENTER
-            setPadding(dp(12), dp(8), dp(12), dp(8))
+            setPadding(dpi(12), dpi(8), dpi(4), dpi(8))
+            setOnClickListener { clearAll(); dismiss() }
         }
-        header.addView(clearAllBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        titleRow.addView(clearAllBtn)
+        header.addView(titleRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
 
+        // Subtitle: "N 条记录"
+        val countView = TextView(context).apply {
+            text = ModuleRes.getString(R.string.clipboard_count, initialItems.size)
+            textSize = 12.5f
+            setTextColor(textMuted)
+            setPadding(0, dpi(4), 0, 0)
+        }
+        header.addView(countView, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         sheet.addView(header, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
 
         // ── Divider ──
-        sheet.addView(View(context).apply {
-            setBackgroundColor(ColorUtils.setAlphaComponent(outline, 80))
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1))
+        sheet.addView(View(context).apply { setBackgroundColor(dividerColor) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
 
         // ── Scrollable list ──
-        val listContainer = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
+        val listContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val scrollView = ScrollView(context).apply {
             isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
             addView(listContainer, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ))
         }
-        // Max height: 65% of screen
-        val maxListH = (screenH * 0.65f).toInt()
         sheet.addView(scrollView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { height = LinearLayout.LayoutParams.WRAP_CONTENT }.also {
-            it.height = minOf(maxListH, LinearLayout.LayoutParams.WRAP_CONTENT)
-        })
-
-        // Bottom padding inside list
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
         sheet.addView(View(context), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(16)
+            ViewGroup.LayoutParams.MATCH_PARENT, dpi(16)
         ))
 
-        // ── Populate list items ──
+        // ── Populate / rebuild helper ──
         fun rebuildList(items: List<String>) {
             listContainer.removeAllViews()
-            countView.text = "${items.size}"
+            countView.text = ModuleRes.getString(R.string.clipboard_count, items.size)
+
             items.forEachIndexed { index, text ->
-                val row = buildItemRow(
-                    context, text, density, accent, onAccent, onSurf, onSurfVar, surfaceVar, outline,
-                    onPaste = {
-                        dismiss()
-                        handler.postDelayed({
-                            try {
-                                GlobalActionHelper.performGlobalAction(
-                                    context, GlobalActionHelper.GLOBAL_ACTION_PASTE
-                                )
-                            } catch (t: Throwable) {
-                                XposedBridge.log("$TAG: paste failed: ${t.message}")
-                            }
-                        }, 150)
-                    },
-                    onDelete = {
-                        deleteEntry(text)
-                        val updated = historySnapshot()
-                        if (updated.isEmpty()) {
+                listContainer.addView(
+                    buildItemRow(context, text, dp, textPrimary, textMuted, itemBg,
+                        onPaste = {
                             dismiss()
-                        } else {
-                            rebuildList(updated)
+                            handler.postDelayed({
+                                try {
+                                    GlobalActionHelper.performGlobalAction(
+                                        context, GlobalActionHelper.GLOBAL_ACTION_PASTE
+                                    )
+                                } catch (t: Throwable) {
+                                    XposedBridge.log("$TAG: paste failed: ${t.message}")
+                                }
+                            }, 150)
+                        },
+                        onDelete = {
+                            deleteEntry(text)
+                            val updated = historySnapshot()
+                            if (updated.isEmpty()) dismiss() else rebuildList(updated)
                         }
-                    }
+                    ),
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
                 )
-                listContainer.addView(row, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ))
-                // Thin separator between items (not after last)
                 if (index < items.lastIndex) {
-                    listContainer.addView(View(context).apply {
-                        setBackgroundColor(ColorUtils.setAlphaComponent(outline, 40))
-                    }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                        marginStart = dp(20)
-                        marginEnd = dp(20)
-                    })
+                    listContainer.addView(View(context).apply { setBackgroundColor(dividerColor) },
+                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1).apply {
+                            marginStart = dpi(20); marginEnd = dpi(20)
+                        })
+                }
+            }
+
+            // Clamp scroll height to 65% of screen after items are laid out
+            scrollView.post {
+                val maxH = (screenH * 0.65f).toInt()
+                if (listContainer.height > maxH) {
+                    scrollView.layoutParams = (scrollView.layoutParams as LinearLayout.LayoutParams)
+                        .also { it.height = maxH }
+                    scrollView.requestLayout()
                 }
             }
         }
 
         rebuildList(initialItems)
-
-        clearAllBtn.setOnClickListener {
-            clearAll()
-            dismiss()
-        }
-
-        // Clamp ScrollView height after measure
-        scrollView.post {
-            val measuredH = listContainer.height
-            if (measuredH > maxListH) {
-                scrollView.layoutParams = (scrollView.layoutParams as LinearLayout.LayoutParams).also {
-                    it.height = maxListH
-                }
-                scrollView.requestLayout()
-            }
-        }
-
         return sheet
     }
 
     private fun buildItemRow(
         context: Context,
         text: String,
-        density: Float,
-        accent: Int,
-        onAccent: Int,
-        onSurf: Int,
-        onSurfVar: Int,
-        surfaceVar: Int,
-        outline: Int,
+        dp: Float,
+        textPrimary: Int,
+        textMuted: Int,
+        itemBg: Int,
         onPaste: () -> Unit,
         onDelete: () -> Unit
     ): View {
-        val dp = { v: Int -> (v * density + 0.5f).toInt() }
+        val dpi = { v: Int -> (v * dp + 0.5f).toInt() }
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(14), dp(8), dp(14))
-            // Ripple-like press feedback via state
+            setPadding(dpi(20), dpi(12), dpi(8), dpi(12))
+            isClickable = true
+            isFocusable = true
             setOnClickListener { onPaste() }
         }
 
-        // Text preview (2 lines max)
-        val textView = TextView(context).apply {
+        row.addView(TextView(context).apply {
             this.text = text
-            setTextColor(onSurf)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            textSize = 14f
+            setTextColor(textPrimary)
             maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setLineSpacing(dp(2).toFloat(), 1f)
-        }
-        row.addView(textView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginEnd = dp(8)
+            ellipsize = TextUtils.TruncateAt.END
+            setLineSpacing((2 * dp), 1f)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            marginEnd = dpi(4)
         })
 
-        // Delete button
-        val deleteBtn = LinearLayout(context).apply {
+        // × delete button
+        row.addView(TextView(context).apply {
+            this.text = "×"
+            textSize = 20f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(textMuted)
             gravity = Gravity.CENTER
-            val size = dp(40)
-            background = GradientDrawable().apply {
-                setColor("#00000000".toColorInt())
-                cornerRadius = dp(20).toFloat()
-            }
+            setPadding(dpi(12), dpi(4), dpi(12), dpi(4))
             setOnClickListener { onDelete() }
-        }
-        val deleteIcon = ImageView(context).apply {
-            setImageResource(R.drawable.ic_delete)
-            imageTintList = android.content.res.ColorStateList.valueOf(
-                ColorUtils.setAlphaComponent(onSurfVar, 160)
-            )
-        }
-        deleteBtn.addView(deleteIcon, LinearLayout.LayoutParams(dp(20), dp(20)))
-        row.addView(deleteBtn, LinearLayout.LayoutParams(dp(40), dp(40)))
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         return row
     }
