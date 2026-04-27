@@ -114,7 +114,9 @@ object ClipboardOverlay {
 
     private fun addOverlay(context: Context, items: List<String>) {
         val dp = context.resources.displayMetrics.density
+        val dpi = { v: Int -> (v * dp + 0.5f).toInt() }
         val screenH = context.resources.displayMetrics.heightPixels
+        val bottomSafeArea = maxOf(dpi(48), navigationBarHeight(context))
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val accent = readAccentColor()
         val dark = isDark(context)
@@ -153,7 +155,7 @@ object ClipboardOverlay {
         }
 
         val sheet = buildSheet(
-            context, items, dp, screenH,
+            context, items, dp, screenH, bottomSafeArea,
             surfaceBg, textPrimary, textMuted, divider, itemBg, cornerRad, accent
         )
         root.addView(sheet, FrameLayout.LayoutParams(
@@ -174,7 +176,8 @@ object ClipboardOverlay {
             height = WindowManager.LayoutParams.MATCH_PARENT
             flags  = WindowManager.LayoutParams.FLAG_DIM_BEHIND or
                      WindowManager.LayoutParams.FLAG_BLUR_BEHIND or
-                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
             dimAmount       = 0.25f
             blurBehindRadius = 36
         })
@@ -190,6 +193,7 @@ object ClipboardOverlay {
         initialItems: List<String>,
         dp: Float,
         screenH: Int,
+        bottomSafeArea: Int,
         surfaceBg: Int,
         textPrimary: Int,
         textMuted: Int,
@@ -289,7 +293,7 @@ object ClipboardOverlay {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
         sheet.addView(View(context), LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dpi(16)
+            ViewGroup.LayoutParams.MATCH_PARENT, bottomSafeArea
         ))
 
         // ── Populate / rebuild helper ──
@@ -381,6 +385,16 @@ object ClipboardOverlay {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val cappedHeightSpec = MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST)
             super.onMeasure(widthMeasureSpec, cappedHeightSpec)
+        }
+    }
+
+    private fun navigationBarHeight(context: Context): Int {
+        return try {
+            val res = context.resources
+            val id = res.getIdentifier("navigation_bar_height", "dimen", "android")
+            if (id > 0) res.getDimensionPixelSize(id) else 0
+        } catch (_: Throwable) {
+            0
         }
     }
 
