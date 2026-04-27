@@ -37,13 +37,11 @@ internal class GestureActionDispatcher(
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             shellExecutor = IShellExecutor.Stub.asInterface(binder)
-            log("ShellExecutorService connected")
             drainPendingCommands()
         }
         override fun onServiceDisconnected(name: ComponentName) {
             shellExecutor = null
             serviceBound = false
-            log("ShellExecutorService disconnected unexpectedly, rebinding...")
             serviceContext?.let {
                 handlerProvider().postDelayed({ bindShellService(it) }, 2000)
             }
@@ -73,7 +71,6 @@ internal class GestureActionDispatcher(
         if (!serviceBound) return
         try {
             ctx.unbindService(serviceConnection)
-            log("ShellExecutorService unbound after idle timeout")
         } catch (e: Exception) {
             log("ShellExecutorService unbind failed: ${e.message}")
         }
@@ -93,7 +90,6 @@ internal class GestureActionDispatcher(
         }
         val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         if (bound) serviceBound = true
-        log("ShellExecutorService bindService=$bound")
     }
     fun triggerGestureAction(
         zone: String,
@@ -130,7 +126,6 @@ internal class GestureActionDispatcher(
             val step = 1.0f / 16f
             val newVal = if (up) minOf(1.0f, current + step) else maxOf(0.0f, current - step)
             setBrightness.invoke(displayManager, 0, newVal)
-            log("Brightness $current -> $newVal")
         } catch (e: Exception) {
             log("adjustBrightness failed: ${e.message}")
         }
@@ -152,25 +147,15 @@ internal class GestureActionDispatcher(
     }
 
     private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
-        log("performAction called with action='$action'")
         when {
             action == "back" -> {
-                log("Performing GLOBAL_ACTION_BACK")
-                val result =
-                    GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
-                log("GLOBAL_ACTION_BACK result=$result")
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
             }
             action == "home" -> {
-                log("Performing GLOBAL_ACTION_HOME")
-                val result =
-                    GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_HOME)
-                log("GLOBAL_ACTION_HOME result=$result")
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_HOME)
             }
             action == "recent" || action == "recents" -> {
-                log("Performing GLOBAL_ACTION_RECENTS")
-                val result =
-                    GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
-                log("GLOBAL_ACTION_RECENTS result=$result")
+                GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
             }
             action == "notifications" || action == "expand_notifications" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_NOTIFICATIONS)
@@ -244,7 +229,6 @@ internal class GestureActionDispatcher(
             val pkg = tasks[0].topActivity?.packageName ?: return
             if (pkg == context.packageName) return
             XposedHelpers.callMethod(activityManager, "forceStopPackage", pkg)
-            log("Killed foreground app: $pkg")
         } catch (e: Exception) {
             log("killForegroundApp failed: ${e.message}")
         }
@@ -268,15 +252,12 @@ internal class GestureActionDispatcher(
         if (executor == null) {
             pendingCommands.addLast(action to context)
             bindShellService(context)
-            log("ShellExecutorService not ready, queued command: $command")
             return
         }
 
-        log("Dispatching shell command (root=$runAsRoot): $command")
         scheduleIdleUnbind()
         executor.execute(command, runAsRoot, object : IShellCallback.Stub() {
             override fun onResult(success: Boolean, output: String?) {
-                log("Shell result: success=$success output='$output'")
                 if (success) {
                     output?.trim()?.takeIf { it.isNotBlank() }?.let {
                         showToast(context, it.take(200))
@@ -308,34 +289,29 @@ internal class GestureActionDispatcher(
             val packageName = parts[1]
             val shortcutId = parts[2]
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N_MR1) {
-                val launcherApps =
-                    context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+            val launcherApps =
+                context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+            try {
+                launcherApps.startShortcut(
+                    packageName,
+                    shortcutId,
+                    null,
+                    null,
+                    currentUserHandle(),
+                )
+            } catch (e: Exception) {
+                log("Failed to launch shortcut: ${e.message}")
                 try {
-                    launcherApps.startShortcut(
-                        packageName,
-                        shortcutId,
-                        null,
-                        null,
-                        currentUserHandle(),
-                    )
-                    log("Launched shortcut: $packageName/$shortcutId")
-                } catch (e: Exception) {
-                    log("Failed to launch shortcut: ${e.message}")
-                    try {
-                        val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-                        if (intent != null) {
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } else {
-                            showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
-                        }
-                    } catch (_: Exception) {
-                        showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
+                    val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    } else {
+                        showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
                     }
+                } catch (_: Exception) {
+                    showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
                 }
-            } else {
-                showToast(context, ModuleRes.getString(R.string.toast_requires_android_71))
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -394,7 +370,6 @@ internal class GestureActionDispatcher(
                                     0,
                                 )
                                 success = true
-                                XposedBridge.log("EdgeX: PM API freeze SUCCESS for $pkg")
                             } catch (e: Exception) {
                                 XposedBridge.log("EdgeX: PM API freeze FAILED for $pkg: ${e.message}")
                             }
@@ -457,7 +432,6 @@ internal class GestureActionDispatcher(
                     log("removeTask failed: ${t.message}")
                 }
             }
-            log("Cleared $count background app(s)")
             if (count > 0) {
                 showToast(context, ModuleRes.getString(R.string.toast_cleared_background, count))
             }
@@ -512,13 +486,12 @@ internal class GestureActionDispatcher(
                 "stop"       -> KeyEvent.KEYCODE_MEDIA_STOP
                 "next"       -> KeyEvent.KEYCODE_MEDIA_NEXT
                 "previous"   -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
-                else -> { log("Unknown music_control subaction: $action"); return }
+                else -> return
             }
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             val now = SystemClock.uptimeMillis()
             audioManager.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0))
             audioManager.dispatchMediaKeyEvent(KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode, 0))
-            log("Dispatched media key: $keyCode for $action")
         } catch (e: Exception) {
             log("dispatchMediaKey failed: ${e.message}")
         }
@@ -561,10 +534,7 @@ internal class GestureActionDispatcher(
                 context,
                 GlobalActionHelper.GLOBAL_ACTION_TAKE_SCREENSHOT,
             )
-            if (result) {
-                log("screenshot via GLOBAL_ACTION_TAKE_SCREENSHOT")
-                return
-            }
+            if (result) return
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: false")
         } catch (t: Throwable) {
             errors.add("GLOBAL_ACTION_TAKE_SCREENSHOT: ${t.message}")
@@ -584,7 +554,6 @@ internal class GestureActionDispatcher(
                 )
                 injectMethod.invoke(inputManager, down, 0)
                 injectMethod.invoke(inputManager, up, 0)
-                log("screenshot via INPUT_SERVICE SYSRQ")
                 return
             }
         } catch (t: Throwable) {
@@ -602,7 +571,6 @@ internal class GestureActionDispatcher(
             )
             injectMethod.invoke(global, down, 0)
             injectMethod.invoke(global, up, 0)
-            log("screenshot via InputManagerGlobal SYSRQ")
             return
         } catch (t: Throwable) {
             errors.add("InputManagerGlobal: ${t.message}")
@@ -610,7 +578,6 @@ internal class GestureActionDispatcher(
 
         try {
             Runtime.getRuntime().exec("input keyevent 120")
-            log("screenshot via shell input SYSRQ")
         } catch (e: Exception) {
             errors.add("shell: ${e.message}")
             log("screenshot failed -> ${errors.joinToString(" | ")}")
@@ -638,7 +605,6 @@ internal class GestureActionDispatcher(
                     KeyManager.markInjectedEvent(event)
                     injectMethod.invoke(inputManager, event, 0)
                 }
-                log("screenshot via injected power+volume chord")
                 true
             } else {
                 errors.add("screenshot chord: INPUT_SERVICE null")

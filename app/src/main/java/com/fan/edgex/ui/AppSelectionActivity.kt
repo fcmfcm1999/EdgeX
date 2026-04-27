@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -35,7 +37,7 @@ class AppSelectionActivity : AppCompatActivity() {
         ThemeManager.applyToActivity(this)
 
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
-            view.setPadding(view.paddingLeft, insets.systemWindowInsetTop, view.paddingRight, view.paddingBottom)
+            view.setPadding(view.paddingLeft, insets.getInsets(android.view.WindowInsets.Type.statusBars()).top, view.paddingRight, view.paddingBottom)
             insets
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
@@ -62,14 +64,14 @@ class AppSelectionActivity : AppCompatActivity() {
         val tvTitle = findViewById<TextView>(R.id.tv_title)
 
         btnSearch.setOnClickListener {
-            if (etSearch.visibility == View.GONE) {
-                tvTitle.visibility = View.GONE
-                etSearch.visibility = View.VISIBLE
+            if (etSearch.isGone) {
+                tvTitle.isGone = true
+                etSearch.isVisible = true
                 etSearch.requestFocus()
             } else {
                 if (etSearch.text.isEmpty()) {
-                    etSearch.visibility = View.GONE
-                    tvTitle.visibility = View.VISIBLE
+                    etSearch.isGone = true
+                    tvTitle.isVisible = true
                 } else {
                     etSearch.text.clear()
                 }

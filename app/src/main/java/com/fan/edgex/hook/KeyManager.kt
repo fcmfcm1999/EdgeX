@@ -1,7 +1,6 @@
 package com.fan.edgex.hook
 
 import android.content.Context
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -44,8 +43,7 @@ object KeyManager {
     private const val STATE_PRESSED = 1
     private const val STATE_WAITING_DOUBLE = 2
     
-    // Android 10+ requires copying KeyEvent (like Xposed Edge Pro's z.E flag)
-    private val needsCopyEvent = Build.VERSION.SDK_INT > Build.VERSION_CODES.Q
+    private val needsCopyEvent = true
 
     // Current state per key
     private val keyStates = mutableMapOf<Int, Int>()
@@ -96,7 +94,6 @@ object KeyManager {
     fun init(context: Context) {
         longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
         doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
-        XposedBridge.log("$TAG: KeyManager init - longPress=${longPressTimeout}ms, doubleTap=${doubleTapTimeout}ms")
     }
 
     /**
@@ -160,7 +157,6 @@ object KeyManager {
         // We activate passthrough so subsequent presses control volume normally.
         if (isVolumeKey(event.keyCode)) {
             volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
-            XposedBridge.log("$TAG: KeyManager power/volume activity — entering passthrough for ${VOLUME_PASSTHROUGH_DURATION}ms")
         }
         
         // Clean up old entries (keep only last 10)
@@ -175,7 +171,6 @@ object KeyManager {
                     Int::class.javaPrimitiveType
                 )
                 injectMethod.invoke(inputManager, event, 0) // 0 = INJECT_INPUT_EVENT_MODE_ASYNC
-                XposedBridge.log("$TAG: Injected key event via InputManager")
                 return
             }
         } catch (t: Throwable) {
@@ -193,7 +188,6 @@ object KeyManager {
                 Int::class.javaPrimitiveType
             )
             injectMethod.invoke(global, event, 0)
-            XposedBridge.log("$TAG: Injected key event via InputManagerGlobal")
             return
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: InputManagerGlobal inject failed: ${t.message}")
@@ -240,25 +234,14 @@ object KeyManager {
         val eventTime = event.eventTime
         
         
-        // Skip events that we injected ourselves (to avoid infinite loop)
-        // Method 1: Check policyFlags (if injection method supports it)
-        if (policyFlags and INJECTED_EVENT_FLAG != 0) {
-            XposedBridge.log("$TAG: Skipping injected event via policyFlags for keyCode=$keyCode")
-            return false
-        }
-        
-        // Method 2: Check if eventTime matches one we injected
+        if (policyFlags and INJECTED_EVENT_FLAG != 0) return false
+
         if (injectedEventTimes.contains(eventTime)) {
-            XposedBridge.log("$TAG: Skipping injected event via eventTime for keyCode=$keyCode (time=$eventTime)")
-            injectedEventTimes.remove(eventTime) // Clean up after recognition
+            injectedEventTimes.remove(eventTime)
             return false
         }
-        
-        // Check if keys feature is enabled
-        if (!keysEnabled) {
-            XposedBridge.log("$TAG: Keys feature disabled, not handling")
-            return false
-        }
+
+        if (!keysEnabled) return false
         
         // Check if this key is supported
         if (!SUPPORTED_KEYS.containsKey(keyCode)) {
@@ -279,9 +262,7 @@ object KeyManager {
         // (we recently executed an action for a volume key), let
         // subsequent volume presses pass through for normal volume control.
         if (isVolumeKey(keyCode) && System.currentTimeMillis() < volumePassthroughUntil) {
-            // Extend the passthrough window on each press (matching volume panel behavior)
             volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
-            XposedBridge.log("$TAG: Volume key $keyCode in passthrough window — letting through for volume control")
             return false
         }
 
@@ -426,8 +407,6 @@ object KeyManager {
                 return true
             }
             
-            // No click or double-click action - forward the events via InputManager injection
-            XposedBridge.log("$TAG: Key $keyCode no click/double-click action -> injecting events")
             pendingUpEvents[keyCode] = copyKeyEvent(event)
             forwardKeyEvents(keyCode, context)
             keyStates[keyCode] = STATE_IDLE
@@ -446,8 +425,6 @@ object KeyManager {
                 executeAction(action, context, keyCode)
                 return true
             }
-            // Forward the events via InputManager injection
-            XposedBridge.log("$TAG: Key $keyCode held but no long-press action -> injecting UP")
             pendingUpEvents[keyCode] = copyKeyEvent(event)
             forwardKeyEvents(keyCode, context)
             keyStates[keyCode] = STATE_IDLE
@@ -472,9 +449,6 @@ object KeyManager {
                         XposedBridge.log("$TAG: Key $keyCode long-press -> $action")
                         executeAction(action, context, keyCode)
                     } else {
-                        // User held the key, but no custom long-press config.
-                        // Forward the DOWN event now so system handles it natively (e.g. for volume auto-repeat).
-                        XposedBridge.log("$TAG: Key $keyCode held but no action -> injecting DOWN to system")
                         val downEvent = pendingDownEvents.remove(keyCode)
                         if (downEvent != null) {
                             injectKeyEvent(downEvent, context)
@@ -516,8 +490,6 @@ object KeyManager {
                         XposedBridge.log("$TAG: Key $keyCode click (after double-tap timeout) -> $action")
                         executeAction(action, context, keyCode)
                     } else {
-                        // No click action, forward original events via InputManager injection
-                        XposedBridge.log("$TAG: Key $keyCode double-tap timeout, no click action -> injecting events")
                         forwardKeyEvents(keyCode, context)
                     }
                 }

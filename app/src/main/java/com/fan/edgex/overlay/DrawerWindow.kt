@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -99,13 +100,14 @@ class DrawerWindow(
             setupModernLayout(displayApps, pm, panelWidth)
         }
 
+        @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
             format = PixelFormat.TRANSLUCENT
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.MATCH_PARENT
             // FLAG_DIM_BEHIND (0x2) | FLAG_BLUR_BEHIND (0x4)
-            flags = 0x00000002 or 0x00000004
+            flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
             dimAmount = 0.25f
             blurBehindRadius = 36
         }
@@ -138,8 +140,8 @@ class DrawerWindow(
         val dark = isDarkMode
 
         val surfaceBg     = if (dark) Color.argb(238, 20, 19, 30)    else Color.argb(238, 250, 248, 255)
-        val textPrimary   = if (dark) Color.WHITE                     else Color.parseColor("#1C1B1F")
-        val textMuted     = if (dark) Color.parseColor("#9A97AA")     else Color.parseColor("#6B6880")
+        val textPrimary   = if (dark) Color.WHITE                     else "#1C1B1F".toColorInt()
+        val textMuted     = if (dark) "#9A97AA".toColorInt()     else "#6B6880".toColorInt()
         val cardBg        = if (dark) Color.argb(160, 42, 40, 58)    else Color.argb(170, 230, 226, 244)
         val dividerColor  = if (dark) Color.argb(35, 255, 255, 255)  else Color.argb(40, 0, 0, 0)
         val frozenBadgeBg = Color.argb(210, 12, 18, 52)
@@ -314,7 +316,7 @@ class DrawerWindow(
                         text = "❄"
                         textSize = (badgeSize / dp * 0.62f)
                         gravity = Gravity.CENTER
-                        setTextColor(Color.parseColor("#90CAF9"))
+                        setTextColor("#90CAF9".toColorInt())
                         background = GradientDrawable().apply {
                             setColor(frozenBadgeBg)
                             cornerRadius = badgeSize * 0.38f
@@ -406,7 +408,7 @@ class DrawerWindow(
                         gravity = Gravity.CENTER
                         setPadding(12, 12, 12, 12)
                         background = GradientDrawable().apply {
-                            setColor(Color.parseColor("#F0F0F0"))
+                            setColor("#F0F0F0".toColorInt())
                             cornerRadius = 24f
                         }
                         addView(ImageView(context).apply {

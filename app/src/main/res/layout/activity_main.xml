@@ -1,4 +1,5 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/ui_background"
@@ -59,7 +60,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_gesture"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -101,7 +102,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_keyboard"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -143,7 +144,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_freezer"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -179,7 +180,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_settings"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -214,7 +215,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_settings"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -231,7 +232,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:src="@drawable/ic_expand_more"
-                    android:tint="@color/ui_text_secondary" />
+                    app:tint="@color/ui_text_secondary" />
             </LinearLayout>
 
             <!-- Advanced Options Content (Collapsible) -->
@@ -267,7 +268,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_developer_mode"
-                            android:tint="@color/ui_icon_tint" />
+                            app:tint="@color/ui_icon_tint" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -325,7 +326,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_apps"
-                            android:tint="@color/ui_icon_tint" />
+                            app:tint="@color/ui_icon_tint" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -383,7 +384,7 @@
                             android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:src="@drawable/ic_restart_alt"
-                            android:tint="@color/ui_icon_tint" />
+                            app:tint="@color/ui_icon_tint" />
                     </FrameLayout>
 
                     <TextView
@@ -419,7 +420,7 @@
                         android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:src="@drawable/ic_about"
-                        android:tint="@color/ui_icon_tint" />
+                        app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
                 <TextView
@@ -436,7 +437,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:src="@drawable/ic_expand_more"
-                    android:tint="@color/ui_text_secondary" />
+                    app:tint="@color/ui_text_secondary" />
             </LinearLayout>
 
             <!-- About Content (Collapsible) -->

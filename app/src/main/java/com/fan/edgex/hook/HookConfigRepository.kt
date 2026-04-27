@@ -52,7 +52,6 @@ internal class HookConfigRepository(
         updateKeyConfig(configCache)
         HookConfigSnapshot.writeForHook(configCache)
         lastConfigLoad = System.currentTimeMillis()
-        log("Config broadcast applied: $appliedCount/${keys.size} keys full=$fullSnapshot")
     }
 
     fun reloadAsync(onLoaded: (() -> Unit)? = null) {
@@ -92,7 +91,6 @@ internal class HookConfigRepository(
         configCache.clear()
         configCache.putAll(snapshot)
         updateKeyConfig(configCache)
-        log("Config snapshot loaded: ${snapshot.size} keys")
         return true
     }
 

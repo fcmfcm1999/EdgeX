@@ -2,12 +2,14 @@ package com.fan.edgex.ui
 
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.net.toUri
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -50,7 +52,7 @@ class FreezerActivity : AppCompatActivity() {
 
         // Header Insets
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
-            view.setPadding(view.paddingLeft, insets.systemWindowInsetTop, view.paddingRight, view.paddingBottom)
+            view.setPadding(view.paddingLeft, insets.getInsets(android.view.WindowInsets.Type.statusBars()).top, view.paddingRight, view.paddingBottom)
             insets
         }
 
@@ -80,16 +82,16 @@ class FreezerActivity : AppCompatActivity() {
         val tvTitle = findViewById<TextView>(R.id.tv_title)
         
         btnSearch.setOnClickListener {
-            if (etSearch.visibility == View.GONE) {
+            if (etSearch.isGone) {
                 // Open Search
-                tvTitle.visibility = View.GONE
-                etSearch.visibility = View.VISIBLE
+                tvTitle.isGone = true
+                etSearch.isVisible = true
                 etSearch.requestFocus()
             } else {
                 // Close/Clear
                 if (etSearch.text.isEmpty()) {
-                    etSearch.visibility = View.GONE
-                    tvTitle.visibility = View.VISIBLE
+                    etSearch.isGone = true
+                    tvTitle.isVisible = true
                 } else {
                     etSearch.text.clear()
                 }
@@ -184,11 +186,11 @@ class FreezerActivity : AppCompatActivity() {
         val btnUnfreeze = view.findViewById<View>(R.id.btn_unfreeze)
         
         if (app.isFrozen) {
-            btnFreeze.visibility = View.GONE
-            btnUnfreeze.visibility = View.VISIBLE
+            btnFreeze.isGone = true
+            btnUnfreeze.isVisible = true
         } else {
-            btnFreeze.visibility = View.VISIBLE
-            btnUnfreeze.visibility = View.GONE
+            btnFreeze.isVisible = true
+            btnUnfreeze.isGone = true
         }
 
         view.findViewById<View>(R.id.btn_run).setOnClickListener {
@@ -207,7 +209,7 @@ class FreezerActivity : AppCompatActivity() {
         
         view.findViewById<View>(R.id.btn_info).setOnClickListener {
             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            intent.data = Uri.parse("package:${app.info.packageName}")
+            intent.data = "package:${app.info.packageName}".toUri()
             startActivity(intent)
             dialog.dismiss()
         }
@@ -289,10 +291,10 @@ class FreezerActivity : AppCompatActivity() {
             holder.checkbox.setOnClickListener { }
 
             if (app.isFrozen) {
-                holder.frozen.visibility = View.VISIBLE
+                holder.frozen.isVisible = true
                 holder.name.alpha = 0.5f
             } else {
-                holder.frozen.visibility = View.GONE
+                holder.frozen.isGone = true
                 holder.name.alpha = 1.0f
             }
 
