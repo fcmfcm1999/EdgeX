@@ -91,6 +91,7 @@
     <string name="action_freezer_drawer">冰箱抽屉</string>
     <string name="action_refreeze">重新冻结</string>
     <string name="action_screenshot">截屏</string>
+    <string name="action_clipboard">剪切板</string>
     <string name="action_universal_copy">全局复制</string>
     <string name="action_lock_screen">锁定屏幕</string>
     <string name="action_kill_app">结束当前应用</string>
@@ -202,6 +203,12 @@
     <string name="toast_shell_invalid_format">无效的命令格式</string>
     <string name="toast_command_failed">命令执行失败：%s</string>
     <string name="toast_command_error">命令出错：%s</string>
+
+    <!-- 剪切板悬浮层 -->
+    <string name="clipboard_overlay_title">剪切板</string>
+    <string name="clipboard_empty">剪切板为空</string>
+    <string name="clipboard_paste">粘贴</string>
+    <string name="clipboard_close">关闭</string>
 
     <!-- 全局复制悬浮层 -->
     <string name="copy_tap_to_select">点按文字选择</string>

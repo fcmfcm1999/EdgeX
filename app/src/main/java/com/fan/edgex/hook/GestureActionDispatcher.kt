@@ -214,6 +214,9 @@ internal class GestureActionDispatcher(
             action.startsWith("launch_app:") -> {
                 launchApp(context, action)
             }
+            action == "clipboard" -> {
+                ClipboardOverlay.show(context)
+            }
             action == "freezer_drawer" -> {
                 DrawerManager.showDrawer(context, resolveConfig)
             }
