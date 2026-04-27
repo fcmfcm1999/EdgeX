@@ -209,6 +209,7 @@
     <string name="clipboard_empty">剪切板为空</string>
     <string name="clipboard_paste">粘贴</string>
     <string name="clipboard_close">关闭</string>
+    <string name="clipboard_clear_all">清空</string>
 
     <!-- 全局复制悬浮层 -->
     <string name="copy_tap_to_select">点按文字选择</string>

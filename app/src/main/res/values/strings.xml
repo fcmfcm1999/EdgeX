@@ -207,6 +207,7 @@
     <string name="clipboard_empty">Clipboard is empty</string>
     <string name="clipboard_paste">Paste</string>
     <string name="clipboard_close">Close</string>
+    <string name="clipboard_clear_all">Clear all</string>
 
     <!-- Universal Copy Overlay -->
     <string name="copy_tap_to_select">Tap to select</string>
