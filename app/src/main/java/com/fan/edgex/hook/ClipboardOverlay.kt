@@ -298,6 +298,10 @@ object ClipboardOverlay {
                 listContainer.addView(
                     buildItemRow(context, text, dp, textPrimary, textMuted, itemBg,
                         onPaste = {
+                            // Write the selected item back to the system clipboard first,
+                            // so GLOBAL_ACTION_PASTE uses the correct text regardless of
+                            // which entry was tapped.
+                            setClipboard(context, text)
                             dismiss()
                             handler.postDelayed({
                                 try {
@@ -386,6 +390,16 @@ object ClipboardOverlay {
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         return row
+    }
+
+    private fun setClipboard(context: Context, text: String) {
+        try {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("EdgeX", text))
+        } catch (t: Throwable) {
+            XposedBridge.log("$TAG: setClipboard failed: ${t.message}")
+        }
     }
 
     private fun showToast(context: Context, text: String) {
