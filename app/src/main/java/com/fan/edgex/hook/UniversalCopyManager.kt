@@ -189,7 +189,13 @@ object UniversalCopyManager {
 
         private fun insertAtSelection(node: AccessibilityNodeInfo, text: String): Boolean {
             return try {
-                val current = node.text?.toString() ?: ""
+                val nodeText = node.text?.toString().orEmpty()
+                val hintText = node.hintText?.toString().orEmpty()
+                val current = if (node.isShowingHintText || (hintText.isNotEmpty() && nodeText == hintText)) {
+                    ""
+                } else {
+                    nodeText
+                }
                 var selStart = node.textSelectionStart
                 var selEnd   = node.textSelectionEnd
                 if (selStart < 0) selStart = current.length

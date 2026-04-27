@@ -275,7 +275,7 @@ object ClipboardOverlay {
 
         // ── Scrollable list ──
         val listContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-        val scrollView = MaxHeightScrollView(context, (screenH * 0.65f).toInt()).apply {
+        val scrollView = MaxHeightScrollView(context, (screenH * 0.30f).toInt()).apply {
             isVerticalScrollBarEnabled = true
             scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
             overScrollMode = View.OVER_SCROLL_NEVER
