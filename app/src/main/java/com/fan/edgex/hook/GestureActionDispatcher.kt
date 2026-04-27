@@ -320,7 +320,7 @@ internal class GestureActionDispatcher(
                         currentUserHandle(),
                     )
                     log("Launched shortcut: $packageName/$shortcutId")
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     log("Failed to launch shortcut: ${e.message}")
                     try {
                         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
@@ -330,14 +330,14 @@ internal class GestureActionDispatcher(
                         } else {
                             showToast(context, ModuleRes.getString(R.string.toast_cannot_launch_shortcut))
                         }
-                    } catch (_: Exception) {
+                    } catch (_: Throwable) {
                         showToast(context, ModuleRes.getString(R.string.toast_launch_failed))
                     }
                 }
             } else {
                 showToast(context, ModuleRes.getString(R.string.toast_requires_android_71))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
             showToast(context, ModuleRes.getString(R.string.toast_shortcut_launch_failed, e.message))
         }
@@ -535,7 +535,7 @@ internal class GestureActionDispatcher(
             } else {
                 showToast(context, ModuleRes.getString(R.string.toast_app_not_found))
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             log("launchApp failed: ${e.message}")
         }
     }

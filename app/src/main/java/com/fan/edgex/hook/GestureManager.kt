@@ -5,10 +5,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
@@ -19,6 +23,7 @@ object GestureManager {
     private const val TAG = "EdgeX"
 
     private var systemContext: Context? = null
+    private var windowAnchor: View? = null
 
     private var screenStateReceiverRegistered = false
     private var systemConfigReceiverRegistered = false
@@ -113,6 +118,7 @@ object GestureManager {
             registerConfigChangeReceiver(context)
             mainHandler().post {
                 debugOverlayController.initialize(context)
+                addWindowAnchor(context)
                 configRepository.reloadAsync(::refreshDebugOverlay)
             }
             actionDispatcher.bindShellService(context)
@@ -244,6 +250,36 @@ object GestureManager {
 
     fun executeKeyAction(action: String, context: Context) {
         actionDispatcher.executeKeyAction(action, context)
+    }
+
+    /**
+     * Adds a 1×1 transparent system window so that system_server always has a visible
+     * window in WMS. Android 15 home-screen protection blocks startActivity() from any
+     * process that has no visible WMS window when the launcher task is in the foreground,
+     * even for SYSTEM_UID callers. This anchor satisfies that check without any visual
+     * effect (1 px, fully transparent, FLAG_NOT_TOUCHABLE).
+     */
+    private fun addWindowAnchor(context: Context) {
+        if (windowAnchor != null) return
+        try {
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val anchor = View(context)
+            val params = WindowManager.LayoutParams(
+                1, 1,
+                2027, // TYPE_ACCESSIBILITY_MAGNIFICATION_OVERLAY – usable by system processes
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+            }
+            wm.addView(anchor, params)
+            windowAnchor = anchor
+            log("Window anchor added")
+        } catch (t: Throwable) {
+            log("Failed to add window anchor: ${t.message}")
+        }
     }
 
 }
