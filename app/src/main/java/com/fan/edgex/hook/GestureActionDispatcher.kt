@@ -10,6 +10,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.os.UserHandle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.BuildConfig
@@ -146,7 +148,23 @@ internal class GestureActionDispatcher(
         }
     }
 
+    private fun vibrateActionFeedback(context: Context) {
+        if (resolveConfig(AppConfig.HAPTIC_FEEDBACK) != "true") return
+        try {
+            val vibrator = context.getSystemService(Vibrator::class.java) ?: return
+            val effect = when (resolveConfig(AppConfig.HAPTIC_FEEDBACK_TYPE)) {
+                AppConfig.HAPTIC_FEEDBACK_TYPE_TICK -> VibrationEffect.EFFECT_TICK
+                AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK -> VibrationEffect.EFFECT_HEAVY_CLICK
+                AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK -> VibrationEffect.EFFECT_DOUBLE_CLICK
+                else -> VibrationEffect.EFFECT_CLICK
+            }
+            vibrator.vibrate(VibrationEffect.createPredefined(effect))
+        } catch (_: Throwable) {
+        }
+    }
+
     private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
+        vibrateActionFeedback(context)
         when {
             action == "back" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)

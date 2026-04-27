@@ -19,6 +19,15 @@
     <string name="menu_debug_matrix_desc">显示手势触发区域</string>
     <string name="menu_arc_drawer">启用弧形冰箱</string>
     <string name="menu_arc_drawer_desc">在屏幕右侧以弧形显示应用列表</string>
+    <string name="menu_haptic_feedback">震动反馈</string>
+    <string name="menu_haptic_feedback_desc">触发动作时震动</string>
+    <string name="menu_haptic_feedback_desc_with_type">触发动作时震动 - %s</string>
+    <string name="menu_haptic_feedback_type">震动类型</string>
+    <string name="haptic_feedback_type_dialog_title">震动类型</string>
+    <string name="haptic_feedback_type_click">轻触</string>
+    <string name="haptic_feedback_type_tick">短促</string>
+    <string name="haptic_feedback_type_heavy_click">重按</string>
+    <string name="haptic_feedback_type_double_click">双击</string>
     <string name="menu_restart_sysui">重启 SystemUI</string>
     <string name="menu_about">关于</string>
     <string name="label_author">作者</string>
