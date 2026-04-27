@@ -1,12 +1,10 @@
 package com.fan.edgex.ui
 
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
@@ -96,17 +94,14 @@ class MainActivity : AppCompatActivity() {
 
         // 1.6 Haptic Feedback Toggle
         val cbHaptic = findViewById<android.widget.CheckBox>(R.id.checkbox_haptic_feedback)
-        val hapticTypeContent = findViewById<View>(R.id.item_haptic_feedback_type)
-        val hapticArrow = findViewById<android.widget.ImageView>(R.id.arrow_haptic_feedback)
-        var isHapticExpanded = false
         cbHaptic.isChecked = getConfigBool(AppConfig.HAPTIC_FEEDBACK)
-        cbHaptic.setOnCheckedChangeListener { _, isChecked -> putConfig(AppConfig.HAPTIC_FEEDBACK, isChecked) }
-        findViewById<View>(R.id.item_haptic_feedback).setOnClickListener {
-            isHapticExpanded = !isHapticExpanded
-            hapticTypeContent.visibility = if (isHapticExpanded) View.VISIBLE else View.GONE
-            hapticArrow.rotation = if (isHapticExpanded) 180f else 0f
+        cbHaptic.setOnCheckedChangeListener { _, isChecked ->
+            putConfig(AppConfig.HAPTIC_FEEDBACK, isChecked)
+            refreshHapticFeedbackType()
+            if (isChecked) showHapticFeedbackTypeDialog()
         }
-        setupHapticFeedbackType()
+        findViewById<View>(R.id.item_haptic_feedback).setOnClickListener { cbHaptic.performClick() }
+        refreshHapticFeedbackType()
 
         // 2. Restart SystemUI
         findViewById<View>(R.id.item_restart_sysui).setOnClickListener {
@@ -166,54 +161,42 @@ class MainActivity : AppCompatActivity() {
         refreshHapticFeedbackType()
     }
 
-    private fun setupHapticFeedbackType() {
-        hapticFeedbackTypes().forEach { option ->
-            findViewById<TextView>(option.chipId).setOnClickListener {
-                putConfig(AppConfig.HAPTIC_FEEDBACK_TYPE, option.value)
+    private fun showHapticFeedbackTypeDialog() {
+        val types = hapticFeedbackTypes()
+        val currentValue = currentHapticFeedbackType()
+        val checkedIndex = types.indexOfFirst { it.value == currentValue }.takeIf { it >= 0 } ?: 0
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.haptic_feedback_type_dialog_title)
+            .setSingleChoiceItems(types.map { getString(it.labelRes) }.toTypedArray(), checkedIndex) { dialog, which ->
+                putConfig(AppConfig.HAPTIC_FEEDBACK_TYPE, types[which].value)
                 refreshHapticFeedbackType()
+                dialog.dismiss()
             }
-        }
-        refreshHapticFeedbackType()
+            .show()
     }
 
     private fun refreshHapticFeedbackType() {
-        val value = getConfigString(
-            AppConfig.HAPTIC_FEEDBACK_TYPE,
-            AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK
-        )
-        val accent = ThemeManager.currentAccent(this)
-        val selectedText = ThemeManager.onAccentColor(accent)
-        val unselectedText = ColorUtils.setAlphaComponent(Color.BLACK, 179)
-        val unselectedStroke = ColorUtils.setAlphaComponent(Color.BLACK, 31)
-
-        hapticFeedbackTypes().forEach { option ->
-            val chip = findViewById<TextView>(option.chipId)
-            val selected = option.value == value
-            chip.setTextColor(if (selected) selectedText else unselectedText)
-            chip.background = hapticTypeChipBackground(
-                fillColor = if (selected) accent else Color.TRANSPARENT,
-                strokeColor = if (selected) accent else unselectedStroke,
-            )
-        }
+        val label = hapticFeedbackTypes()
+            .firstOrNull { it.value == currentHapticFeedbackType() }
+            ?.labelRes
+            ?: R.string.haptic_feedback_type_click
+        findViewById<TextView>(R.id.text_haptic_feedback_desc).text =
+            getString(R.string.menu_haptic_feedback_desc_with_type, getString(label))
     }
 
-    private fun hapticTypeChipBackground(fillColor: Int, strokeColor: Int): GradientDrawable =
-        GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = resources.displayMetrics.density * 18
-            setColor(fillColor)
-            setStroke((resources.displayMetrics.density).toInt().coerceAtLeast(1), strokeColor)
-        }
+    private fun currentHapticFeedbackType(): String =
+        getConfigString(AppConfig.HAPTIC_FEEDBACK_TYPE, AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK)
 
     private fun hapticFeedbackTypes(): List<HapticFeedbackType> = listOf(
-        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK, R.id.chip_haptic_type_click),
-        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_TICK, R.id.chip_haptic_type_tick),
-        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK, R.id.chip_haptic_type_heavy_click),
-        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK, R.id.chip_haptic_type_double_click),
+        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK, R.string.haptic_feedback_type_click),
+        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_TICK, R.string.haptic_feedback_type_tick),
+        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK, R.string.haptic_feedback_type_heavy_click),
+        HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK, R.string.haptic_feedback_type_double_click),
     )
 
     private data class HapticFeedbackType(
         val value: String,
-        val chipId: Int,
+        val labelRes: Int,
     )
 }

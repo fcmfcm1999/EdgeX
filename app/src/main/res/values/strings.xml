@@ -23,6 +23,7 @@
     <string name="menu_arc_drawer_desc">Display app list in arc on right side</string>
     <string name="menu_haptic_feedback">Haptic Feedback</string>
     <string name="menu_haptic_feedback_desc">Vibrate on action trigger</string>
+    <string name="menu_haptic_feedback_desc_with_type">Vibrate on action trigger - %s</string>
     <string name="menu_haptic_feedback_type">Haptic Type</string>
     <string name="haptic_feedback_type_dialog_title">Haptic Type</string>
     <string name="haptic_feedback_type_click">Click</string>
