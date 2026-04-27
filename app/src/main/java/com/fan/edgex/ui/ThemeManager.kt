@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.ColorUtils
+import androidx.core.graphics.toColorInt
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.widget.CompoundButtonCompat
@@ -38,11 +39,11 @@ object ThemeManager {
     )
 
     val presets = listOf(
-        ThemePreset(PRESET_DEFAULT, R.string.theme_preset_default, Color.parseColor("#326D32")),
-        ThemePreset(PRESET_CLASSIC, R.string.theme_preset_classic, Color.parseColor("#00796B")),
-        ThemePreset(PRESET_CEDAR, R.string.theme_preset_cedar, Color.parseColor("#496B3D")),
-        ThemePreset(PRESET_OCEAN, R.string.theme_preset_ocean, Color.parseColor("#2F6F8F")),
-        ThemePreset(PRESET_EMBER, R.string.theme_preset_ember, Color.parseColor("#C56B2A")),
+        ThemePreset(PRESET_DEFAULT, R.string.theme_preset_default, "#326D32".toColorInt()),
+        ThemePreset(PRESET_CLASSIC, R.string.theme_preset_classic, "#00796B".toColorInt()),
+        ThemePreset(PRESET_CEDAR, R.string.theme_preset_cedar, "#496B3D".toColorInt()),
+        ThemePreset(PRESET_OCEAN, R.string.theme_preset_ocean, "#2F6F8F".toColorInt()),
+        ThemePreset(PRESET_EMBER, R.string.theme_preset_ember, "#C56B2A".toColorInt()),
     )
 
     fun currentPresetId(context: Context): String =
@@ -145,5 +146,5 @@ object ThemeManager {
     }
 
     private fun parseColorOrDefault(value: String): Int =
-        runCatching { Color.parseColor(value) }.getOrElse { Color.parseColor(DEFAULT_CUSTOM_COLOR) }
+        runCatching { value.toColorInt() }.getOrElse { DEFAULT_CUSTOM_COLOR.toColorInt() }
 }

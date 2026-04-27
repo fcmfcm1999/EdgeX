@@ -54,8 +54,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
      * the native InputDispatcher actually calls filterInputEvent.
      */
     private fun hookInputManager(lpparam: XC_LoadPackage.LoadPackageParam) {
-        XposedBridge.log("$TAG: Initializing filterInputEvent hook (system_server)")
-
         try {
             val inputManagerService = XposedHelpers.findClass(
                 "com.android.server.input.InputManagerService", lpparam.classLoader
@@ -88,7 +86,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                         }
                     }
                 )
-                XposedBridge.log("$TAG: Hooked interceptKeyBeforeDispatching")
             } catch (t: Throwable) {
                 XposedBridge.log("$TAG: interceptKeyBeforeDispatching hook failed: ${t.message}")
             }
@@ -132,9 +129,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                         InputEvent::class.java, Int::class.javaPrimitiveType, hook
                     )
                     hooked = true
-                    XposedBridge.log("$TAG: Hooked filterInputEvent(InputEvent, int)")
                 } catch (t: Throwable) {
-                    XposedBridge.log("$TAG: filterInputEvent(InputEvent, int) not found")
                 }
             }
 
@@ -146,9 +141,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                         InputEvent::class.java, hook
                     )
                     hooked = true
-                    XposedBridge.log("$TAG: Hooked filterInputEvent(InputEvent)")
                 } catch (t: Throwable) {
-                    XposedBridge.log("$TAG: filterInputEvent(InputEvent) not found")
                 }
             }
 
@@ -159,7 +152,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                         try {
                             XposedBridge.hookMethod(m, hook)
                             hooked = true
-                            XposedBridge.log("$TAG: Hooked filterInputEvent via reflection: ${m.parameterTypes.joinToString()}")
                             break
                         } catch (t: Throwable) {
                             XposedBridge.log("$TAG: Reflection hook failed: ${t.message}")
@@ -202,18 +194,12 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "android.view.IInputFilter",
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val filter = param.args[0]
-                        val ims = param.thisObject
-                        XposedBridge.log("$TAG: setInputFilter called with filter=${filter?.javaClass?.name ?: "null"}")
-                        if (filter == null) {
-                            // Real filter removed — re-register ours to keep the path alive
-                            XposedBridge.log("$TAG: Real InputFilter removed, re-registering fake filter")
-                            registerFakeInputFilter(ims, inputManagerService.classLoader)
+                        if (param.args[0] == null) {
+                            registerFakeInputFilter(param.thisObject, inputManagerService.classLoader!!)
                         }
                     }
                 }
             )
-            XposedBridge.log("$TAG: Hooked setInputFilter")
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: Failed to hook setInputFilter: ${t.message}")
         }
@@ -242,7 +228,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         inputManagerServiceInstance = param.thisObject
                         mNativeInstance = XposedHelpers.getObjectField(param.thisObject, "mNative")
-                        XposedBridge.log("$TAG: Got InputManagerService and mNative instances")
                     }
                 })
 
@@ -262,7 +247,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                             val native = mNativeInstance
                             if (native != null) {
                                 XposedHelpers.callMethod(native, "setInputFilterEnabled", true)
-                                XposedBridge.log("$TAG: InputFilter enabled via mNative.setInputFilterEnabled(true)")
                             } else {
                                 XposedBridge.log("$TAG: mNative is null at start(), cannot enable InputFilter")
                             }
@@ -281,19 +265,14 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                                 XposedHelpers.getObjectField(ims, "mInputFilter")
                             } catch (_: Throwable) { null }
                             if (existingFilter == null) {
-                                XposedBridge.log("$TAG: No existing InputFilter, registering fake filter")
                                 registerFakeInputFilter(ims, classLoader)
-                            } else {
-                                XposedBridge.log("$TAG: InputFilter already set by ${existingFilter.javaClass.name}, skipping fake filter")
                             }
                         }
                     }
                 })
 
-            XposedBridge.log("$TAG: Hooked NativeImpl for InputFilter control (Android 16+)")
             return
         } catch (t: Throwable) {
-            XposedBridge.log("$TAG: NativeImpl not found, trying legacy approach: ${t.message}")
         }
 
         // Legacy: nativeSetInputFilterEnabled(long ptr, boolean enable)
@@ -325,14 +304,12 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                         try {
                             val ptr = XposedHelpers.getLongField(param.thisObject, "mPtr")
                             nativeMethod.invoke(null, ptr, true)
-                            XposedBridge.log("$TAG: InputFilter enabled via legacy nativeSetInputFilterEnabled")
                         } catch (t: Throwable) {
                             XposedBridge.log("$TAG: Legacy InputFilter enable failed: ${t.message}")
                         }
                     }
                 })
 
-            XposedBridge.log("$TAG: Hooked legacy nativeSetInputFilterEnabled for InputFilter control")
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: All InputFilter enable approaches failed: ${t.message}")
         }
@@ -367,7 +344,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     when (method.name) {
                         "install" -> {
                             hostRef = args?.get(0)
-                            XposedBridge.log("$TAG: IInputFilter.install() called, host acquired")
                         }
                         "filterInputEvent" -> {
                             val host = hostRef
@@ -389,7 +365,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
             )
 
             XposedHelpers.callMethod(imsInstance, "setInputFilter", filterProxy)
-            XposedBridge.log("$TAG: Registered fake IInputFilter to activate filterInputEvent path")
         } catch (e: Exception) {
             XposedBridge.log("$TAG: registerFakeInputFilter failed: ${e.message}")
             e.printStackTrace()

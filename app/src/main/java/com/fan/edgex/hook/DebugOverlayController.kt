@@ -56,7 +56,6 @@ internal class DebugOverlayController(
         debugViews.forEach { view ->
             view.updateDebugColor(color)
             view.updateWindowRegion()
-            view.destroyDrawingCache()
             view.invalidate()
         }
     }
@@ -212,8 +211,7 @@ internal class DebugOverlayController(
 
         fun updateWindowRegion() {
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            val realSize = android.graphics.Point()
-            wm.defaultDisplay.getRealSize(realSize)
+            val bounds = wm.currentWindowMetrics.bounds
             val thicknessPx = (12 * context.resources.displayMetrics.density).toInt()
 
             try {
@@ -229,9 +227,9 @@ internal class DebugOverlayController(
                     params.x = 0
                     params.y = 0
                     params.width =
-                        if (edge == OverlayEdge.LEFT || edge == OverlayEdge.RIGHT) thicknessPx else realSize.x
+                        if (edge == OverlayEdge.LEFT || edge == OverlayEdge.RIGHT) thicknessPx else bounds.width()
                     params.height =
-                        if (edge == OverlayEdge.TOP || edge == OverlayEdge.BOTTOM) thicknessPx else realSize.y
+                        if (edge == OverlayEdge.TOP || edge == OverlayEdge.BOTTOM) thicknessPx else bounds.height()
                 } else {
                     visibility = GONE
                     params.width = 0

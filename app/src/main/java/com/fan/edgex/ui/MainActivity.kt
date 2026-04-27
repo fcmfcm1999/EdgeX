@@ -3,6 +3,7 @@ package com.fan.edgex.ui
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import androidx.core.net.toUri
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
@@ -24,10 +25,10 @@ class MainActivity : AppCompatActivity() {
         // Fix for "Header too tall": fitsSystemWindows="true" defaults to applying ALL system insets (Top + Bottom).
         // Since this view is at the top, we only want the Top Inset (Status Bar).
         // The Bottom Inset (Nav Bar) was erroneously adding huge padding to the bottom of the header.
-        findViewById<android.view.View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
+        findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
             view.setPadding(
                 view.paddingLeft,
-                insets.systemWindowInsetTop, // Only apply status bar height
+                insets.getInsets(android.view.WindowInsets.Type.statusBars()).top, // Only apply status bar height
                 view.paddingRight,
                 view.paddingBottom // Keep original bottom padding (0 or defined)
             )
@@ -117,7 +118,7 @@ class MainActivity : AppCompatActivity() {
                 show()
             }
             try {
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/fcmfcm1999/EdgeX"))
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, "https://github.com/fcmfcm1999/EdgeX".toUri())
                 startActivity(intent)
             } catch (e: Exception) {
                 android.widget.Toast.makeText(this, getString(R.string.toast_cannot_open_browser), android.widget.Toast.LENGTH_SHORT).show()

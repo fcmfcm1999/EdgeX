@@ -1,7 +1,6 @@
 package com.fan.edgex.config
 
 import android.content.Context
-import android.os.Build
 import com.fan.edgex.BuildConfig
 import java.io.File
 import java.io.FileInputStream
@@ -22,11 +21,7 @@ object HookConfigSnapshot {
 
     fun snapshotFileForHook(): File =
         systemSnapshotFile().takeIf { it.isFile && it.canRead() }
-            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            File("/data/user_de/0/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
-        } else {
-            File("/data/data/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
-        }
+            ?: File("/data/user_de/0/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
 
     fun writeFromPreferences(context: Context): Boolean {
         val prefs = context.configPrefs()
@@ -88,15 +83,8 @@ object HookConfigSnapshot {
     private fun valuesForHook(values: Map<String, String>): Map<String, String> =
         values.filterKeys(::isHookRuntimeKey)
 
-    private fun snapshotFile(context: Context): File {
-        val storageContext =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                context.createDeviceProtectedStorageContext()
-            } else {
-                context
-            }
-        return File(storageContext.filesDir, SNAPSHOT_FILE)
-    }
+    private fun snapshotFile(context: Context): File =
+        File(context.createDeviceProtectedStorageContext().filesDir, SNAPSHOT_FILE)
 
     private fun systemSnapshotFile(): File =
         File("/data/system/edgex/$SNAPSHOT_FILE")
@@ -110,10 +98,6 @@ object HookConfigSnapshot {
             filesDir.setReadable(true, false)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            file.parentFile?.parentFile?.let { dataDir ->
-                dataDir.setExecutable(true, false)
-            }
-        }
+        file.parentFile?.parentFile?.setExecutable(true, false)
     }
 }
