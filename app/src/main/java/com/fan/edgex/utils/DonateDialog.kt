@@ -84,18 +84,25 @@ object DonateDialog {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).also { it.bottomMargin = dp(8f) })
 
-        // Buttons row 2 (Ko-fi)
-        val kofiBtn = makeButton(context, context.getString(R.string.donate_kofi), "#13C3FF".toColorInt())
-        root.addView(kofiBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(44f)
-        ).also { it.bottomMargin = dp(8f) })
+        // Buttons row 2 (Ko-fi + Crypto)
+        val buttonRow2 = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
 
-        // Buttons row 3 (Crypto)
+        val kofiBtn = makeButton(context, context.getString(R.string.donate_kofi), "#13C3FF".toColorInt())
+        buttonRow2.addView(kofiBtn, LinearLayout.LayoutParams(0, dp(44f), 1f).also {
+            it.marginEnd = dp(8f)
+        })
+
         val cryptoBtn = makeButton(context, context.getString(R.string.donate_crypto), "#F7931A".toColorInt())
-        root.addView(cryptoBtn, LinearLayout.LayoutParams(
+        buttonRow2.addView(cryptoBtn, LinearLayout.LayoutParams(0, dp(44f), 1f).also {
+            it.marginStart = dp(8f)
+        })
+
+        root.addView(buttonRow2, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(44f)
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ).also { it.bottomMargin = dp(4f) })
 
         val shape = GradientDrawable().apply {
