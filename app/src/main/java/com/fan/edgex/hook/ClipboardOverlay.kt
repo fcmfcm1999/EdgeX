@@ -1,6 +1,5 @@
 package com.fan.edgex.hook
 
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -39,12 +38,19 @@ object ClipboardOverlay {
     private var overlayRef: WeakReference<View>? = null
     private var autoDismissRunnable: Runnable? = null
 
+    // Populated by ClipboardHook whenever any app writes to the clipboard
+    @Volatile var cachedText: String? = null
+
+    fun onClipboardChanged(text: String?) {
+        cachedText = text
+    }
+
     fun isShowing(): Boolean = overlayRef?.get() != null
 
     fun show(context: Context) {
         handler.post {
             dismiss()
-            val text = readClipboardText(context)
+            val text = cachedText
             if (text == null) {
                 showToast(context, ModuleRes.getString(R.string.clipboard_empty))
                 return@post
@@ -67,21 +73,6 @@ object ClipboardOverlay {
             wm.removeViewImmediate(overlay)
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: ClipboardOverlay dismiss failed: ${t.message}")
-        }
-    }
-
-    // ── Clipboard read ─────────────────────────────────────────────────────────
-
-    private fun readClipboardText(context: Context): String? {
-        return try {
-            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = cm.primaryClip ?: return null
-            if (clip.itemCount == 0) return null
-            val text = clip.getItemAt(0).coerceToText(context)?.toString()?.trim()
-            if (text.isNullOrEmpty()) null else text
-        } catch (t: Throwable) {
-            XposedBridge.log("$TAG: readClipboard failed: ${t.message}")
-            null
         }
     }
 
