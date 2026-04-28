@@ -21,6 +21,10 @@ internal class EdgeGestureDetector(
         fun performContinuousAdjustment(action: String, context: Context, up: Boolean)
         fun isGlobalCopyModeActive(): Boolean
         fun log(message: String)
+        fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String)
+        fun updatePie(x: Float, y: Float)
+        fun commitPie(context: Context)
+        fun cancelPie()
     }
 
     private enum class Edge { LEFT, RIGHT, TOP, BOTTOM }
@@ -52,6 +56,8 @@ internal class EdgeGestureDetector(
         var subGestureAnchorEventTime: Long = 0L,
         var subGestureAnchorLocked: Boolean = false,
         var primaryGesture: String = "",
+        // Pie mode: finger holds to select, release to execute
+        var pieMode: Boolean = false,
     )
 
     private var activeSession: GestureSession? = null
@@ -81,6 +87,10 @@ internal class EdgeGestureDetector(
     fun reset() {
         val previousSession = activeSession
         activeSession = null
+
+        if (previousSession?.pieMode == true) {
+            callbacks.cancelPie()
+        }
 
         pendingLongPressRunnable?.let { handlerProvider().removeCallbacks(it) }
         pendingLongPressRunnable = null
@@ -120,6 +130,11 @@ internal class EdgeGestureDetector(
         val session = activeSession ?: return false
         updateTargetPoint(session, event.rawX, event.rawY)
 
+        if (session.pieMode) {
+            callbacks.updatePie(event.rawX, event.rawY)
+            return session.handoff.consumeStream
+        }
+
         if (session.subGestureMode) {
             updateSubGestureAnchor(session, event.rawX, event.rawY, event.eventTime)
             return session.handoff.consumeStream
@@ -142,6 +157,12 @@ internal class EdgeGestureDetector(
                         session.subGestureAnchorY = event.rawY
                         session.subGestureAnchorEventTime = event.eventTime
                         session.primaryGesture = gestureType
+                    }
+                    action == AppConfig.PIE_ACTION -> {
+                        handoff.cancel(session.handoff, context)
+                        cancelLongPressTimer()
+                        session.pieMode = true
+                        callbacks.showPie(context, session.downX, session.downY, session.edge.name.lowercase())
                     }
                     hasConfiguredAction(action) -> {
                         handoff.cancel(session.handoff, context)
@@ -175,6 +196,11 @@ internal class EdgeGestureDetector(
 
     private fun handleUp(event: MotionEvent, context: Context): Boolean {
         val session = activeSession ?: return false
+
+        if (session.pieMode) {
+            callbacks.commitPie(context)
+            return finishSession()
+        }
 
         if (session.subGestureMode) {
             // The anchor follows the first swipe to its farthest primary point. Child

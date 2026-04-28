@@ -25,6 +25,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_expand_notifications), "expand_notifications", R.drawable.ic_notifications),
         ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal),
         ActionItem(getString(R.string.action_sub_gesture), "sub_gesture", R.drawable.ic_sub_gesture),
+        ActionItem(getString(R.string.action_pie), "pie", R.drawable.ic_pie_menu),
         ActionItem(getString(R.string.action_launch_app), "launch_app", R.drawable.ic_launch_app),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_app_shortcut),
         ActionItem(getString(R.string.action_clear_background), "clear_background", R.drawable.ic_clear_recent),
@@ -81,6 +82,12 @@ class ActionSelectionActivity : AppCompatActivity() {
                     startActivity(Intent(this, SubGestureActivity::class.java)
                         .putExtra("pref_key", prefKey)
                         .putExtra("title", title))
+                    finish()
+                }
+                "pie" -> {
+                    putConfig(prefKey, "pie")
+                    putConfig("${prefKey}_label", getString(R.string.action_pie))
+                    startActivity(Intent(this, PieSettingsActivity::class.java))
                     finish()
                 }
                 "launch_app" -> {

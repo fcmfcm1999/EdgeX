@@ -93,6 +93,11 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
+        <activity
+            android:name=".ui.PieSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
         <receiver
             android:name=".config.ConfigSnapshotReceiver"
             android:exported="false">

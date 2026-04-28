@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Center dot -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,11 A1,1 0 1,0 12,13 A1,1 0 1,0 12,11 Z" />
+    <!-- Fan arc top-left -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,12 L5.5,5.5 A9,9 0 0,1 12,3 Z" />
+    <!-- Fan arc top -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,12 L12,3 A9,9 0 0,1 18.5,5.5 Z" />
+    <!-- Fan arc top-right -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,12 L18.5,5.5 A9,9 0 0,1 21,12 Z" />
+</vector>

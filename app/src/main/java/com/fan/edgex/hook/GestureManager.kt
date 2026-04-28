@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.overlay.PieManager
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -94,6 +95,22 @@ object GestureManager {
                 override fun log(message: String) {
                     gestureLog(message)
                 }
+
+                override fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String) {
+                    mainHandler().post { actionDispatcher.showPie(context, anchorX, anchorY, edge) }
+                }
+
+                override fun updatePie(x: Float, y: Float) {
+                    PieManager.update(x, y)
+                }
+
+                override fun commitPie(context: Context) {
+                    mainHandler().post { actionDispatcher.commitPieAction(context) }
+                }
+
+                override fun cancelPie() {
+                    mainHandler().post { PieManager.dismiss() }
+                }
             },
         )
     }
@@ -152,6 +169,7 @@ object GestureManager {
                     Intent.ACTION_SCREEN_OFF -> {
                         gestureDetector.reset()
                         KeyManager.reset()
+                        mainHandler().post { PieManager.dismiss() }
                     }
                     Intent.ACTION_USER_UNLOCKED -> {
                         configRepository.invalidate()
