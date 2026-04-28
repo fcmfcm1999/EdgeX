@@ -23,12 +23,12 @@ class PieView(context: Context) : View(context) {
 
     private companion object {
         const val INNER_DEAD_ZONE_DP = 90f
-        const val RING_BOUNDARY_DP   = 165f   // hit-test boundary between ring 0 and ring 1
+        const val RING_BOUNDARY_DP   = 159f   // hit-test boundary between ring 0 and ring 1
         const val RING0_DRAW_OUTER   = 154f   // ring 0 drawn outer edge
-        const val RING1_DRAW_INNER   = 175f   // ring 1 drawn inner edge (21dp gap)
+        const val RING1_DRAW_INNER   = 164f   // ring 1 drawn inner edge (10dp gap)
         const val OUTER_LIMIT_DP     = 250f
         const val FAN_ARC_DEG        = 160f
-        const val SECTOR_GAP_DEG     = 2.5f
+        const val SECTOR_GAP_DEG     = 1.5f
         const val ICON_SIZE_DP       = 40f
         const val LABEL_TEXT_SIZE_SP  = 12f
 
@@ -37,14 +37,28 @@ class PieView(context: Context) : View(context) {
         const val ANGLE_START_BOTTOM = 190f
         const val ANGLE_START_TOP    = 10f
 
-        val COLOR_RING_INNER       = Color.rgb(2, 134, 180)
-        val COLOR_RING_OUTER       = Color.rgb(34, 163, 208)
-        val COLOR_HIGHLIGHT        = Color.rgb(0, 102, 146)
         val COLOR_HIGHLIGHT_STROKE = Color.argb(210, 255, 255, 255)
         val COLOR_DIVIDER          = Color.argb(235, 255, 245, 250)
         val COLOR_SHADOW           = Color.argb(80, 0, 24, 48)
         val COLOR_DOT              = Color.argb(230, 255, 255, 255)
         val COLOR_DOT_HALO         = Color.argb(70, 255, 255, 255)
+    }
+
+    var accentColor: Int = Color.rgb(2, 134, 180)
+        set(value) { field = value; invalidate() }
+
+    private fun colorNormal(ringIndex: Int): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(accentColor, hsv)
+        if (ringIndex == 1) hsv[2] = (hsv[2] + 0.12f).coerceAtMost(1f)
+        return Color.HSVToColor(Color.alpha(accentColor), hsv)
+    }
+
+    private fun colorHighlight(): Int {
+        val hsv = FloatArray(3)
+        Color.colorToHSV(accentColor, hsv)
+        hsv[2] = (hsv[2] * 0.65f).coerceAtLeast(0f)
+        return Color.HSVToColor(Color.alpha(accentColor), hsv)
     }
 
     var rings: List<Ring> = emptyList()
@@ -217,11 +231,7 @@ class PieView(context: Context) : View(context) {
 
                 canvas.drawPath(path, shadowPaint)
 
-                sectorPaint.color = when {
-                    isHighlighted -> COLOR_HIGHLIGHT
-                    ringIndex == 0 -> COLOR_RING_INNER
-                    else -> COLOR_RING_OUTER
-                }
+                sectorPaint.color = if (isHighlighted) colorHighlight() else colorNormal(ringIndex)
                 sectorPaint.alpha = alpha
                 canvas.drawPath(path, sectorPaint)
 

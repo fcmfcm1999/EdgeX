@@ -21,6 +21,7 @@ import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.overlay.DrawerManager
 import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.PieView
@@ -257,7 +258,17 @@ internal class GestureActionDispatcher(
             })
         }
         if (rings.all { it.slots.isEmpty() }) return
-        PieManager.show(context, anchorX, anchorY, edge, rings)
+        PieManager.show(context, anchorX, anchorY, edge, rings, resolveAccentColor())
+    }
+
+    private fun resolveAccentColor(): Int {
+        val presetId = resolveConfig(AppConfig.THEME_PRESET).ifEmpty { ThemeManager.PRESET_DEFAULT }
+        if (presetId == ThemeManager.PRESET_CUSTOM) {
+            val hex = resolveConfig(AppConfig.THEME_CUSTOM_COLOR).ifEmpty { "#326D32" }
+            return try { android.graphics.Color.parseColor(hex) } catch (_: Exception) { android.graphics.Color.parseColor("#326D32") }
+        }
+        return ThemeManager.presets.firstOrNull { it.id == presetId }?.accentColor
+            ?: ThemeManager.presets.first().accentColor
     }
 
     private fun loadActionIcon(context: Context, action: String): Drawable? {

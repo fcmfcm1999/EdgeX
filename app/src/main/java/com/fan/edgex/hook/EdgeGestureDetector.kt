@@ -68,7 +68,7 @@ internal class EdgeGestureDetector(
 
     fun handle(event: MotionEvent, context: Context): Boolean {
         activeSession?.let { session ->
-            if (nowMillis() - session.startedAtMs > GESTURE_TIMEOUT_MS) reset()
+            if (!session.pieMode && nowMillis() - session.startedAtMs > GESTURE_TIMEOUT_MS) reset()
         }
 
         return when (event.actionMasked) {
