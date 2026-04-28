@@ -8,6 +8,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
+import android.text.TextPaint
+import android.util.TypedValue
 import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -28,16 +30,21 @@ class PieView(context: Context) : View(context) {
         const val FAN_ARC_DEG        = 160f
         const val SECTOR_GAP_DEG     = 2.5f
         const val ICON_SIZE_DP       = 28f
+        const val LABEL_TEXT_SIZE_SP  = 12f
 
         const val ANGLE_START_RIGHT  = 100f
         const val ANGLE_START_LEFT   = -80f
         const val ANGLE_START_BOTTOM = 190f
         const val ANGLE_START_TOP    = 10f
 
-        val COLOR_NORMAL    = Color.argb(220, 13, 71, 161)
-        val COLOR_HIGHLIGHT = Color.argb(240, 6, 40, 100)
-        val COLOR_DIVIDER   = Color.WHITE
-        val COLOR_DOT       = Color.argb(200, 255, 255, 255)
+        val COLOR_RING_INNER       = Color.rgb(2, 134, 180)
+        val COLOR_RING_OUTER       = Color.rgb(34, 163, 208)
+        val COLOR_HIGHLIGHT        = Color.rgb(0, 102, 146)
+        val COLOR_HIGHLIGHT_STROKE = Color.argb(210, 255, 255, 255)
+        val COLOR_DIVIDER          = Color.argb(235, 255, 245, 250)
+        val COLOR_SHADOW           = Color.argb(80, 0, 24, 48)
+        val COLOR_DOT              = Color.argb(230, 255, 255, 255)
+        val COLOR_DOT_HALO         = Color.argb(70, 255, 255, 255)
     }
 
     var rings: List<Ring> = emptyList()
@@ -51,13 +58,31 @@ class PieView(context: Context) : View(context) {
         set(value) { if (field != value) { field = value; invalidate() } }
 
     private val sectorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = COLOR_SHADOW
+        setShadowLayer(8f, 0f, 3f, COLOR_SHADOW)
+    }
     private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = COLOR_DIVIDER
     }
+    private val highlightStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = COLOR_HIGHLIGHT_STROKE
+    }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = COLOR_DOT
+    }
+    private val dotHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = COLOR_DOT_HALO
+    }
+    private val labelPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
     }
     private val path = Path()
     private val outerRect = RectF()
@@ -65,6 +90,10 @@ class PieView(context: Context) : View(context) {
 
     private var animFraction = 0f
     private var animator: ValueAnimator? = null
+
+    init {
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+    }
 
     fun isAnimationComplete() = animFraction >= 1.0f
 
@@ -81,6 +110,9 @@ class PieView(context: Context) : View(context) {
     }
 
     private fun dp(v: Float) = v * resources.displayMetrics.density
+
+    private fun sp(v: Float) =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, resources.displayMetrics)
 
     private fun fanStartAngle() = when (edge) {
         "right"  -> ANGLE_START_RIGHT
@@ -155,6 +187,11 @@ class PieView(context: Context) : View(context) {
 
         dividerPaint.strokeWidth = dp(2f)
         dividerPaint.alpha = alpha
+        highlightStrokePaint.strokeWidth = dp(1.5f)
+        highlightStrokePaint.alpha = alpha
+        shadowPaint.alpha = (95 * scale).toInt().coerceIn(0, 95)
+        labelPaint.textSize = sp(LABEL_TEXT_SIZE_SP) * scale
+        labelPaint.alpha = alpha
 
         val iconHalf = (dp(ICON_SIZE_DP) / 2f * scale).toInt()
 
@@ -178,7 +215,13 @@ class PieView(context: Context) : View(context) {
                 path.arcTo(innerRect, startAngle + sweep, -sweep)
                 path.close()
 
-                sectorPaint.color = if (isHighlighted) COLOR_HIGHLIGHT else COLOR_NORMAL
+                canvas.drawPath(path, shadowPaint)
+
+                sectorPaint.color = when {
+                    isHighlighted -> COLOR_HIGHLIGHT
+                    ringIndex == 0 -> COLOR_RING_INNER
+                    else -> COLOR_RING_OUTER
+                }
                 sectorPaint.alpha = alpha
                 canvas.drawPath(path, sectorPaint)
 
@@ -203,6 +246,13 @@ class PieView(context: Context) : View(context) {
                     icon.alpha = alpha
                     icon.setBounds(cx - iconHalf, cy - iconHalf, cx + iconHalf, cy + iconHalf)
                     icon.draw(canvas)
+                } else if (slot.label.isNotBlank()) {
+                    val baseline = cy - (labelPaint.descent() + labelPaint.ascent()) / 2f
+                    canvas.drawText(slot.label.take(4), cx.toFloat(), baseline, labelPaint)
+                }
+
+                if (isHighlighted) {
+                    canvas.drawPath(path, highlightStrokePaint)
                 }
             }
 
@@ -219,7 +269,9 @@ class PieView(context: Context) : View(context) {
         }
 
         // Center anchor dot
+        dotHaloPaint.alpha = (95 * scale).toInt().coerceIn(0, 95)
+        canvas.drawCircle(anchorX, anchorY, dp(15f) * scale, dotHaloPaint)
         dotPaint.alpha = alpha
-        canvas.drawCircle(anchorX, anchorY, dp(5f) * scale, dotPaint)
+        canvas.drawCircle(anchorX, anchorY, dp(4.5f) * scale, dotPaint)
     }
 }
