@@ -155,29 +155,39 @@ class PieView(context: Context) : View(context) {
 
         if (dist < dp(INNER_DEAD_ZONE_DP) || dist > dp(OUTER_LIMIT_DP)) return null
 
-        val ringIndex = if (dist < dp(RING_BOUNDARY_DP)) 0 else 1
-        val ring = rings.getOrNull(ringIndex) ?: return null
-        val n = ring.slots.size
-        if (n == 0) return null
-        if (n == 1) return Pair(ringIndex, 0)
-
         val fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
+        val preferredRi = if (dist < dp(RING_BOUNDARY_DP)) 0 else 1
 
-        for (i in 0 until n) {
-            if (isAngleInArc(fingerAngle, normalize(sectorStartAngle(i, n)), sectorSweep(n))) {
-                return Pair(ringIndex, i)
+        // Try preferred ring (radially closest) first, then the other ring.
+        // This ensures top/bottom items are found even when the finger overshoots
+        // radially into a ring that is empty or doesn't cover that angular range.
+        var fallback: Pair<Int, Int>? = null
+        for (ri in listOf(preferredRi, 1 - preferredRi)) {
+            val ring = rings.getOrNull(ri) ?: continue
+            val n = ring.slots.size
+            if (n == 0) continue
+
+            // Exact sector match
+            for (i in 0 until n) {
+                if (isAngleInArc(fingerAngle, normalize(sectorStartAngle(i, n)), sectorSweep(n))) {
+                    return Pair(ri, i)
+                }
+            }
+
+            // Record nearest-angle fallback from the first non-empty ring
+            if (fallback == null) {
+                var minDiff = Float.MAX_VALUE
+                var best = -1
+                for (i in 0 until n) {
+                    val mid = normalize(sectorStartAngle(i, n) + sectorSweep(n) / 2f)
+                    val d = angleDiff(fingerAngle, mid)
+                    if (d < minDiff) { minDiff = d; best = i }
+                }
+                if (best >= 0) fallback = Pair(ri, best)
             }
         }
 
-        // fallback: nearest mid-angle
-        var minDiff = Float.MAX_VALUE
-        var best = -1
-        for (i in 0 until n) {
-            val mid = normalize(sectorStartAngle(i, n) + sectorSweep(n) / 2f)
-            val d = angleDiff(fingerAngle, mid)
-            if (d < minDiff) { minDiff = d; best = i }
-        }
-        return if (best >= 0) Pair(ringIndex, best) else null
+        return fallback
     }
 
     private fun isAngleInArc(angle: Float, start: Float, sweep: Float): Boolean {
