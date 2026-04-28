@@ -22,14 +22,14 @@ class PieView(context: Context) : View(context) {
     data class Ring(val slots: List<Slot>)
 
     private companion object {
-        const val INNER_DEAD_ZONE_DP = 60f
-        const val RING_BOUNDARY_DP   = 110f   // hit-test boundary between ring 0 and ring 1
-        const val RING0_DRAW_OUTER   = 103f   // ring 0 drawn outer edge
-        const val RING1_DRAW_INNER   = 117f   // ring 1 drawn inner edge (14dp gap)
-        const val OUTER_LIMIT_DP     = 166f
-        const val FAN_ARC_DEG        = 320f
+        const val INNER_DEAD_ZONE_DP = 90f
+        const val RING_BOUNDARY_DP   = 165f   // hit-test boundary between ring 0 and ring 1
+        const val RING0_DRAW_OUTER   = 154f   // ring 0 drawn outer edge
+        const val RING1_DRAW_INNER   = 175f   // ring 1 drawn inner edge (21dp gap)
+        const val OUTER_LIMIT_DP     = 250f
+        const val FAN_ARC_DEG        = 160f
         const val SECTOR_GAP_DEG     = 2.5f
-        const val ICON_SIZE_DP       = 28f
+        const val ICON_SIZE_DP       = 40f
         const val LABEL_TEXT_SIZE_SP  = 12f
 
         const val ANGLE_START_RIGHT  = 100f
