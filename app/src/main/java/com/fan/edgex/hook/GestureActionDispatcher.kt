@@ -247,18 +247,17 @@ internal class GestureActionDispatcher(
 
     fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String) {
         val rings = (1..AppConfig.PIE_RINGS).map { ring ->
-            PieView.Ring((0 until AppConfig.PIE_SLOTS_PER_RING).map { slot ->
+            PieView.Ring((0 until AppConfig.PIE_SLOTS_PER_RING).mapNotNull { slot ->
                 val action = resolveConfig(AppConfig.pieSlot(edge, ring, slot))
-                if (action.isEmpty() || action == "none") {
-                    PieView.Slot("", action, null)
-                } else {
+                if (action.isEmpty() || action == "none") null
+                else {
                     val label = resolveConfig(AppConfig.pieSlotLabel(edge, ring, slot)).ifEmpty { pieActionToLabel(action) }
                     val icon = loadActionIcon(context, action)
                     PieView.Slot(label, action, icon)
                 }
             })
         }
-        if (rings.all { ring -> ring.slots.none { it.hasAction } }) return
+        if (rings.all { it.slots.isEmpty() }) return
         PieManager.show(context, anchorX, anchorY, edge, rings, resolveAccentColor())
     }
 

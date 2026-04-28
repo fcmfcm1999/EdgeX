@@ -14,18 +14,15 @@ import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class PieView(context: Context) : View(context) {
 
-    data class Slot(val label: String, val action: String, val icon: Drawable? = null) {
-        val hasAction: Boolean
-            get() = action.isNotEmpty() && action != "none"
-    }
+    data class Slot(val label: String, val action: String, val icon: Drawable? = null)
     data class Ring(val slots: List<Slot>)
 
     private companion object {
         const val INNER_DEAD_ZONE_DP = 90f
-        const val RING_BOUNDARY_DP   = 159f   // hit-test boundary between ring 0 and ring 1
         const val RING0_DRAW_OUTER   = 154f   // ring 0 drawn outer edge
         const val RING1_DRAW_INNER   = 164f   // ring 1 drawn inner edge (10dp gap)
         const val OUTER_LIMIT_DP     = 250f
@@ -33,6 +30,7 @@ class PieView(context: Context) : View(context) {
         const val SECTOR_GAP_DEG     = 1.5f
         const val ICON_SIZE_DP       = 40f
         const val LABEL_TEXT_SIZE_SP  = 12f
+        const val HIT_RADIUS_SLOP_DP  = 8f
 
         const val ANGLE_START_RIGHT  = 100f
         const val ANGLE_START_LEFT   = -80f
@@ -144,16 +142,6 @@ class PieView(context: Context) : View(context) {
     private fun ringDrawOuterR(ringIndex: Int) =
         if (ringIndex == 0) dp(RING0_DRAW_OUTER) else dp(OUTER_LIMIT_DP)
 
-    private fun activeSlotCount(): Int {
-        var maxSlot = -1
-        rings.forEach { ring ->
-            ring.slots.forEachIndexed { index, slot ->
-                if (slot.hasAction) maxSlot = maxOf(maxSlot, index)
-            }
-        }
-        return (maxSlot + 1).coerceAtLeast(1)
-    }
-
     private fun sectorStartAngle(slotIndex: Int, count: Int): Float =
         fanStartAngle() + slotIndex * (FAN_ARC_DEG / count) + SECTOR_GAP_DEG / 2f
 
@@ -164,31 +152,46 @@ class PieView(context: Context) : View(context) {
         val dx = x - anchorX
         val dy = y - anchorY
         val distSq = dx * dx + dy * dy
-        val innerLimit = dp(INNER_DEAD_ZONE_DP)
-        val outerLimit = dp(OUTER_LIMIT_DP)
-
-        if (distSq < innerLimit * innerLimit || distSq > outerLimit * outerLimit) return null
-
-        val boundary = dp(RING_BOUNDARY_DP)
-        val ringIndex = if (distSq <= boundary * boundary) 0 else 1
+        val dist = sqrt(distSq.toDouble()).toFloat()
+        val ringIndex = hitRingIndex(dist) ?: return null
         val ring = rings.getOrNull(ringIndex) ?: return null
-        val n = activeSlotCount()
+        val n = ring.slots.size
         if (n == 0) return null
 
-        var fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
-        if (edge == "left" && fingerAngle >= 270f) {
-            fingerAngle -= 360f
-        }
+        val fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
+        val step = FAN_ARC_DEG / n
 
         for (i in 0 until n) {
-            val start = fanStartAngle() + i * (FAN_ARC_DEG / n)
-            val end = start + (FAN_ARC_DEG / n)
-            if (fingerAngle > start && fingerAngle < end) {
-                return if (ring.slots.getOrNull(i)?.hasAction == true) Pair(ringIndex, i) else null
+            val start = normalize(fanStartAngle() + i * step)
+            if (isAngleInArc(fingerAngle, start, step)) {
+                return Pair(ringIndex, i)
             }
         }
 
         return null
+    }
+
+    private fun hitRingIndex(dist: Float): Int? {
+        val candidates = rings.indices.filter { ringIndex ->
+            rings[ringIndex].slots.isNotEmpty() &&
+                dist >= ringDrawInnerR(ringIndex) - dp(HIT_RADIUS_SLOP_DP) &&
+                dist <= ringDrawOuterR(ringIndex) + dp(HIT_RADIUS_SLOP_DP)
+        }
+        if (candidates.isEmpty()) return null
+
+        if (highlightedRing in candidates) return highlightedRing
+
+        return candidates.minByOrNull { ringIndex ->
+            val inner = ringDrawInnerR(ringIndex)
+            val outer = ringDrawOuterR(ringIndex)
+            if (dist in inner..outer) 0f else minOf(kotlin.math.abs(dist - inner), kotlin.math.abs(dist - outer))
+        }
+    }
+
+    private fun isAngleInArc(angle: Float, start: Float, sweep: Float): Boolean {
+        val end = normalize(start + sweep)
+        return if (start <= end) angle in start..end
+        else angle >= start || angle <= end
     }
 
     private fun normalize(a: Float): Float = ((a % 360f) + 360f) % 360f
@@ -210,16 +213,13 @@ class PieView(context: Context) : View(context) {
         val iconHalf = (dp(ICON_SIZE_DP) / 2f * scale).toInt()
 
         rings.forEachIndexed { ringIndex, ring ->
-            val n = activeSlotCount()
+            val n = ring.slots.size
             if (n == 0) return@forEachIndexed
 
             val innerR = ringDrawInnerR(ringIndex) * scale
             val outerR = ringDrawOuterR(ringIndex) * scale
 
-            for (slotIndex in 0 until n) {
-                val slot = ring.slots.getOrNull(slotIndex) ?: continue
-                if (!slot.hasAction) continue
-
+            ring.slots.forEachIndexed { slotIndex, slot ->
                 val startAngle = sectorStartAngle(slotIndex, n)
                 val sweep = sectorSweep(n)
                 val isHighlighted = (ringIndex == highlightedRing && slotIndex == highlightedSlot)
@@ -258,7 +258,6 @@ class PieView(context: Context) : View(context) {
                     canvas.drawPath(path, highlightStrokePaint)
                 }
             }
-
         }
 
         // Center anchor dot
