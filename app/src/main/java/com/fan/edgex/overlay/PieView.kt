@@ -27,7 +27,7 @@ class PieView(context: Context) : View(context) {
         const val RING0_DRAW_OUTER   = 103f   // ring 0 drawn outer edge
         const val RING1_DRAW_INNER   = 117f   // ring 1 drawn inner edge (14dp gap)
         const val OUTER_LIMIT_DP     = 166f
-        const val FAN_ARC_DEG        = 160f
+        const val FAN_ARC_DEG        = 320f
         const val SECTOR_GAP_DEG     = 2.5f
         const val ICON_SIZE_DP       = 28f
         const val LABEL_TEXT_SIZE_SP  = 12f
