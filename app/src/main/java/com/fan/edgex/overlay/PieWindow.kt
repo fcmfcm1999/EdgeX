@@ -13,12 +13,12 @@ class PieWindow(
     private val pieView = PieView(context)
     private var added = false
 
-    fun show(anchorX: Float, anchorY: Float, edge: String, slots: List<PieView.Slot>) {
+    fun show(anchorX: Float, anchorY: Float, edge: String, rings: List<PieView.Ring>) {
         if (added) return
         pieView.anchorX = anchorX
         pieView.anchorY = anchorY
         pieView.edge = edge
-        pieView.slots = slots
+        pieView.rings = rings
 
         @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams(
@@ -43,12 +43,15 @@ class PieWindow(
 
     fun update(x: Float, y: Float) {
         if (!added) return
-        pieView.highlightedIndex = pieView.hitTest(x, y)
+        val hit = pieView.hitTest(x, y)
+        pieView.highlightedRing = hit?.first ?: -1
+        pieView.highlightedSlot = hit?.second ?: -1
     }
 
     fun commit(): String? {
-        val idx = pieView.highlightedIndex
-        val selected = if (idx >= 0 && idx < pieView.slots.size) pieView.slots[idx].action else null
+        val r = pieView.highlightedRing
+        val s = pieView.highlightedSlot
+        val selected = if (r >= 0 && s >= 0) pieView.rings.getOrNull(r)?.slots?.getOrNull(s)?.action else null
         dismiss()
         return selected
     }

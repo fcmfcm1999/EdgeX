@@ -244,23 +244,24 @@ internal class GestureActionDispatcher(
     }
 
     fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String) {
-        val slots = loadPieSlots()
-        if (slots.isEmpty()) return
-        PieManager.show(context, anchorX, anchorY, edge, slots)
+        val rings = (1..AppConfig.PIE_RINGS).map { ring ->
+            PieView.Ring((0 until AppConfig.PIE_SLOTS_PER_RING).mapNotNull { slot ->
+                val action = resolveConfig(AppConfig.pieSlot(edge, ring, slot))
+                if (action.isEmpty() || action == "none") null
+                else {
+                    val label = resolveConfig(AppConfig.pieSlotLabel(edge, ring, slot)).ifEmpty { pieActionToLabel(action) }
+                    PieView.Slot(label, action)
+                }
+            })
+        }
+        if (rings.all { it.slots.isEmpty() }) return
+        PieManager.show(context, anchorX, anchorY, edge, rings)
     }
 
     fun commitPieAction(context: Context) {
         val action = PieManager.commit() ?: return
         performAction(action, context, 0f, 0f)
     }
-
-    private fun loadPieSlots(): List<PieView.Slot> =
-        (0 until AppConfig.PIE_MAX_SLOTS).mapNotNull { i ->
-            val action = resolveConfig(AppConfig.pieSlot(i))
-            if (action.isEmpty() || action == "none") return@mapNotNull null
-            val label = resolveConfig(AppConfig.pieSlotLabel(i)).ifEmpty { pieActionToLabel(action) }
-            PieView.Slot(label = label, action = action)
-        }
 
     private fun pieActionToLabel(action: String): String = when {
         action == "back"              -> "Back"

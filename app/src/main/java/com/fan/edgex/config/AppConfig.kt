@@ -47,10 +47,12 @@ object AppConfig {
     fun subGestureChildKey(parentKey: String, direction: String) = "${parentKey}_sub_${direction}"
 
     const val PIE_ACTION = "pie"
-    const val PIE_MAX_SLOTS = 8
+    const val PIE_RINGS = 2
+    const val PIE_SLOTS_PER_RING = 6
+    val PIE_EDGES = listOf("left", "right", "top", "bottom")
 
-    fun pieSlot(index: Int) = "pie_slot_$index"
-    fun pieSlotLabel(index: Int) = "pie_slot_${index}_label"
+    fun pieSlot(edge: String, ring: Int, slot: Int) = "pie_${edge}_ring${ring}_slot${slot}"
+    fun pieSlotLabel(edge: String, ring: Int, slot: Int) = "pie_${edge}_ring${ring}_slot${slot}_label"
 
     fun zoneEnabled(zone: String) = "zone_enabled_$zone"
     fun gestureAction(zone: String, gesture: String) = "${zone}_${gesture}"

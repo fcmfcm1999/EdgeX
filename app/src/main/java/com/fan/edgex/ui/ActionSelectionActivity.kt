@@ -87,7 +87,6 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "pie" -> {
                     putConfig(prefKey, "pie")
                     putConfig("${prefKey}_label", getString(R.string.action_pie))
-                    startActivity(Intent(this, PieSettingsActivity::class.java))
                     finish()
                 }
                 "launch_app" -> {
