@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
 import android.os.Handler
@@ -261,7 +260,6 @@ internal class GestureActionDispatcher(
         PieManager.show(context, anchorX, anchorY, edge, rings)
     }
 
-    @Suppress("DEPRECATION")
     private fun loadActionIcon(context: Context, action: String): Drawable? {
         if (action.startsWith("launch_app:")) {
             val pkg = action.substringAfter("launch_app:")
@@ -269,9 +267,7 @@ internal class GestureActionDispatcher(
         }
         val resId = actionToIconRes(action)
         if (resId == 0) return null
-        return try {
-            context.resources.getDrawable(resId, context.theme).also { it.setTint(Color.WHITE) }
-        } catch (_: Exception) { null }
+        return ModuleRes.getDrawable(resId)
     }
 
     private fun actionToIconRes(action: String): Int = when {
