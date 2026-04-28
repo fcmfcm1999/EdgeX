@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -15,16 +16,18 @@ import kotlin.math.sqrt
 
 class PieView(context: Context) : View(context) {
 
-    data class Slot(val label: String, val action: String)
+    data class Slot(val label: String, val action: String, val icon: Drawable? = null)
     data class Ring(val slots: List<Slot>)
 
     private companion object {
         const val INNER_DEAD_ZONE_DP = 40f
-        const val RING_BOUNDARY_DP   = 140f
-        const val OUTER_LIMIT_DP     = 250f
+        const val RING_BOUNDARY_DP   = 140f   // hit-test boundary between ring 0 and ring 1
+        const val RING0_DRAW_OUTER   = 126f   // ring 0 drawn outer edge
+        const val RING1_DRAW_INNER   = 154f   // ring 1 drawn inner edge (28dp gap)
+        const val OUTER_LIMIT_DP     = 252f
         const val FAN_ARC_DEG        = 160f
         const val SECTOR_GAP_DEG     = 2.5f
-        const val LABEL_SIZE_SP      = 11f
+        const val ICON_SIZE_DP       = 28f
 
         const val ANGLE_START_RIGHT  = 100f
         const val ANGLE_START_LEFT   = -80f
@@ -52,11 +55,6 @@ class PieView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         color = COLOR_DIVIDER
     }
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        color = Color.WHITE
-        isFakeBoldText = true
-    }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = COLOR_DOT
@@ -83,8 +81,6 @@ class PieView(context: Context) : View(context) {
     }
 
     private fun dp(v: Float) = v * resources.displayMetrics.density
-    @Suppress("DEPRECATION")
-    private fun sp(v: Float) = v * resources.displayMetrics.scaledDensity
 
     private fun fanStartAngle() = when (edge) {
         "right"  -> ANGLE_START_RIGHT
@@ -94,8 +90,11 @@ class PieView(context: Context) : View(context) {
         else     -> ANGLE_START_RIGHT
     }
 
-    private fun ringInnerR(ringIndex: Int) = if (ringIndex == 0) dp(INNER_DEAD_ZONE_DP) else dp(RING_BOUNDARY_DP)
-    private fun ringOuterR(ringIndex: Int) = if (ringIndex == 0) dp(RING_BOUNDARY_DP) else dp(OUTER_LIMIT_DP)
+    // Drawing radii (with gap between rings)
+    private fun ringDrawInnerR(ringIndex: Int) =
+        if (ringIndex == 0) dp(INNER_DEAD_ZONE_DP) else dp(RING1_DRAW_INNER)
+    private fun ringDrawOuterR(ringIndex: Int) =
+        if (ringIndex == 0) dp(RING0_DRAW_OUTER) else dp(OUTER_LIMIT_DP)
 
     private fun sectorStartAngle(slotIndex: Int, count: Int): Float =
         fanStartAngle() + slotIndex * (FAN_ARC_DEG / count) + SECTOR_GAP_DEG / 2f
@@ -119,9 +118,9 @@ class PieView(context: Context) : View(context) {
         val fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
 
         for (i in 0 until n) {
-            val start = normalize(sectorStartAngle(i, n))
-            val end = normalize(start + sectorSweep(n))
-            if (isAngleInArc(fingerAngle, start, sectorSweep(n))) return Pair(ringIndex, i)
+            if (isAngleInArc(fingerAngle, normalize(sectorStartAngle(i, n)), sectorSweep(n))) {
+                return Pair(ringIndex, i)
+            }
         }
 
         // fallback: nearest mid-angle
@@ -154,23 +153,24 @@ class PieView(context: Context) : View(context) {
         val scale = animFraction
         val alpha = (255 * scale).toInt().coerceIn(0, 255)
 
-        textPaint.textSize = sp(LABEL_SIZE_SP) * scale
         dividerPaint.strokeWidth = dp(2f)
         dividerPaint.alpha = alpha
+
+        val iconHalf = (dp(ICON_SIZE_DP) / 2f * scale).toInt()
 
         rings.forEachIndexed { ringIndex, ring ->
             val n = ring.slots.size
             if (n == 0) return@forEachIndexed
 
-            val innerR = ringInnerR(ringIndex) * scale
-            val outerR = ringOuterR(ringIndex) * scale
+            val innerR = ringDrawInnerR(ringIndex) * scale
+            val outerR = ringDrawOuterR(ringIndex) * scale
 
             ring.slots.forEachIndexed { slotIndex, slot ->
                 val startAngle = sectorStartAngle(slotIndex, n)
                 val sweep = sectorSweep(n)
                 val isHighlighted = (ringIndex == highlightedRing && slotIndex == highlightedSlot)
 
-                // Build sector path
+                // Sector path
                 path.reset()
                 outerRect.set(anchorX - outerR, anchorY - outerR, anchorX + outerR, anchorY + outerR)
                 innerRect.set(anchorX - innerR, anchorY - innerR, anchorX + innerR, anchorY + innerR)
@@ -178,12 +178,11 @@ class PieView(context: Context) : View(context) {
                 path.arcTo(innerRect, startAngle + sweep, -sweep)
                 path.close()
 
-                val baseColor = if (isHighlighted) COLOR_HIGHLIGHT else COLOR_NORMAL
-                sectorPaint.color = baseColor
+                sectorPaint.color = if (isHighlighted) COLOR_HIGHLIGHT else COLOR_NORMAL
                 sectorPaint.alpha = alpha
                 canvas.drawPath(path, sectorPaint)
 
-                // Divider lines at sector start boundary
+                // Leading divider line
                 val startRad = Math.toRadians(startAngle.toDouble())
                 canvas.drawLine(
                     anchorX + innerR * cos(startRad).toFloat(),
@@ -193,16 +192,21 @@ class PieView(context: Context) : View(context) {
                     dividerPaint,
                 )
 
-                // Label in sector centroid
-                val midAngleRad = Math.toRadians((startAngle + sweep / 2f).toDouble())
+                // Icon or label centered in sector
+                val midRad = Math.toRadians((startAngle + sweep / 2f).toDouble())
                 val midR = (innerR + outerR) / 2f
-                val tx = anchorX + midR * cos(midAngleRad).toFloat()
-                val ty = anchorY + midR * sin(midAngleRad).toFloat()
-                textPaint.color = Color.argb(alpha, 255, 255, 255)
-                canvas.drawText(slot.label.take(6), tx, ty + textPaint.textSize * 0.38f, textPaint)
+                val cx = (anchorX + midR * cos(midRad)).toInt()
+                val cy = (anchorY + midR * sin(midRad)).toInt()
+
+                val icon = slot.icon
+                if (icon != null) {
+                    icon.alpha = alpha
+                    icon.setBounds(cx - iconHalf, cy - iconHalf, cx + iconHalf, cy + iconHalf)
+                    icon.draw(canvas)
+                }
             }
 
-            // Final divider line after last sector
+            // Trailing divider after last sector
             val endAngle = sectorStartAngle(n - 1, n) + sectorSweep(n)
             val endRad = Math.toRadians(endAngle.toDouble())
             canvas.drawLine(
@@ -214,7 +218,7 @@ class PieView(context: Context) : View(context) {
             )
         }
 
-        // Center dot at anchor
+        // Center anchor dot
         dotPaint.alpha = alpha
         canvas.drawCircle(anchorX, anchorY, dp(5f) * scale, dotPaint)
     }

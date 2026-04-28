@@ -4,6 +4,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.media.AudioManager
 import android.os.Handler
 import android.os.IBinder
@@ -250,12 +252,57 @@ internal class GestureActionDispatcher(
                 if (action.isEmpty() || action == "none") null
                 else {
                     val label = resolveConfig(AppConfig.pieSlotLabel(edge, ring, slot)).ifEmpty { pieActionToLabel(action) }
-                    PieView.Slot(label, action)
+                    val icon = loadActionIcon(context, action)
+                    PieView.Slot(label, action, icon)
                 }
             })
         }
         if (rings.all { it.slots.isEmpty() }) return
         PieManager.show(context, anchorX, anchorY, edge, rings)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun loadActionIcon(context: Context, action: String): Drawable? {
+        if (action.startsWith("launch_app:")) {
+            val pkg = action.substringAfter("launch_app:")
+            try { return context.packageManager.getApplicationIcon(pkg) } catch (_: Exception) {}
+        }
+        val resId = actionToIconRes(action)
+        if (resId == 0) return null
+        return try {
+            context.resources.getDrawable(resId, context.theme).also { it.setTint(Color.WHITE) }
+        } catch (_: Exception) { null }
+    }
+
+    private fun actionToIconRes(action: String): Int = when {
+        action == "back"                     -> R.drawable.ic_arrow_back
+        action == "home"                     -> R.drawable.ic_home
+        action == "recents"                  -> R.drawable.ic_recents
+        action == "screenshot"               -> R.drawable.ic_camera
+        action == "lock_screen"              -> R.drawable.ic_power
+        action == "expand_notifications"     -> R.drawable.ic_notifications
+        action == "kill_app"                 -> R.drawable.ic_kill_app
+        action == "clipboard"                -> R.drawable.ic_paste
+        action == "universal_copy"           -> R.drawable.ic_content_copy
+        action == "freezer_drawer"           -> R.drawable.ic_freezer
+        action == "refreeze"                 -> R.drawable.ic_refreeze
+        action == "brightness_up"            -> R.drawable.ic_brightness_up
+        action == "brightness_down"          -> R.drawable.ic_brightness_down
+        action == "volume_up"                -> R.drawable.ic_volume_up
+        action == "volume_down"              -> R.drawable.ic_volume_down
+        action == "clear_background"         -> R.drawable.ic_clear_recent
+        action == "sub_gesture"              -> R.drawable.ic_sub_gesture
+        action.startsWith("music_control:")  -> when (action.substringAfter("music_control:")) {
+            "play_pause" -> R.drawable.ic_music_play_pause
+            "stop"       -> R.drawable.ic_music_stop
+            "previous"   -> R.drawable.ic_music_previous
+            "next"       -> R.drawable.ic_music_next
+            else         -> R.drawable.ic_music
+        }
+        action.startsWith("shell:")          -> R.drawable.ic_terminal
+        action.startsWith("app_shortcut:")   -> R.drawable.ic_app_shortcut
+        action.startsWith("launch_app:")     -> R.drawable.ic_launch_app
+        else                                 -> 0
     }
 
     fun commitPieAction(context: Context) {
