@@ -14,11 +14,13 @@ import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 class PieView(context: Context) : View(context) {
 
-    data class Slot(val label: String, val action: String, val icon: Drawable? = null)
+    data class Slot(val label: String, val action: String, val icon: Drawable? = null) {
+        val hasAction: Boolean
+            get() = action.isNotEmpty() && action != "none"
+    }
     data class Ring(val slots: List<Slot>)
 
     private companion object {
@@ -142,6 +144,16 @@ class PieView(context: Context) : View(context) {
     private fun ringDrawOuterR(ringIndex: Int) =
         if (ringIndex == 0) dp(RING0_DRAW_OUTER) else dp(OUTER_LIMIT_DP)
 
+    private fun activeSlotCount(): Int {
+        var maxSlot = -1
+        rings.forEach { ring ->
+            ring.slots.forEachIndexed { index, slot ->
+                if (slot.hasAction) maxSlot = maxOf(maxSlot, index)
+            }
+        }
+        return (maxSlot + 1).coerceAtLeast(1)
+    }
+
     private fun sectorStartAngle(slotIndex: Int, count: Int): Float =
         fanStartAngle() + slotIndex * (FAN_ARC_DEG / count) + SECTOR_GAP_DEG / 2f
 
@@ -151,57 +163,35 @@ class PieView(context: Context) : View(context) {
     fun hitTest(x: Float, y: Float): Pair<Int, Int>? {
         val dx = x - anchorX
         val dy = y - anchorY
-        val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+        val distSq = dx * dx + dy * dy
+        val innerLimit = dp(INNER_DEAD_ZONE_DP)
+        val outerLimit = dp(OUTER_LIMIT_DP)
 
-        if (dist < dp(INNER_DEAD_ZONE_DP) || dist > dp(OUTER_LIMIT_DP)) return null
+        if (distSq < innerLimit * innerLimit || distSq > outerLimit * outerLimit) return null
 
-        val fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
-        val preferredRi = if (dist < dp(RING_BOUNDARY_DP)) 0 else 1
+        val boundary = dp(RING_BOUNDARY_DP)
+        val ringIndex = if (distSq <= boundary * boundary) 0 else 1
+        val ring = rings.getOrNull(ringIndex) ?: return null
+        val n = activeSlotCount()
+        if (n == 0) return null
 
-        // Try preferred ring (radially closest) first, then the other ring.
-        // This ensures top/bottom items are found even when the finger overshoots
-        // radially into a ring that is empty or doesn't cover that angular range.
-        var fallback: Pair<Int, Int>? = null
-        for (ri in listOf(preferredRi, 1 - preferredRi)) {
-            val ring = rings.getOrNull(ri) ?: continue
-            val n = ring.slots.size
-            if (n == 0) continue
+        var fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
+        if (edge == "left" && fingerAngle >= 270f) {
+            fingerAngle -= 360f
+        }
 
-            // Exact sector match
-            for (i in 0 until n) {
-                if (isAngleInArc(fingerAngle, normalize(sectorStartAngle(i, n)), sectorSweep(n))) {
-                    return Pair(ri, i)
-                }
-            }
-
-            // Record nearest-angle fallback from the first non-empty ring
-            if (fallback == null) {
-                var minDiff = Float.MAX_VALUE
-                var best = -1
-                for (i in 0 until n) {
-                    val mid = normalize(sectorStartAngle(i, n) + sectorSweep(n) / 2f)
-                    val d = angleDiff(fingerAngle, mid)
-                    if (d < minDiff) { minDiff = d; best = i }
-                }
-                if (best >= 0) fallback = Pair(ri, best)
+        for (i in 0 until n) {
+            val start = fanStartAngle() + i * (FAN_ARC_DEG / n)
+            val end = start + (FAN_ARC_DEG / n)
+            if (fingerAngle > start && fingerAngle < end) {
+                return if (ring.slots.getOrNull(i)?.hasAction == true) Pair(ringIndex, i) else null
             }
         }
 
-        return fallback
-    }
-
-    private fun isAngleInArc(angle: Float, start: Float, sweep: Float): Boolean {
-        val end = normalize(start + sweep)
-        return if (start <= end) angle in start..end
-        else angle >= start || angle <= end
+        return null
     }
 
     private fun normalize(a: Float): Float = ((a % 360f) + 360f) % 360f
-
-    private fun angleDiff(a: Float, b: Float): Float {
-        val d = ((a - b + 360f) % 360f)
-        return if (d > 180f) 360f - d else d
-    }
 
     override fun onDraw(canvas: Canvas) {
         if (animFraction == 0f || rings.isEmpty()) return
@@ -220,13 +210,16 @@ class PieView(context: Context) : View(context) {
         val iconHalf = (dp(ICON_SIZE_DP) / 2f * scale).toInt()
 
         rings.forEachIndexed { ringIndex, ring ->
-            val n = ring.slots.size
+            val n = activeSlotCount()
             if (n == 0) return@forEachIndexed
 
             val innerR = ringDrawInnerR(ringIndex) * scale
             val outerR = ringDrawOuterR(ringIndex) * scale
 
-            ring.slots.forEachIndexed { slotIndex, slot ->
+            for (slotIndex in 0 until n) {
+                val slot = ring.slots.getOrNull(slotIndex) ?: continue
+                if (!slot.hasAction) continue
+
                 val startAngle = sectorStartAngle(slotIndex, n)
                 val sweep = sectorSweep(n)
                 val isHighlighted = (ringIndex == highlightedRing && slotIndex == highlightedSlot)
