@@ -5,11 +5,13 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.view.View
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class PieView(context: Context) : View(context) {
 
@@ -17,19 +19,22 @@ class PieView(context: Context) : View(context) {
     data class Ring(val slots: List<Slot>)
 
     private companion object {
-        const val RING1_RADIUS_DP = 110f
-        const val RING2_RADIUS_DP = 185f
-        const val INNER_DEAD_ZONE_DP = 35f
-        const val RING_BOUNDARY_DP = 150f
-        const val OUTER_LIMIT_DP = 230f
-        const val ITEM_RADIUS_DP = 38f
-        const val LABEL_SIZE_SP = 11f
-        const val FAN_ARC_DEG = 160f
+        const val INNER_DEAD_ZONE_DP = 40f
+        const val RING_BOUNDARY_DP   = 140f
+        const val OUTER_LIMIT_DP     = 250f
+        const val FAN_ARC_DEG        = 160f
+        const val SECTOR_GAP_DEG     = 2.5f
+        const val LABEL_SIZE_SP      = 11f
 
         const val ANGLE_START_RIGHT  = 100f
         const val ANGLE_START_LEFT   = -80f
         const val ANGLE_START_BOTTOM = 190f
         const val ANGLE_START_TOP    = 10f
+
+        val COLOR_NORMAL    = Color.argb(220, 13, 71, 161)
+        val COLOR_HIGHLIGHT = Color.argb(240, 6, 40, 100)
+        val COLOR_DIVIDER   = Color.WHITE
+        val COLOR_DOT       = Color.argb(200, 255, 255, 255)
     }
 
     var rings: List<Ring> = emptyList()
@@ -38,28 +43,27 @@ class PieView(context: Context) : View(context) {
     var anchorY: Float = 0f
     var edge: String = "right"
     var highlightedRing: Int = -1
-        set(value) {
-            if (field != value) { field = value; invalidate() }
-        }
+        set(value) { if (field != value) { field = value; invalidate() } }
     var highlightedSlot: Int = -1
-        set(value) {
-            if (field != value) { field = value; invalidate() }
-        }
+        set(value) { if (field != value) { field = value; invalidate() } }
 
-    private val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val sectorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.argb(80, 255, 255, 255)
+        color = COLOR_DIVIDER
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         color = Color.WHITE
-        isFakeBoldText = false
+        isFakeBoldText = true
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.argb(160, 255, 255, 255)
+        color = COLOR_DOT
     }
+    private val path = Path()
+    private val outerRect = RectF()
+    private val innerRect = RectF()
 
     private var animFraction = 0f
     private var animator: ValueAnimator? = null
@@ -90,41 +94,51 @@ class PieView(context: Context) : View(context) {
         else     -> ANGLE_START_RIGHT
     }
 
-    private fun itemAngleDeg(index: Int, count: Int): Float {
-        val start = fanStartAngle()
-        return if (count == 1) start + FAN_ARC_DEG / 2f
-        else start + index * (FAN_ARC_DEG / (count - 1))
-    }
+    private fun ringInnerR(ringIndex: Int) = if (ringIndex == 0) dp(INNER_DEAD_ZONE_DP) else dp(RING_BOUNDARY_DP)
+    private fun ringOuterR(ringIndex: Int) = if (ringIndex == 0) dp(RING_BOUNDARY_DP) else dp(OUTER_LIMIT_DP)
+
+    private fun sectorStartAngle(slotIndex: Int, count: Int): Float =
+        fanStartAngle() + slotIndex * (FAN_ARC_DEG / count) + SECTOR_GAP_DEG / 2f
+
+    private fun sectorSweep(count: Int): Float =
+        (FAN_ARC_DEG / count) - SECTOR_GAP_DEG
 
     fun hitTest(x: Float, y: Float): Pair<Int, Int>? {
         val dx = x - anchorX
         val dy = y - anchorY
-        val dist = kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+        val dist = sqrt((dx * dx + dy * dy).toDouble()).toFloat()
 
-        val innerR = dp(INNER_DEAD_ZONE_DP)
-        val boundaryR = dp(RING_BOUNDARY_DP)
-        val outerR = dp(OUTER_LIMIT_DP)
+        if (dist < dp(INNER_DEAD_ZONE_DP) || dist > dp(OUTER_LIMIT_DP)) return null
 
-        if (dist < innerR || dist > outerR) return null
-
-        val ringIndex = if (dist <= boundaryR) 0 else 1
+        val ringIndex = if (dist < dp(RING_BOUNDARY_DP)) 0 else 1
         val ring = rings.getOrNull(ringIndex) ?: return null
         val n = ring.slots.size
         if (n == 0) return null
         if (n == 1) return Pair(ringIndex, 0)
 
         val fingerAngle = normalize(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
-        var minDiff = Float.MAX_VALUE
-        var bestSlot = -1
+
         for (i in 0 until n) {
-            val itemAngle = normalize(itemAngleDeg(i, n))
-            val diff = angleDiff(fingerAngle, itemAngle)
-            if (diff < minDiff) {
-                minDiff = diff
-                bestSlot = i
-            }
+            val start = normalize(sectorStartAngle(i, n))
+            val end = normalize(start + sectorSweep(n))
+            if (isAngleInArc(fingerAngle, start, sectorSweep(n))) return Pair(ringIndex, i)
         }
-        return if (bestSlot >= 0) Pair(ringIndex, bestSlot) else null
+
+        // fallback: nearest mid-angle
+        var minDiff = Float.MAX_VALUE
+        var best = -1
+        for (i in 0 until n) {
+            val mid = normalize(sectorStartAngle(i, n) + sectorSweep(n) / 2f)
+            val d = angleDiff(fingerAngle, mid)
+            if (d < minDiff) { minDiff = d; best = i }
+        }
+        return if (best >= 0) Pair(ringIndex, best) else null
+    }
+
+    private fun isAngleInArc(angle: Float, start: Float, sweep: Float): Boolean {
+        val end = normalize(start + sweep)
+        return if (start <= end) angle in start..end
+        else angle >= start || angle <= end
     }
 
     private fun normalize(a: Float): Float = ((a % 360f) + 360f) % 360f
@@ -138,46 +152,70 @@ class PieView(context: Context) : View(context) {
         if (animFraction == 0f || rings.isEmpty()) return
 
         val scale = animFraction
-        val itemR = dp(ITEM_RADIUS_DP) * scale
-        textPaint.textSize = sp(LABEL_SIZE_SP) * scale
-        strokePaint.strokeWidth = dp(1.5f)
+        val alpha = (255 * scale).toInt().coerceIn(0, 255)
 
-        val ringRadii = listOf(dp(RING1_RADIUS_DP) * scale, dp(RING2_RADIUS_DP) * scale)
+        textPaint.textSize = sp(LABEL_SIZE_SP) * scale
+        dividerPaint.strokeWidth = dp(2f)
+        dividerPaint.alpha = alpha
 
         rings.forEachIndexed { ringIndex, ring ->
-            val ringR = ringRadii[ringIndex]
             val n = ring.slots.size
+            if (n == 0) return@forEachIndexed
+
+            val innerR = ringInnerR(ringIndex) * scale
+            val outerR = ringOuterR(ringIndex) * scale
+
             ring.slots.forEachIndexed { slotIndex, slot ->
-                val angleDeg = itemAngleDeg(slotIndex, n)
-                val angleRad = Math.toRadians(angleDeg.toDouble())
-                val cx = anchorX + ringR * cos(angleRad).toFloat()
-                val cy = anchorY + ringR * sin(angleRad).toFloat()
-
+                val startAngle = sectorStartAngle(slotIndex, n)
+                val sweep = sectorSweep(n)
                 val isHighlighted = (ringIndex == highlightedRing && slotIndex == highlightedSlot)
-                val alpha = (255 * scale).toInt().coerceIn(0, 255)
 
-                circlePaint.color = Color.argb((40 * scale).toInt().coerceIn(0, 255), 0, 0, 0)
-                canvas.drawCircle(cx + dp(2f), cy + dp(3f), itemR, circlePaint)
+                // Build sector path
+                path.reset()
+                outerRect.set(anchorX - outerR, anchorY - outerR, anchorX + outerR, anchorY + outerR)
+                innerRect.set(anchorX - innerR, anchorY - innerR, anchorX + innerR, anchorY + innerR)
+                path.arcTo(outerRect, startAngle, sweep)
+                path.arcTo(innerRect, startAngle + sweep, -sweep)
+                path.close()
 
-                circlePaint.color = if (isHighlighted)
-                    Color.argb(alpha, 50, 130, 240)
-                else
-                    Color.argb((190 * scale).toInt().coerceIn(0, 255), 20, 20, 20)
-                canvas.drawCircle(cx, cy, itemR, circlePaint)
+                val baseColor = if (isHighlighted) COLOR_HIGHLIGHT else COLOR_NORMAL
+                sectorPaint.color = baseColor
+                sectorPaint.alpha = alpha
+                canvas.drawPath(path, sectorPaint)
 
-                strokePaint.color = if (isHighlighted)
-                    Color.argb((200 * scale).toInt().coerceIn(0, 255), 100, 170, 255)
-                else
-                    Color.argb((80 * scale).toInt().coerceIn(0, 255), 255, 255, 255)
-                canvas.drawCircle(cx, cy, itemR, strokePaint)
+                // Divider lines at sector start boundary
+                val startRad = Math.toRadians(startAngle.toDouble())
+                canvas.drawLine(
+                    anchorX + innerR * cos(startRad).toFloat(),
+                    anchorY + innerR * sin(startRad).toFloat(),
+                    anchorX + outerR * cos(startRad).toFloat(),
+                    anchorY + outerR * sin(startRad).toFloat(),
+                    dividerPaint,
+                )
 
-                val label = slot.label.take(7)
+                // Label in sector centroid
+                val midAngleRad = Math.toRadians((startAngle + sweep / 2f).toDouble())
+                val midR = (innerR + outerR) / 2f
+                val tx = anchorX + midR * cos(midAngleRad).toFloat()
+                val ty = anchorY + midR * sin(midAngleRad).toFloat()
                 textPaint.color = Color.argb(alpha, 255, 255, 255)
-                canvas.drawText(label, cx, cy + textPaint.textSize * 0.38f, textPaint)
+                canvas.drawText(slot.label.take(6), tx, ty + textPaint.textSize * 0.38f, textPaint)
             }
+
+            // Final divider line after last sector
+            val endAngle = sectorStartAngle(n - 1, n) + sectorSweep(n)
+            val endRad = Math.toRadians(endAngle.toDouble())
+            canvas.drawLine(
+                anchorX + innerR * cos(endRad).toFloat(),
+                anchorY + innerR * sin(endRad).toFloat(),
+                anchorX + outerR * cos(endRad).toFloat(),
+                anchorY + outerR * sin(endRad).toFloat(),
+                dividerPaint,
+            )
         }
 
-        dotPaint.color = Color.argb((120 * scale).toInt().coerceIn(0, 255), 255, 255, 255)
+        // Center dot at anchor
+        dotPaint.alpha = alpha
         canvas.drawCircle(anchorX, anchorY, dp(5f) * scale, dotPaint)
     }
 }
