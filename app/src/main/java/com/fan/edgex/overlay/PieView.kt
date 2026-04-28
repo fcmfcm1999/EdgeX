@@ -22,11 +22,11 @@ class PieView(context: Context) : View(context) {
     data class Ring(val slots: List<Slot>)
 
     private companion object {
-        const val INNER_DEAD_ZONE_DP = 40f
-        const val RING_BOUNDARY_DP   = 140f   // hit-test boundary between ring 0 and ring 1
-        const val RING0_DRAW_OUTER   = 126f   // ring 0 drawn outer edge
-        const val RING1_DRAW_INNER   = 154f   // ring 1 drawn inner edge (28dp gap)
-        const val OUTER_LIMIT_DP     = 252f
+        const val INNER_DEAD_ZONE_DP = 60f
+        const val RING_BOUNDARY_DP   = 110f   // hit-test boundary between ring 0 and ring 1
+        const val RING0_DRAW_OUTER   = 103f   // ring 0 drawn outer edge
+        const val RING1_DRAW_INNER   = 117f   // ring 1 drawn inner edge (14dp gap)
+        const val OUTER_LIMIT_DP     = 166f
         const val FAN_ARC_DEG        = 160f
         const val SECTOR_GAP_DEG     = 2.5f
         const val ICON_SIZE_DP       = 28f
@@ -225,16 +225,6 @@ class PieView(context: Context) : View(context) {
                 sectorPaint.alpha = alpha
                 canvas.drawPath(path, sectorPaint)
 
-                // Leading divider line
-                val startRad = Math.toRadians(startAngle.toDouble())
-                canvas.drawLine(
-                    anchorX + innerR * cos(startRad).toFloat(),
-                    anchorY + innerR * sin(startRad).toFloat(),
-                    anchorX + outerR * cos(startRad).toFloat(),
-                    anchorY + outerR * sin(startRad).toFloat(),
-                    dividerPaint,
-                )
-
                 // Icon or label centered in sector
                 val midRad = Math.toRadians((startAngle + sweep / 2f).toDouble())
                 val midR = (innerR + outerR) / 2f
@@ -256,16 +246,6 @@ class PieView(context: Context) : View(context) {
                 }
             }
 
-            // Trailing divider after last sector
-            val endAngle = sectorStartAngle(n - 1, n) + sectorSweep(n)
-            val endRad = Math.toRadians(endAngle.toDouble())
-            canvas.drawLine(
-                anchorX + innerR * cos(endRad).toFloat(),
-                anchorY + innerR * sin(endRad).toFloat(),
-                anchorX + outerR * cos(endRad).toFloat(),
-                anchorY + outerR * sin(endRad).toFloat(),
-                dividerPaint,
-            )
         }
 
         // Center anchor dot
