@@ -86,7 +86,8 @@ object UpdateChecker {
 
     private fun showUpdateDialog(activity: Activity, release: ReleaseInfo) {
         if (activity.isFinishing || activity.isDestroyed) return
-        val body = release.body.ifBlank { activity.getString(R.string.update_no_changelog) }
+        val raw = extractLocalizedBody(release.body, activity)
+        val body = raw.ifBlank { activity.getString(R.string.update_no_changelog) }
         val styledBody = parseMarkdown(body)
         // Make URLs open in browser instead of crashing
         val clickableBody = makeLinksClickable(styledBody, activity)
@@ -266,6 +267,40 @@ object UpdateChecker {
             cursor = match.range.last + 1
         }
         if (cursor < text.length) sb.append(text, cursor, text.length)
+    }
+
+    /**
+     * Extracts the localized section from a bilingual release body.
+     *
+     * Format expected in the GitHub release body:
+     *   <!-- EN -->
+     *   English content...
+     *   <!-- ZH -->
+     *   中文内容...
+     *
+     * The markers can appear in either order. If no markers are found the full
+     * body is returned as-is (backwards compatible with single-language releases).
+     */
+    private fun extractLocalizedBody(body: String, context: android.content.Context): String {
+        val enMarker = "<!-- EN -->"
+        val zhMarker = "<!-- ZH -->"
+        val enIdx = body.indexOf(enMarker)
+        val zhIdx = body.indexOf(zhMarker)
+        if (enIdx == -1 && zhIdx == -1) return body
+
+        @Suppress("DEPRECATION")
+        val isZh = context.resources.configuration.locales[0].language == "zh"
+        return if (isZh) {
+            if (zhIdx == -1) return body
+            val start = zhIdx + zhMarker.length
+            val end = if (enIdx != -1 && enIdx > zhIdx) enIdx else body.length
+            body.substring(start, end).trim()
+        } else {
+            if (enIdx == -1) return body
+            val start = enIdx + enMarker.length
+            val end = if (zhIdx != -1 && zhIdx > enIdx) zhIdx else body.length
+            body.substring(start, end).trim()
+        }
     }
 
     private fun fetchLatestRelease(callback: (ReleaseInfo?) -> Unit) {
