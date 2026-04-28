@@ -39,6 +39,7 @@ object UpdateChecker {
     private const val KEY_LAST_CHECK = "last_check_time"
     private const val KEY_SKIPPED_VERSION = "skipped_version"
     private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
+    private val MARKDOWN_HEADING_REGEX = Regex("^\\s{0,3}(#{1,3})\\s+(.*)")
 
     data class ReleaseInfo(
         val tagName: String,
@@ -208,11 +209,10 @@ object UpdateChecker {
 
             val start = sb.length
 
-            // Heading: ## text
-            val headingMatch = Regex("^(#{1,3})\\s+(.*)").matchEntire(line)
-            if (headingMatch != null) {
-                val level = headingMatch.groupValues[1].length
-                val text = headingMatch.groupValues[2]
+            // Heading: ## text, allowing the indentation GitHub release notes often keep.
+            val heading = parseMarkdownHeading(line)
+            if (heading != null) {
+                val (level, text) = heading
                 appendInlineFormatted(sb, text)
                 val size = when (level) { 1 -> 1.3f; 2 -> 1.15f; else -> 1.05f }
                 sb.setSpan(RelativeSizeSpan(size), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -239,6 +239,11 @@ object UpdateChecker {
         // Trim trailing newlines
         while (sb.isNotEmpty() && sb[sb.length - 1] == '\n') sb.delete(sb.length - 1, sb.length)
         return sb
+    }
+
+    internal fun parseMarkdownHeading(line: String): Pair<Int, String>? {
+        val match = MARKDOWN_HEADING_REGEX.matchEntire(line) ?: return null
+        return match.groupValues[1].length to match.groupValues[2]
     }
 
     /** Apply inline formatting: **bold**, `code`, [text](url) */
