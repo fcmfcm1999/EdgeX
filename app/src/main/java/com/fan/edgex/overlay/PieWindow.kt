@@ -51,7 +51,9 @@ class PieWindow(
     fun commit(): String? {
         val r = pieView.highlightedRing
         val s = pieView.highlightedSlot
-        val selected = if (r >= 0 && s >= 0) pieView.rings.getOrNull(r)?.slots?.getOrNull(s)?.action else null
+        val selected = if (pieView.isAnimationComplete() && r >= 0 && s >= 0)
+            pieView.rings.getOrNull(r)?.slots?.getOrNull(s)?.action
+        else null
         dismiss()
         return selected
     }

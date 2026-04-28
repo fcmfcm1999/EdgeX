@@ -101,7 +101,7 @@ object GestureManager {
                 }
 
                 override fun updatePie(x: Float, y: Float) {
-                    PieManager.update(x, y)
+                    mainHandler().post { PieManager.update(x, y) }
                 }
 
                 override fun commitPie(context: Context) {

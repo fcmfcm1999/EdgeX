@@ -64,6 +64,8 @@ class PieView(context: Context) : View(context) {
     private var animFraction = 0f
     private var animator: ValueAnimator? = null
 
+    fun isAnimationComplete() = animFraction >= 1.0f
+
     fun animateIn() {
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
