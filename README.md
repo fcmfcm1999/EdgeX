@@ -18,13 +18,12 @@
 
 ## Overview
 
-EdgeX is not a regular floating-window utility. The app process is only the configuration surface; the module logic runs inside LSPosed/Xposed-injected system processes:
+EdgeX is not a regular floating-window utility. The app process is only the configuration surface; the module logic runs entirely inside the `system_server` process injected by LSPosed/Xposed:
 
-- `system`: edge touch handling, hardware key interception, and system actions.
-- `com.android.systemui`: freezer drawer, universal copy overlay, and other SystemUI-side surfaces.
+- `android` (system_server): edge touch handling, hardware key interception, all action dispatch, freezer drawer, clipboard history overlay, universal copy overlay, and other system-side surfaces.
 - `com.fan.edgex`: settings UI and cross-process configuration storage.
 
-It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on modern Android: Back, Home, Recents, screenshots, app launch, app shortcuts, shell commands, freezer drawer, universal copy, and more.
+It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on modern Android: Back, Home, Recents, screenshots, app launch, app shortcuts, shell commands, freezer drawer, clipboard history, universal copy, and more.
 
 ## Features
 
@@ -34,19 +33,19 @@ It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on 
 - **System actions**: Back, Home, Recents, notifications, lock screen, screenshot, volume, brightness, and more.
 - **Apps and shortcuts**: launch selected apps or app shortcuts, with a root fallback for restricted shortcut discovery.
 - **Freezer drawer**: manage frozen apps, open a side drawer, unfreeze and launch apps, then refreeze them.
+- **Clipboard history**: show the last 50 clipboard entries in a bottom-sheet overlay; tap any entry to inject it into the focused field, or delete individual entries.
 - **Universal copy**: collect accessible text from the current screen and copy selected text blocks from an overlay.
 - **Shell commands**: bind custom commands to gestures or keys, with optional `su` execution.
 - **Media controls**: play/pause, stop, previous track, and next track.
-- **Debug and theming**: gesture-zone debug overlay, SystemUI restart shortcut, and configurable accent colors.
+- **Debug and theming**: gesture-zone debug overlay, SystemUI restart shortcut, haptic feedback on action trigger, and configurable accent colors.
 
 ## Requirements
 
 - Android 15 or later.
 - LSPosed / Xposed environment with Xposed API 82 or later.
 - Current build config: `minSdk 35`, `targetSdk 36`, `compileSdk 36`.
-- Required LSPosed scopes:
-  - `system` / System Framework
-  - `com.android.systemui` / System UI
+- Required LSPosed scope:
+  - `android` / System Framework (system_server)
 
 ### Root Notes
 
@@ -59,8 +58,8 @@ It is intended for rooted LSPosed users who want Xposed Edge-style shortcuts on 
 
 1. Install the EdgeX APK.
 2. Enable EdgeX in LSPosed.
-3. Select at least the `system` and `com.android.systemui` scopes.
-4. Reboot the device. Restarting SystemUI may be enough for some changes, but a full reboot is recommended after first activation or scope changes.
+3. Select the `android` (System Framework) scope.
+4. Reboot the device. A full reboot is recommended after first activation or scope changes.
 5. Open EdgeX, enable gestures or keys, and assign actions.
 
 ## Usage Tips
@@ -88,6 +87,10 @@ Useful issue details:
 - Enabled scopes.
 - Trigger path, for example `Mid-Right Edge, Swipe Left`.
 - Xposed logs and reproduction steps.
+
+## Support
+
+If you find EdgeX useful, you can support development via [Ko-fi](https://ko-fi.com/fantasy1999).
 
 ## Credits
 
