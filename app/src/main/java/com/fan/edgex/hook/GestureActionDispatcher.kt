@@ -165,6 +165,10 @@ internal class GestureActionDispatcher(
 
     private fun performAction(action: String, context: Context, touchX: Float, touchY: Float) {
         vibrateActionFeedback(context)
+        dispatchAction(action, context, touchX, touchY)
+    }
+
+    private fun dispatchAction(action: String, context: Context, touchX: Float, touchY: Float) {
         when {
             action == "back" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
@@ -248,10 +252,20 @@ internal class GestureActionDispatcher(
         val id = action.removePrefix("multi_action:")
         if (id.isBlank()) return
         val steps = com.fan.edgex.config.MultiActionStore.getStepsFromConfig(resolveConfig, id)
-        steps.forEach { step ->
-            if (step.code.isNotBlank() && step.code != "none") {
-                performAction(step.code, context, touchX, touchY)
-            }
+        if (steps.isEmpty()) return
+        val handler = handlerProvider()
+        var delay = 0L
+        for (step in steps) {
+            if (step.code.isBlank() || step.code == "none") continue
+            val code = step.code
+            handler.postDelayed({
+                try {
+                    dispatchAction(code, context, touchX, touchY)
+                } catch (t: Throwable) {
+                    log("multi_action step '$code' failed: ${t.message}")
+                }
+            }, delay)
+            delay += 150L
         }
     }
 
