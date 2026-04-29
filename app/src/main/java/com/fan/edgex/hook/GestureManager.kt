@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.overlay.PanelOverlayManager
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -152,6 +153,7 @@ object GestureManager {
                     Intent.ACTION_SCREEN_OFF -> {
                         gestureDetector.reset()
                         KeyManager.reset()
+                        PanelOverlayManager.dismiss()
                     }
                     Intent.ACTION_USER_UNLOCKED -> {
                         configRepository.invalidate()

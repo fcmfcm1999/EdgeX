@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.putConfig
 
 class ActionSelectionActivity : AppCompatActivity() {
@@ -41,6 +42,9 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
         ActionItem(getString(R.string.action_music_control), "music_control", R.drawable.ic_music),
         ActionItem(getString(R.string.action_multi_action), "multi_action", R.drawable.ic_multi_action),
+        ActionItem(getString(R.string.action_custom_panel), AppConfig.CUSTOM_PANEL_ACTION, R.drawable.ic_apps),
+        ActionItem(getString(R.string.action_left_side_bar), AppConfig.SIDE_BAR_LEFT_ACTION, R.drawable.ic_edge_left_full),
+        ActionItem(getString(R.string.action_right_side_bar), AppConfig.SIDE_BAR_RIGHT_ACTION, R.drawable.ic_edge_right_full),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

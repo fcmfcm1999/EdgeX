@@ -71,6 +71,21 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, MultiActionsListActivity::class.java))
         }
 
+        findViewById<View>(R.id.item_custom_panel).setOnClickListener {
+            startActivity(android.content.Intent(this, PanelConfigActivity::class.java)
+                .putExtra(PanelConfigActivity.EXTRA_MODE, PanelConfigActivity.MODE_CUSTOM))
+        }
+
+        findViewById<View>(R.id.item_left_side_bar).setOnClickListener {
+            startActivity(android.content.Intent(this, PanelConfigActivity::class.java)
+                .putExtra(PanelConfigActivity.EXTRA_MODE, PanelConfigActivity.MODE_SIDE_LEFT))
+        }
+
+        findViewById<View>(R.id.item_right_side_bar).setOnClickListener {
+            startActivity(android.content.Intent(this, PanelConfigActivity::class.java)
+                .putExtra(PanelConfigActivity.EXTRA_MODE, PanelConfigActivity.MODE_SIDE_RIGHT))
+        }
+
         // Advanced Options (Collapsible)
         val advancedContent = findViewById<View>(R.id.advanced_options_content)
         val advancedArrow = findViewById<android.widget.ImageView>(R.id.arrow_advanced)

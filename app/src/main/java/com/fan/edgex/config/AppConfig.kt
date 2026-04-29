@@ -20,6 +20,13 @@ object AppConfig {
     const val HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK = "heavy_click"
     const val HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK = "double_click"
 
+    const val CUSTOM_PANEL_ACTION = "custom_panel"
+    const val SIDE_BAR_LEFT_ACTION = "side_bar:left"
+    const val SIDE_BAR_RIGHT_ACTION = "side_bar:right"
+    const val CUSTOM_PANEL_ROWS = 4
+    const val CUSTOM_PANEL_COLUMNS = 4
+    const val SIDE_BAR_SLOTS = 7
+
     val ZONES = listOf(
         "left_top",
         "left_mid",
@@ -52,6 +59,10 @@ object AppConfig {
     fun keyEnabled(keyCode: Int) = "key_enabled_$keyCode"
     fun keyAction(keyCode: Int, trigger: String) = "key_${keyCode}_$trigger"
     fun keyActionLabel(keyCode: Int, trigger: String) = "key_${keyCode}_${trigger}_label"
+    fun customPanelSlot(row: Int, column: Int) = "custom_panel_${row}_${column}"
+    fun customPanelSlotTitle(row: Int, column: Int) = "custom_panel_${row}_${column}_title"
+    fun sideBarSlot(side: String, index: Int) = "side_bar_${side}_$index"
+    fun sideBarSlotTitle(side: String, index: Int) = "side_bar_${side}_${index}_title"
 
     fun fallbackEdgeZone(zone: String): String? =
         when (zone) {
