@@ -67,6 +67,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, ThemeActivity::class.java))
         }
 
+        findViewById<View>(R.id.item_multi_actions).setOnClickListener {
+            startActivity(android.content.Intent(this, MultiActionsListActivity::class.java))
+        }
+
         // Advanced Options (Collapsible)
         val advancedContent = findViewById<View>(R.id.advanced_options_content)
         val advancedArrow = findViewById<android.widget.ImageView>(R.id.arrow_advanced)

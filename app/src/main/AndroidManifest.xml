@@ -93,6 +93,17 @@
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 
+        <activity
+            android:name=".ui.MultiActionsListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
+        <activity
+            android:name=".ui.MultiActionEditActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX"
+            android:windowSoftInputMode="adjustResize" />
+
         <receiver
             android:name=".config.ConfigSnapshotReceiver"
             android:exported="false">

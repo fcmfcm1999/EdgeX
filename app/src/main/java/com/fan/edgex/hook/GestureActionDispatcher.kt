@@ -238,6 +238,20 @@ internal class GestureActionDispatcher(
             action == "freezer_drawer" -> {
                 DrawerManager.showDrawer(context, resolveConfig)
             }
+            action.startsWith("multi_action:") -> {
+                executeMultiAction(action, context, touchX, touchY)
+            }
+        }
+    }
+
+    private fun executeMultiAction(action: String, context: Context, touchX: Float, touchY: Float) {
+        val id = action.removePrefix("multi_action:")
+        if (id.isBlank()) return
+        val steps = com.fan.edgex.config.MultiActionStore.getStepsFromConfig(resolveConfig, id)
+        steps.forEach { step ->
+            if (step.code.isNotBlank() && step.code != "none") {
+                performAction(step.code, context, touchX, touchY)
+            }
         }
     }
 

@@ -40,6 +40,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
         ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
         ActionItem(getString(R.string.action_music_control), "music_control", R.drawable.ic_music),
+        ActionItem(getString(R.string.action_multi_action), "multi_action", R.drawable.ic_multi_action),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,6 +92,13 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "music_control" -> {
                     startActivity(Intent(this, MusicControlActivity::class.java)
                         .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                "multi_action" -> {
+                    startActivity(Intent(this, MultiActionsListActivity::class.java)
+                        .putExtra(MultiActionsListActivity.EXTRA_MODE, MultiActionsListActivity.MODE_PICK)
+                        .putExtra(MultiActionsListActivity.EXTRA_PREF_KEY, prefKey)
+                        .putExtra(MultiActionsListActivity.EXTRA_TITLE, title))
                     finish()
                 }
                 else -> {
