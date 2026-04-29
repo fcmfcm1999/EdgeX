@@ -73,7 +73,16 @@ class MultiActionEditActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { handleBack() }
         findViewById<View>(R.id.btn_save).setOnClickListener { saveAndShowToast() }
-        findViewById<View>(R.id.btn_add_step).setOnClickListener { startAddStep() }
+
+        val fab = findViewById<View>(R.id.btn_fab)
+        fab.setOnClickListener { startAddStep() }
+        fab.setOnApplyWindowInsetsListener { view, insets ->
+            val navBottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            val lp = view.layoutParams as android.widget.FrameLayout.LayoutParams
+            lp.bottomMargin = (16 * resources.displayMetrics.density + navBottom).toInt()
+            view.layoutParams = lp
+            insets
+        }
 
         updateEmpty()
     }

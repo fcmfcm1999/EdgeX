@@ -71,8 +71,14 @@ class MultiActionsListActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        findViewById<View>(R.id.btn_add).setOnClickListener {
-            createNew()
+        val fab = findViewById<View>(R.id.btn_fab)
+        fab.setOnClickListener { createNew() }
+        fab.setOnApplyWindowInsetsListener { view, insets ->
+            val navBottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            val lp = view.layoutParams as android.widget.FrameLayout.LayoutParams
+            lp.bottomMargin = (16 * resources.displayMetrics.density + navBottom).toInt()
+            view.layoutParams = lp
+            insets
         }
 
         loadData()
