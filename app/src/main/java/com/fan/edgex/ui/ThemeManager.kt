@@ -99,6 +99,11 @@ object ThemeManager {
             tintBackground(view, accent)
         }
 
+        if (view.tag == "theme_fab") {
+            ViewCompat.setBackgroundTintList(view, ColorStateList.valueOf(accent))
+            (view as? ImageView)?.setColorFilter(onAccent)
+        }
+
         when (view) {
             is android.widget.CompoundButton -> {
                 CompoundButtonCompat.setButtonTintList(view, ColorStateList.valueOf(accent))

@@ -93,10 +93,9 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="32dp"
+        android:tag="theme_fab"
         android:src="@drawable/ic_add"
         android:contentDescription="@string/multi_action_add_step"
-        app:backgroundTint="@color/ui_header_background"
-        app:tint="@color/white"
         app:fabSize="normal" />
 
 </FrameLayout>
