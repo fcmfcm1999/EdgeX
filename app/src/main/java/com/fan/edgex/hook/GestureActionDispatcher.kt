@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.media.AudioManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -117,36 +116,11 @@ internal class GestureActionDispatcher(
         }
     }
 
-    fun adjustBrightness(context: Context, up: Boolean) {
-        try {
-            val displayManager = context.getSystemService("display") as android.hardware.display.DisplayManager
-            val getBrightness = android.hardware.display.DisplayManager::class.java
-                .getMethod("getBrightness", Int::class.java)
-            val setBrightness = android.hardware.display.DisplayManager::class.java
-                .getMethod("setBrightness", Int::class.java, Float::class.java)
-            val current = getBrightness.invoke(displayManager, 0) as Float
-            val step = 1.0f / 16f
-            val newVal = if (up) minOf(1.0f, current + step) else maxOf(0.0f, current - step)
-            setBrightness.invoke(displayManager, 0, newVal)
-        } catch (e: Exception) {
-            log("adjustBrightness failed: ${e.message}")
-        }
-    }
+    fun adjustBrightness(context: Context, up: Boolean) =
+        com.fan.edgex.action.AppActionExecutor.adjustBrightness(context, up)
 
-    fun adjustVolume(context: Context, up: Boolean) {
-        try {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
-            val direction =
-                if (up) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER
-            audioManager.adjustStreamVolume(
-                android.media.AudioManager.STREAM_MUSIC,
-                direction,
-                android.media.AudioManager.FLAG_SHOW_UI,
-            )
-        } catch (e: Exception) {
-            log("adjustVolume failed: ${e.message}")
-        }
-    }
+    fun adjustVolume(context: Context, up: Boolean) =
+        com.fan.edgex.action.AppActionExecutor.adjustVolume(context, up)
 
     private fun vibrateActionFeedback(context: Context) {
         if (resolveConfig(AppConfig.HAPTIC_FEEDBACK) != "true") return
@@ -198,7 +172,7 @@ internal class GestureActionDispatcher(
                 clearBackgroundApps(context)
             }
             action.startsWith("music_control:") -> {
-                dispatchMediaKey(context, action)
+                com.fan.edgex.action.AppActionExecutor.dispatchMusicControl(context, action)
             }
             action == "brightness_up" || action == "brightness_down" -> {
                 adjustBrightness(context, action == "brightness_up")
@@ -547,23 +521,6 @@ internal class GestureActionDispatcher(
         return -1
     }
 
-    private fun dispatchMediaKey(context: Context, action: String) {
-        try {
-            val keyCode = when (action.removePrefix("music_control:")) {
-                "play_pause" -> KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
-                "stop"       -> KeyEvent.KEYCODE_MEDIA_STOP
-                "next"       -> KeyEvent.KEYCODE_MEDIA_NEXT
-                "previous"   -> KeyEvent.KEYCODE_MEDIA_PREVIOUS
-                else -> return
-            }
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val now = SystemClock.uptimeMillis()
-            audioManager.dispatchMediaKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0))
-            audioManager.dispatchMediaKeyEvent(KeyEvent(now, now + 10, KeyEvent.ACTION_UP, keyCode, 0))
-        } catch (e: Exception) {
-            log("dispatchMediaKey failed: ${e.message}")
-        }
-    }
 
     private fun launchApp(context: Context, action: String) {
         try {
