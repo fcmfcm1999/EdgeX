@@ -17,6 +17,7 @@ import com.fan.edgex.config.MultiActionStore
 import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.requestHookActionExecution
 
 class MultiActionsListActivity : AppCompatActivity() {
 
@@ -137,7 +138,7 @@ class MultiActionsListActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openEdit(multiAction.id)
                     1 -> showRenameDialog(multiAction)
-                    2 -> com.fan.edgex.action.AppActionExecutor.executeSteps(this, multiAction.steps)
+                    2 -> requestHookActionExecution(MultiActionStore.actionCode(multiAction.id))
                     3 -> showDeleteConfirm(multiAction)
                 }
             }

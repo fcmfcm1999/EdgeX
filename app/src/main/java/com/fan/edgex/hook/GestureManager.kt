@@ -180,26 +180,38 @@ object GestureManager {
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.action != HookConfigSnapshot.ACTION_CONFIG_CHANGED) return
+                when (intent.action) {
+                    HookConfigSnapshot.ACTION_CONFIG_CHANGED -> {
+                        val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
+                        val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
+                        if (keys != null && values != null) {
+                            configRepository.updateFromBroadcast(
+                                keys,
+                                values,
+                                intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
+                            )
+                            refreshDebugOverlay()
+                        } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
+                            configRepository.invalidate()
+                            configRepository.reloadAsync(::refreshDebugOverlay)
+                        }
+                    }
+                    HookConfigSnapshot.ACTION_EXECUTE_ACTION -> {
+                        val action = intent.getStringExtra(HookConfigSnapshot.EXTRA_ACTION_CODE).orEmpty()
+                        if (action.isBlank() || action == "none") return
 
-                val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
-                val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
-                if (keys != null && values != null) {
-                    configRepository.updateFromBroadcast(
-                        keys,
-                        values,
-                        intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
-                    )
-                    refreshDebugOverlay()
-                } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
-                    configRepository.invalidate()
-                    configRepository.reloadAsync(::refreshDebugOverlay)
+                        log("Execute action request from UI: $action")
+                        actionDispatcher.executeKeyAction(action, ctx)
+                    }
                 }
             }
         }
 
         try {
-            val filter = IntentFilter(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+            val filter = IntentFilter().apply {
+                addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+                addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+            }
             context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } catch (e: Exception) {
             systemConfigReceiverRegistered = false

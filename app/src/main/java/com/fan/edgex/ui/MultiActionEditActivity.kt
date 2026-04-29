@@ -20,6 +20,7 @@ import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.requestHookActionExecution
 
 class MultiActionEditActivity : AppCompatActivity() {
 
@@ -214,14 +215,7 @@ class MultiActionEditActivity : AppCompatActivity() {
     }
 
     private fun executeStep(step: MultiActionStep) {
-        val handled = com.fan.edgex.action.AppActionExecutor.execute(this, step.code)
-        if (!handled) {
-            Toast.makeText(
-                this,
-                getString(R.string.multi_action_execute_not_supported, step.label),
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
+        requestHookActionExecution(step.code)
     }
 
     private fun showStepInfo(step: MultiActionStep) {
