@@ -185,7 +185,12 @@ class PanelConfigActivity : AppCompatActivity() {
             val action = getConfigString(slot.prefKey, "none")
             val label = getConfigString("${slot.prefKey}_label", getString(R.string.action_none))
             slot.subtitle.text = label
-            slot.icon.setImageResource(iconForAction(action))
+            slot.icon.setImageDrawable(drawableForAction(action))
+            if (action.startsWith("launch_app:")) {
+                slot.icon.clearColorFilter()
+            } else {
+                slot.icon.setColorFilter(resources.getColor(R.color.ui_icon_tint, theme))
+            }
         }
     }
 
@@ -205,6 +210,17 @@ class PanelConfigActivity : AppCompatActivity() {
     }
 
     private fun sideForMode(): String = if (mode == MODE_SIDE_RIGHT) "right" else "left"
+
+    private fun drawableForAction(action: String): android.graphics.drawable.Drawable? {
+        if (action.startsWith("launch_app:")) {
+            val packageName = action.removePrefix("launch_app:")
+            val appIcon = runCatching {
+                packageManager.getApplicationIcon(packageName)
+            }.getOrNull()
+            if (appIcon != null) return appIcon
+        }
+        return resources.getDrawable(iconForAction(action), theme)
+    }
 
     private fun iconForAction(action: String): Int = when {
         action == "back" -> R.drawable.ic_arrow_back

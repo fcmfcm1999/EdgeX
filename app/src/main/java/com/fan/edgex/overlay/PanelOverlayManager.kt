@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.KeyEvent
@@ -18,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.hook.ModuleRes
 
 object PanelOverlayManager {
     private var activeWindow: PanelOverlayWindow? = null
@@ -296,8 +298,11 @@ private class PanelOverlayWindow(
         }
         val iconSize = if (showText) (30 * dp).toInt() else (34 * dp).toInt()
         container.addView(ImageView(context).apply {
-            setImageResource(iconForAction(item.action))
-            setColorFilter(Color.WHITE)
+            val icon = drawableForAction(item.action)
+            setImageDrawable(icon)
+            if (!item.action.startsWith("launch_app:")) {
+                setColorFilter(Color.WHITE)
+            }
         }, LinearLayout.LayoutParams(iconSize, iconSize))
         if (showText) {
             container.addView(TextView(context).apply {
@@ -338,6 +343,17 @@ private class PanelOverlayWindow(
         action.startsWith("music_control:") -> "Music"
         action.startsWith("multi_action:") -> "Multi"
         else -> action
+    }
+
+    private fun drawableForAction(action: String): Drawable? {
+        if (action.startsWith("launch_app:")) {
+            val packageName = action.removePrefix("launch_app:")
+            val appIcon = runCatching {
+                context.packageManager.getApplicationIcon(packageName)
+            }.getOrNull()
+            if (appIcon != null) return appIcon
+        }
+        return ModuleRes.getDrawable(iconForAction(action))?.mutate()
     }
 
     private fun iconForAction(action: String): Int = when {

@@ -1,6 +1,8 @@
 package com.fan.edgex.hook
 
 import android.content.res.XModuleResources
+import android.graphics.drawable.Drawable
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 
 object ModuleRes {
@@ -15,4 +17,7 @@ object ModuleRes {
         val raw = r.getString(id)
         return if (args.isEmpty()) raw else String.format(raw, *args)
     }
+
+    fun getDrawable(@DrawableRes id: Int): Drawable? =
+        runCatching { res?.getDrawable(id) }.getOrNull()
 }
