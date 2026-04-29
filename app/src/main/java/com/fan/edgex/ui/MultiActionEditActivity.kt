@@ -25,6 +25,7 @@ class MultiActionEditActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_ID = "multi_action_id"
+        const val EXTRA_IS_NEW = "is_new"
     }
 
     private lateinit var multiActionId: String
@@ -36,6 +37,7 @@ class MultiActionEditActivity : AppCompatActivity() {
 
     private var multiActionName = ""
     private var isModified = false
+    private var isNew = false
 
     private var addingStep = false
     private var editingStepIndex = -1
@@ -46,10 +48,16 @@ class MultiActionEditActivity : AppCompatActivity() {
         ThemeManager.applyToActivity(this)
 
         multiActionId = intent.getStringExtra(EXTRA_ID) ?: run { finish(); return }
+        isNew = intent.getBooleanExtra(EXTRA_IS_NEW, false)
 
-        val existing = MultiActionStore.get(configPrefs(), multiActionId) ?: run { finish(); return }
-        multiActionName = existing.name
-        steps = existing.steps
+        if (isNew) {
+            multiActionName = multiActionId
+            steps = mutableListOf()
+        } else {
+            val existing = MultiActionStore.get(configPrefs(), multiActionId) ?: run { finish(); return }
+            multiActionName = existing.name
+            steps = existing.steps
+        }
 
         tvTitle = findViewById(R.id.tv_title)
         tvTitle.text = multiActionName
@@ -280,6 +288,7 @@ class MultiActionEditActivity : AppCompatActivity() {
         MultiActionStore.save(configPrefs(), updated)
         broadcastFullConfigSnapshot()
         isModified = false
+        isNew = false
     }
 
     private fun handleBack() {
@@ -295,6 +304,7 @@ class MultiActionEditActivity : AppCompatActivity() {
                 finish()
             }
             .setNegativeButton(R.string.multi_action_discard) { _, _ ->
+                if (isNew) MultiActionStore.delete(configPrefs(), multiActionId)
                 finish()
             }
             .setNeutralButton(android.R.string.cancel, null)

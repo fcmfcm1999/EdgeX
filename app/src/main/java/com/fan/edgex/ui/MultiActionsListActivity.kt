@@ -106,10 +106,9 @@ class MultiActionsListActivity : AppCompatActivity() {
 
     private fun createNew() {
         val id = MultiActionStore.generateId()
-        val action = com.fan.edgex.config.MultiAction(id, id, mutableListOf())
-        MultiActionStore.save(configPrefs(), action)
-        broadcastFullConfigSnapshot()
-        openEdit(id)
+        startActivity(Intent(this, MultiActionEditActivity::class.java)
+            .putExtra(MultiActionEditActivity.EXTRA_ID, id)
+            .putExtra(MultiActionEditActivity.EXTRA_IS_NEW, true))
     }
 
     private fun openEdit(id: String) {

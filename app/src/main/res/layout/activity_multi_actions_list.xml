@@ -69,10 +69,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="32dp"
         android:src="@drawable/ic_add"
         android:contentDescription="@string/multi_action_add"
-        app:backgroundTint="@color/ui_icon_bg"
+        app:backgroundTint="@color/ui_header_background"
         app:tint="@color/white"
         app:fabSize="normal" />
 
