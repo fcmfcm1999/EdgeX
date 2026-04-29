@@ -6,6 +6,8 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.widget.Toast
+import com.topjohnwu.superuser.Shell
 
 /**
  * Executes actions using standard Android APIs available in any process context.
@@ -31,6 +33,7 @@ object AppActionExecutor {
         code == "expand_notifications" || code == "notifications" -> { expandNotifications(context); true }
         code.startsWith("launch_app:") -> { launchApp(context, code); true }
         code.startsWith("app_shortcut:") -> { launchShortcut(context, code); true }
+        code.startsWith("shell:") -> { executeShell(context, code); true }
         else -> false
     }
 
@@ -102,6 +105,37 @@ object AppActionExecutor {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         }
+    }
+
+    private fun executeShell(context: Context, action: String) {
+        val content = action.removePrefix("shell:")
+        val parts = content.split(":", limit = 2)
+        if (parts.size != 2) return
+        val runAsRoot = parts[0] == "true"
+        val command = parts[1].takeIf { it.isNotBlank() } ?: return
+        Thread {
+            try {
+                val (success, output) = if (runAsRoot) {
+                    val result = Shell.cmd(command).exec()
+                    result.isSuccess to (if (result.isSuccess) result.out else result.err)
+                        .joinToString("\n").trim()
+                } else {
+                    val process = ProcessBuilder("sh", "-c", command)
+                        .redirectErrorStream(true).start()
+                    process.outputStream.close()
+                    val out = process.inputStream.bufferedReader().readText().trim()
+                    (process.waitFor() == 0) to out
+                }
+                val msg = output.take(200).ifBlank { if (success) "OK" else "Failed" }
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    Toast.makeText(context, e.message ?: "Error", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun launchShortcut(context: Context, action: String) {
