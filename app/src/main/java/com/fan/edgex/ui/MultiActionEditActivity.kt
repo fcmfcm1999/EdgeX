@@ -214,22 +214,78 @@ class MultiActionEditActivity : AppCompatActivity() {
     }
 
     private fun executeStep(step: MultiActionStep) {
-        when {
-            step.code.startsWith("launch_app:") -> {
-                val pkg = step.code.removePrefix("launch_app:")
-                try {
+        try {
+            when {
+                step.code == "home" -> {
+                    startActivity(Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_HOME)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                }
+                step.code == "recents" || step.code == "recent" -> {
+                    @Suppress("DEPRECATION")
+                    val statusBar = getSystemService("statusbar")
+                    if (statusBar != null) {
+                        val cls = Class.forName("android.app.StatusBarManager")
+                        cls.getMethod("toggleRecentApps").invoke(statusBar)
+                    }
+                }
+                step.code == "expand_notifications" || step.code == "notifications" -> {
+                    @Suppress("DEPRECATION")
+                    val statusBar = getSystemService("statusbar")
+                    if (statusBar != null) {
+                        val cls = Class.forName("android.app.StatusBarManager")
+                        cls.getMethod("expandNotificationsPanel").invoke(statusBar)
+                    }
+                }
+                step.code == "volume_up" -> {
+                    (getSystemService(AUDIO_SERVICE) as android.media.AudioManager)
+                        .adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                            android.media.AudioManager.ADJUST_RAISE,
+                            android.media.AudioManager.FLAG_SHOW_UI)
+                }
+                step.code == "volume_down" -> {
+                    (getSystemService(AUDIO_SERVICE) as android.media.AudioManager)
+                        .adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                            android.media.AudioManager.ADJUST_LOWER,
+                            android.media.AudioManager.FLAG_SHOW_UI)
+                }
+                step.code.startsWith("music_control:") -> {
+                    val keyCode = when (step.code.removePrefix("music_control:")) {
+                        "play_pause" -> android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                        "next"       -> android.view.KeyEvent.KEYCODE_MEDIA_NEXT
+                        "previous"   -> android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS
+                        "stop"       -> android.view.KeyEvent.KEYCODE_MEDIA_STOP
+                        else -> -1
+                    }
+                    if (keyCode != -1) {
+                        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                        val now = android.os.SystemClock.uptimeMillis()
+                        am.dispatchMediaKeyEvent(android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_DOWN, keyCode, 0))
+                        am.dispatchMediaKeyEvent(android.view.KeyEvent(now, now + 10, android.view.KeyEvent.ACTION_UP, keyCode, 0))
+                    }
+                }
+                step.code.startsWith("launch_app:") -> {
+                    val pkg = step.code.removePrefix("launch_app:")
                     val intent = packageManager.getLaunchIntentForPackage(pkg)
                     if (intent != null) startActivity(intent)
                     else Toast.makeText(this, getString(R.string.toast_app_not_found), Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(this, getString(R.string.toast_cannot_launch), Toast.LENGTH_SHORT).show()
                 }
+                step.code.startsWith("app_shortcut:") -> {
+                    val parts = step.code.split(":", limit = 3)
+                    if (parts.size == 3) {
+                        val launcherApps = getSystemService(LAUNCHER_APPS_SERVICE) as android.content.pm.LauncherApps
+                        launcherApps.startShortcut(parts[1], parts[2], null, null, android.os.Process.myUserHandle())
+                    }
+                }
+                else -> Toast.makeText(
+                    this,
+                    getString(R.string.multi_action_execute_not_supported, step.label),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
-            else -> Toast.makeText(
-                this,
-                getString(R.string.multi_action_execute_not_supported, step.label),
-                Toast.LENGTH_SHORT,
-            ).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.multi_action_execute_not_supported, step.label), Toast.LENGTH_SHORT).show()
         }
     }
 
