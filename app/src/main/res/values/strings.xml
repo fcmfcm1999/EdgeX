@@ -250,6 +250,7 @@
     <string name="multi_action_step_delete">Delete</string>
     <string name="multi_action_option_edit">Edit</string>
     <string name="multi_action_option_rename">Rename</string>
+    <string name="multi_action_option_execute">Execute</string>
     <string name="multi_action_option_delete">Delete</string>
     <string name="multi_action_option_delete_confirm">Delete \"%s\"?</string>
     <string name="multi_action_option_delete_confirm_btn">Delete</string>

@@ -4,9 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.widget.Toast
+import com.fan.edgex.config.MultiActionStep
 import com.topjohnwu.superuser.Shell
 
 /**
@@ -105,6 +108,35 @@ object AppActionExecutor {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         }
+    }
+
+    /**
+     * Execute a list of steps sequentially with action-type-aware delays between them.
+     * Uses a main-thread Handler so callers don't need to manage one.
+     */
+    fun executeSteps(context: Context, steps: List<MultiActionStep>, handler: Handler = Handler(Looper.getMainLooper())) {
+        var delay = 0L
+        for (step in steps) {
+            if (step.code.isBlank() || step.code == "none") continue
+            val code = step.code
+            handler.postDelayed({
+                runCatching { execute(context, code) }
+            }, delay)
+            delay += stepSettleDuration(code)
+        }
+    }
+
+    /**
+     * How long to wait after dispatching [code] before the next step is safe to fire.
+     * Matches the delays used in GestureActionDispatcher for consistency.
+     */
+    fun stepSettleDuration(code: String): Long = when {
+        code == "home" || code == "back" || code == "recent" || code == "recents"
+            || code == "lock_screen" || code == "notifications" || code == "expand_notifications"
+            || code == "quick_settings" -> 600L
+        code.startsWith("launch_app:") || code.startsWith("app_shortcut:") -> 500L
+        code == "screenshot" || code == "clear_background" || code == "refreeze" -> 300L
+        else -> 150L
     }
 
     private fun executeShell(context: Context, action: String) {

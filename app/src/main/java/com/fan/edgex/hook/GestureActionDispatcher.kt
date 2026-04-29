@@ -249,14 +249,8 @@ internal class GestureActionDispatcher(
     // Navigation actions (HOME, BACK, etc.) animate for ~300ms; give 600ms to be safe.
     // App launches need ~500ms for the window to fully appear.
     // Everything else (brightness, volume, media) is near-instant.
-    private fun stepSettleDuration(code: String): Long = when {
-        code == "home" || code == "back" || code == "recent" || code == "recents"
-            || code == "lock_screen" || code == "notifications" || code == "expand_notifications"
-            || code == "quick_settings" -> 600L
-        code.startsWith("launch_app:") || code.startsWith("app_shortcut:") -> 500L
-        code == "screenshot" || code == "clear_background" || code == "refreeze" -> 300L
-        else -> 150L
-    }
+    private fun stepSettleDuration(code: String): Long =
+        com.fan.edgex.action.AppActionExecutor.stepSettleDuration(code)
 
     private fun killForegroundApp(context: Context) {
         try {

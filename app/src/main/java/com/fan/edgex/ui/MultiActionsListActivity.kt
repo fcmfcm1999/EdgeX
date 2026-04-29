@@ -128,6 +128,7 @@ class MultiActionsListActivity : AppCompatActivity() {
         val options = arrayOf(
             getString(R.string.multi_action_option_edit),
             getString(R.string.multi_action_option_rename),
+            getString(R.string.multi_action_option_execute),
             getString(R.string.multi_action_option_delete),
         )
         AlertDialog.Builder(this)
@@ -136,7 +137,8 @@ class MultiActionsListActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openEdit(multiAction.id)
                     1 -> showRenameDialog(multiAction)
-                    2 -> showDeleteConfirm(multiAction)
+                    2 -> com.fan.edgex.action.AppActionExecutor.executeSteps(this, multiAction.steps)
+                    3 -> showDeleteConfirm(multiAction)
                 }
             }
             .show()
