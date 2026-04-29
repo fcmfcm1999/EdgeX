@@ -258,15 +258,30 @@ internal class GestureActionDispatcher(
         for (step in steps) {
             if (step.code.isBlank() || step.code == "none") continue
             val code = step.code
+            de.robv.android.xposed.XposedBridge.log("EdgeX: multi_action step='$code' scheduledAt=${delay}ms")
             handler.postDelayed({
                 try {
+                    de.robv.android.xposed.XposedBridge.log("EdgeX: multi_action executing step='$code'")
                     dispatchAction(code, context, touchX, touchY)
                 } catch (t: Throwable) {
                     log("multi_action step '$code' failed: ${t.message}")
                 }
             }, delay)
-            delay += 150L
+            delay += stepSettleDuration(code)
         }
+    }
+
+    // How long to wait after this action before firing the next step.
+    // Navigation actions (HOME, BACK, etc.) animate for ~300ms; give 600ms to be safe.
+    // App launches need ~500ms for the window to fully appear.
+    // Everything else (brightness, volume, media) is near-instant.
+    private fun stepSettleDuration(code: String): Long = when {
+        code == "home" || code == "back" || code == "recent" || code == "recents"
+            || code == "lock_screen" || code == "notifications" || code == "expand_notifications"
+            || code == "quick_settings" -> 600L
+        code.startsWith("launch_app:") || code.startsWith("app_shortcut:") -> 500L
+        code == "screenshot" || code == "clear_background" || code == "refreeze" -> 300L
+        else -> 150L
     }
 
     private fun killForegroundApp(context: Context) {
