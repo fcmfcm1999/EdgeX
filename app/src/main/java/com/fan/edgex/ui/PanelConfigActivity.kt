@@ -1,6 +1,9 @@
 package com.fan.edgex.ui
 
 import android.content.Intent
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -217,10 +220,17 @@ class PanelConfigActivity : AppCompatActivity() {
             val appIcon = runCatching {
                 packageManager.getApplicationIcon(packageName)
             }.getOrNull()
-            if (appIcon != null) return appIcon
+            if (appIcon != null) return appIcon.foregroundOrSelf()
         }
         return resources.getDrawable(iconForAction(action), theme)
     }
+
+    private fun Drawable.foregroundOrSelf(): Drawable =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this is AdaptiveIconDrawable) {
+            foreground?.mutate() ?: mutate()
+        } else {
+            mutate()
+        }
 
     private fun iconForAction(action: String): Int = when {
         action == "back" -> R.drawable.ic_arrow_back

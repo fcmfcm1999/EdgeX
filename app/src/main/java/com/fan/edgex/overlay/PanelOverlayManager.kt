@@ -4,8 +4,10 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -351,10 +353,17 @@ private class PanelOverlayWindow(
             val appIcon = runCatching {
                 context.packageManager.getApplicationIcon(packageName)
             }.getOrNull()
-            if (appIcon != null) return appIcon
+            if (appIcon != null) return appIcon.foregroundOrSelf()
         }
         return ModuleRes.getDrawable(iconForAction(action))?.mutate()
     }
+
+    private fun Drawable.foregroundOrSelf(): Drawable =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this is AdaptiveIconDrawable) {
+            foreground?.mutate() ?: mutate()
+        } else {
+            mutate()
+        }
 
     private fun iconForAction(action: String): Int = when {
         action == "back" -> R.drawable.ic_arrow_back
