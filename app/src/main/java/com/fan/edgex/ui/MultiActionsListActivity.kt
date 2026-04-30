@@ -190,6 +190,7 @@ class MultiActionsListActivity : AppCompatActivity() {
         inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tv_name)
             val tvCount: TextView = v.findViewById(R.id.tv_count)
+            val icon: ImageView = v.findViewById(R.id.icon)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -202,6 +203,7 @@ class MultiActionsListActivity : AppCompatActivity() {
             holder.tvName.text = item.name
             holder.tvCount.text = getString(R.string.multi_action_step_count, item.steps.size)
             ThemeManager.applyToView(holder.itemView, this@MultiActionsListActivity)
+            MultiActionIconUtils.applyTo(this@MultiActionsListActivity, holder.icon, item.iconRef)
             holder.itemView.setOnClickListener { onClick(item) }
             holder.itemView.setOnLongClickListener {
                 onLongClick(item)

@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -37,11 +38,26 @@ class MultiActionEditActivity : AppCompatActivity() {
     private lateinit var tvTitle: TextView
 
     private var multiActionName = ""
+    private var currentIconRef = ""
     private var isModified = false
     private var isNew = false
 
     private var addingStep = false
     private var editingStepIndex = -1
+
+    private lateinit var ivIconPreview: ImageView
+
+    private val iconPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val ref = result.data?.getStringExtra(AppIconPickerActivity.EXTRA_ICON_REF) ?: return@registerForActivityResult
+            MultiActionIconUtils.deleteIfCustom(this, currentIconRef)
+            currentIconRef = ref
+            MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
+            markModified()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,15 +70,21 @@ class MultiActionEditActivity : AppCompatActivity() {
         if (isNew) {
             multiActionName = multiActionId
             steps = mutableListOf()
+            currentIconRef = ""
         } else {
             val existing = MultiActionStore.get(configPrefs(), multiActionId) ?: run { finish(); return }
             multiActionName = existing.name
             steps = existing.steps
+            currentIconRef = existing.iconRef
         }
 
         tvTitle = findViewById(R.id.tv_title)
         tvTitle.text = multiActionName
         tvTitle.setOnClickListener { showRenameDialog() }
+
+        ivIconPreview = findViewById(R.id.iv_icon_preview)
+        MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
+        findViewById<View>(R.id.btn_icon).setOnClickListener { openIconPicker() }
 
         recyclerView = findViewById(R.id.recycler_view)
         tvEmpty = findViewById(R.id.tv_empty)
@@ -268,8 +290,12 @@ class MultiActionEditActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.multi_action_saved, Toast.LENGTH_SHORT).show()
     }
 
+    private fun openIconPicker() {
+        iconPickerLauncher.launch(Intent(this, AppIconPickerActivity::class.java))
+    }
+
     private fun doSave() {
-        val updated = MultiAction(multiActionId, multiActionName, steps)
+        val updated = MultiAction(multiActionId, multiActionName, steps, currentIconRef)
         MultiActionStore.save(configPrefs(), updated)
         broadcastFullConfigSnapshot()
         isModified = false
