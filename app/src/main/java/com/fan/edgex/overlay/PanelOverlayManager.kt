@@ -298,7 +298,12 @@ private class PanelOverlayWindow(
                 dispatchAction(item.action)
             }
         }
-        val iconSize = if (showText) (30 * dp).toInt() else (34 * dp).toInt()
+        val iconSize = when {
+            item.action.startsWith("launch_app:") && showText -> (42 * dp).toInt()
+            item.action.startsWith("launch_app:") -> (48 * dp).toInt()
+            showText -> (30 * dp).toInt()
+            else -> (34 * dp).toInt()
+        }
         container.addView(ImageView(context).apply {
             val icon = drawableForAction(item.action)
             setImageDrawable(icon)

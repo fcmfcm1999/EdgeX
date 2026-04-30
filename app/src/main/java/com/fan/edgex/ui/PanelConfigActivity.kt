@@ -188,6 +188,12 @@ class PanelConfigActivity : AppCompatActivity() {
             val action = getConfigString(slot.prefKey, "none")
             val label = getConfigString("${slot.prefKey}_label", getString(R.string.action_none))
             slot.subtitle.text = label
+            val iconSize = if (action.startsWith("launch_app:")) 34 else 24
+            slot.icon.layoutParams = FrameLayout.LayoutParams(
+                (iconSize * resources.displayMetrics.density).toInt(),
+                (iconSize * resources.displayMetrics.density).toInt(),
+                Gravity.CENTER,
+            )
             slot.icon.setImageDrawable(drawableForAction(action))
             if (action.startsWith("launch_app:")) {
                 slot.icon.clearColorFilter()
