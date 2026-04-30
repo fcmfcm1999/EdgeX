@@ -121,6 +121,7 @@ class MultiActionEditActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         ThemeManager.applyToActivity(this)
+        MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
         consumeTempStep()
     }
 

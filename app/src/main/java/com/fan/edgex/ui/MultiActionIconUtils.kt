@@ -66,6 +66,7 @@ object MultiActionIconUtils {
         if (drawable != null) {
             imageView.setImageDrawable(drawable)
             imageView.imageTintList = null
+            imageView.clearColorFilter()
         } else {
             imageView.setImageResource(R.drawable.ic_multi_action)
             imageView.imageTintList =
