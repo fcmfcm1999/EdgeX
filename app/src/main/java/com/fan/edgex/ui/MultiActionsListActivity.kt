@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -34,6 +35,21 @@ class MultiActionsListActivity : AppCompatActivity() {
     private lateinit var tvEmpty: TextView
     private var pickMode = false
     private var prefKey = ""
+
+    private var pendingIconMultiAction: MultiAction? = null
+    private val iconPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val action = pendingIconMultiAction ?: return@registerForActivityResult
+        pendingIconMultiAction = null
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val newRef = result.data?.getStringExtra(AppIconPickerActivity.EXTRA_ICON_REF) ?: return@registerForActivityResult
+            MultiActionIconUtils.deleteIfCustom(this, action.iconRef)
+            MultiActionStore.save(configPrefs(), action.copy(iconRef = newRef))
+            broadcastFullConfigSnapshot()
+            loadData()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,6 +145,7 @@ class MultiActionsListActivity : AppCompatActivity() {
         val options = arrayOf(
             getString(R.string.multi_action_option_edit),
             getString(R.string.multi_action_option_rename),
+            getString(R.string.multi_action_option_edit_icon),
             getString(R.string.multi_action_option_execute),
             getString(R.string.multi_action_option_delete),
         )
@@ -138,11 +155,17 @@ class MultiActionsListActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openEdit(multiAction.id)
                     1 -> showRenameDialog(multiAction)
-                    2 -> requestHookActionExecution(MultiActionStore.actionCode(multiAction.id))
-                    3 -> showDeleteConfirm(multiAction)
+                    2 -> openIconPicker(multiAction)
+                    3 -> requestHookActionExecution(MultiActionStore.actionCode(multiAction.id))
+                    4 -> showDeleteConfirm(multiAction)
                 }
             }
             .show()
+    }
+
+    private fun openIconPicker(multiAction: MultiAction) {
+        pendingIconMultiAction = multiAction
+        iconPickerLauncher.launch(Intent(this, AppIconPickerActivity::class.java))
     }
 
     private fun showRenameDialog(multiAction: MultiAction) {

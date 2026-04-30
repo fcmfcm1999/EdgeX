@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
@@ -18,7 +17,7 @@ object MultiActionIconUtils {
     const val PREFIX_CUSTOM = "custom:"
 
     fun resolveDrawable(context: Context, iconRef: String): Drawable? = when {
-        iconRef.startsWith(PREFIX_APP) -> loadAppForeground(context, iconRef.removePrefix(PREFIX_APP))
+        iconRef.startsWith(PREFIX_APP) -> loadAppIcon(context, iconRef.removePrefix(PREFIX_APP))
         iconRef.startsWith(PREFIX_CUSTOM) -> {
             val bmp = loadCustomBitmap(context, iconRef.removePrefix(PREFIX_CUSTOM))
             bmp?.let { BitmapDrawable(context.resources, it) }
@@ -26,10 +25,9 @@ object MultiActionIconUtils {
         else -> null
     }
 
-    fun loadAppForeground(context: Context, packageName: String): Drawable? {
+    fun loadAppIcon(context: Context, packageName: String): Drawable? {
         return try {
-            val d = context.packageManager.getApplicationIcon(packageName)
-            if (d is AdaptiveIconDrawable) d.foreground else d
+            context.packageManager.getApplicationIcon(packageName)
         } catch (e: PackageManager.NameNotFoundException) {
             null
         }
