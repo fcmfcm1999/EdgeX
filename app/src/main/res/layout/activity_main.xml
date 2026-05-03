@@ -179,7 +179,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:layout_gravity="center"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_theme"
                         app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 
@@ -325,7 +325,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_apps"
+                            android:src="@drawable/ic_arc_drawer"
                             app:tint="@color/ui_icon_tint" />
                     </FrameLayout>
 
