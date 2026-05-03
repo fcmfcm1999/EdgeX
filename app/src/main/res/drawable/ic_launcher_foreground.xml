@@ -5,29 +5,25 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!--
-        Centered on canvas (54,54), scaled 0.8× — all elements within 35dp of center.
-    -->
-
     <!-- Edge trigger bar (right, semi-transparent white pill) -->
     <path
         android:fillColor="#FFFFFF"
         android:fillAlpha="0.3"
-        android:pathData="M77.04,32.4 Q80.64,32.4 80.64,36 V72 Q80.64,75.6 77.04,75.6 Q73.44,75.6 73.44,72 V36 Q73.44,32.4 77.04,32.4 Z" />
+        android:pathData="M78,33 Q81,33 81,36 V72 Q81,75 78,75 Q75,75 75,72 V36 Q75,33 78,33 Z" />
 
     <!-- Arrow pointing left -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="10.08"
+        android:strokeWidth="8"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000"
-        android:pathData="M52.56,36 L27.36,54 L52.56,72" />
+        android:pathData="M53,38 L30,54 L53,70" />
 
     <!-- Circle dot -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.7"
-        android:pathData="M54.72,54 A7.2,7.2,0,1,0,69.12,54 A7.2,7.2,0,1,0,54.72,54 Z" />
+        android:fillAlpha="0.8"
+        android:pathData="M61,54 m-6,0 a6,6 0 1,1 12,0 a6,6 0 1,1 -12,0" />
 
 </vector>
