@@ -119,6 +119,16 @@
                 android:exported="false"
                 android:theme="@style/Theme.EdgeX" />
 
+        <activity
+            android:name=".ui.ConditionActionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
+        <activity
+            android:name=".ui.ConditionPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
         <receiver
             android:name=".config.ConfigSnapshotReceiver"
             android:exported="false">

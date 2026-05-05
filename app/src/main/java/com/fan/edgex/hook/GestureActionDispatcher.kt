@@ -240,6 +240,25 @@ internal class GestureActionDispatcher(
             action.startsWith("multi_action:") -> {
                 executeMultiAction(action, context, touchX, touchY)
             }
+            action.startsWith("condition:") -> {
+                executeConditionAction(action, context, touchX, touchY)
+            }
+        }
+    }
+
+    private fun executeConditionAction(action: String, context: Context, touchX: Float, touchY: Float) {
+        val id = action.removePrefix("condition:")
+        if (id.isBlank()) return
+        val condCode = resolveConfig(com.fan.edgex.config.ConditionStore.condIfKey(id))
+        if (condCode.isBlank()) return
+        val result = ConditionEvaluator.evaluate(condCode, context)
+        val nextAction = if (result) {
+            resolveConfig(com.fan.edgex.config.ConditionStore.condThenKey(id))
+        } else {
+            resolveConfig(com.fan.edgex.config.ConditionStore.condElseKey(id))
+        }
+        if (nextAction.isNotBlank() && nextAction != "none") {
+            dispatchAction(nextAction, context, touchX, touchY)
         }
     }
 
