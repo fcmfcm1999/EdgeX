@@ -17,6 +17,7 @@ data class MultiAction(
     val id: String,
     val name: String,
     val steps: MutableList<MultiActionStep>,
+    val iconRef: String = "",
 )
 
 object MultiActionStore {
@@ -41,7 +42,8 @@ object MultiActionStore {
     private fun load(prefs: SharedPreferences, id: String): MultiAction? {
         val name = prefs.getString("multi_action_${id}_name", null) ?: return null
         val stepsJson = prefs.getString("multi_action_${id}_steps", null) ?: "[]"
-        return MultiAction(id, name, parseSteps(stepsJson).toMutableList())
+        val iconRef = prefs.getString("multi_action_${id}_icon", "") ?: ""
+        return MultiAction(id, name, parseSteps(stepsJson).toMutableList(), iconRef)
     }
 
     fun save(prefs: SharedPreferences, multiAction: MultiAction) {
@@ -52,6 +54,7 @@ object MultiActionStore {
             .putString(KEY_INDEX, existing.joinToString(","))
             .putString("multi_action_${multiAction.id}_name", multiAction.name)
             .putString("multi_action_${multiAction.id}_steps", serializeSteps(multiAction.steps))
+            .putString("multi_action_${multiAction.id}_icon", multiAction.iconRef)
             .commit()
     }
 
@@ -62,6 +65,7 @@ object MultiActionStore {
             .putString(KEY_INDEX, existing.joinToString(","))
             .remove("multi_action_${id}_name")
             .remove("multi_action_${id}_steps")
+            .remove("multi_action_${id}_icon")
             .commit()
     }
 

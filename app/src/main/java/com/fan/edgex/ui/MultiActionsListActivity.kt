@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -17,6 +18,7 @@ import com.fan.edgex.config.MultiActionStore
 import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.requestHookActionExecution
 
 class MultiActionsListActivity : AppCompatActivity() {
 
@@ -33,6 +35,21 @@ class MultiActionsListActivity : AppCompatActivity() {
     private lateinit var tvEmpty: TextView
     private var pickMode = false
     private var prefKey = ""
+
+    private var pendingIconMultiAction: MultiAction? = null
+    private val iconPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val action = pendingIconMultiAction ?: return@registerForActivityResult
+        pendingIconMultiAction = null
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val newRef = result.data?.getStringExtra(AppIconPickerActivity.EXTRA_ICON_REF) ?: return@registerForActivityResult
+            MultiActionIconUtils.deleteIfCustom(this, action.iconRef)
+            MultiActionStore.save(configPrefs(), action.copy(iconRef = newRef))
+            broadcastFullConfigSnapshot()
+            loadData()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,8 +88,14 @@ class MultiActionsListActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
 
-        findViewById<View>(R.id.btn_add).setOnClickListener {
-            createNew()
+        val fab = findViewById<View>(R.id.btn_fab)
+        fab.setOnClickListener { createNew() }
+        fab.setOnApplyWindowInsetsListener { view, insets ->
+            val navBottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            val lp = view.layoutParams as android.widget.FrameLayout.LayoutParams
+            lp.bottomMargin = (16 * resources.displayMetrics.density + navBottom).toInt()
+            view.layoutParams = lp
+            insets
         }
 
         loadData()
@@ -100,10 +123,9 @@ class MultiActionsListActivity : AppCompatActivity() {
 
     private fun createNew() {
         val id = MultiActionStore.generateId()
-        val action = com.fan.edgex.config.MultiAction(id, id, mutableListOf())
-        MultiActionStore.save(configPrefs(), action)
-        broadcastFullConfigSnapshot()
-        openEdit(id)
+        startActivity(Intent(this, MultiActionEditActivity::class.java)
+            .putExtra(MultiActionEditActivity.EXTRA_ID, id)
+            .putExtra(MultiActionEditActivity.EXTRA_IS_NEW, true))
     }
 
     private fun openEdit(id: String) {
@@ -121,9 +143,11 @@ class MultiActionsListActivity : AppCompatActivity() {
 
     private fun showItemOptions(multiAction: MultiAction) {
         val options = arrayOf(
-            getString(R.string.multi_action_option_edit),
-            getString(R.string.multi_action_option_rename),
-            getString(R.string.multi_action_option_delete),
+            getString(R.string.action_edit),
+            getString(R.string.action_rename),
+            getString(R.string.multi_action_option_edit_icon),
+            getString(R.string.action_execute),
+            getString(R.string.action_delete),
         )
         AlertDialog.Builder(this)
             .setTitle(multiAction.name)
@@ -131,10 +155,17 @@ class MultiActionsListActivity : AppCompatActivity() {
                 when (which) {
                     0 -> openEdit(multiAction.id)
                     1 -> showRenameDialog(multiAction)
-                    2 -> showDeleteConfirm(multiAction)
+                    2 -> openIconPicker(multiAction)
+                    3 -> requestHookActionExecution(MultiActionStore.actionCode(multiAction.id))
+                    4 -> showDeleteConfirm(multiAction)
                 }
             }
             .show()
+    }
+
+    private fun openIconPicker(multiAction: MultiAction) {
+        pendingIconMultiAction = multiAction
+        iconPickerLauncher.launch(Intent(this, AppIconPickerActivity::class.java))
     }
 
     private fun showRenameDialog(multiAction: MultiAction) {
@@ -148,9 +179,9 @@ class MultiActionsListActivity : AppCompatActivity() {
             addView(editText)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.multi_action_edit_name_title)
+            .setTitle(R.string.action_rename)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newName = editText.text.toString().trim().ifBlank { multiAction.name }
                 val updated = multiAction.copy(name = newName)
                 MultiActionStore.save(configPrefs(), updated)
@@ -164,7 +195,7 @@ class MultiActionsListActivity : AppCompatActivity() {
     private fun showDeleteConfirm(multiAction: MultiAction) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.multi_action_option_delete_confirm, multiAction.name))
-            .setPositiveButton(R.string.multi_action_option_delete_confirm_btn) { _, _ ->
+            .setPositiveButton(R.string.action_delete) { _, _ ->
                 MultiActionStore.delete(configPrefs(), multiAction.id)
                 broadcastFullConfigSnapshot()
                 loadData()
@@ -182,6 +213,7 @@ class MultiActionsListActivity : AppCompatActivity() {
         inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tv_name)
             val tvCount: TextView = v.findViewById(R.id.tv_count)
+            val icon: ImageView = v.findViewById(R.id.icon)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -194,6 +226,7 @@ class MultiActionsListActivity : AppCompatActivity() {
             holder.tvName.text = item.name
             holder.tvCount.text = getString(R.string.multi_action_step_count, item.steps.size)
             ThemeManager.applyToView(holder.itemView, this@MultiActionsListActivity)
+            MultiActionIconUtils.applyTo(this@MultiActionsListActivity, holder.icon, item.iconRef)
             holder.itemView.setOnClickListener { onClick(item) }
             holder.itemView.setOnLongClickListener {
                 onLongClick(item)

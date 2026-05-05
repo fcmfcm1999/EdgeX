@@ -94,6 +94,11 @@
             android:theme="@style/Theme.EdgeX" />
 
         <activity
+            android:name=".ui.PieSettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.EdgeX" />
+
+        <activity
             android:name=".ui.MultiActionsListActivity"
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
@@ -105,9 +110,14 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".ui.PanelConfigActivity"
+            android:name=".ui.AppIconPickerActivity"
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
+
+        <activity
+                android:name=".ui.PanelConfigActivity"
+                android:exported="false"
+                android:theme="@style/Theme.EdgeX" />
 
         <receiver
             android:name=".config.ConfigSnapshotReceiver"

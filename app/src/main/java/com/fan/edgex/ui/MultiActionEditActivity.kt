@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,11 +21,13 @@ import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.requestHookActionExecution
 
 class MultiActionEditActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_ID = "multi_action_id"
+        const val EXTRA_IS_NEW = "is_new"
     }
 
     private lateinit var multiActionId: String
@@ -35,10 +38,26 @@ class MultiActionEditActivity : AppCompatActivity() {
     private lateinit var tvTitle: TextView
 
     private var multiActionName = ""
+    private var currentIconRef = ""
     private var isModified = false
+    private var isNew = false
 
     private var addingStep = false
     private var editingStepIndex = -1
+
+    private lateinit var ivIconPreview: ImageView
+
+    private val iconPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val ref = result.data?.getStringExtra(AppIconPickerActivity.EXTRA_ICON_REF) ?: return@registerForActivityResult
+            MultiActionIconUtils.deleteIfCustom(this, currentIconRef)
+            currentIconRef = ref
+            MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
+            markModified()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,14 +65,26 @@ class MultiActionEditActivity : AppCompatActivity() {
         ThemeManager.applyToActivity(this)
 
         multiActionId = intent.getStringExtra(EXTRA_ID) ?: run { finish(); return }
+        isNew = intent.getBooleanExtra(EXTRA_IS_NEW, false)
 
-        val existing = MultiActionStore.get(configPrefs(), multiActionId) ?: run { finish(); return }
-        multiActionName = existing.name
-        steps = existing.steps
+        if (isNew) {
+            multiActionName = multiActionId
+            steps = mutableListOf()
+            currentIconRef = ""
+        } else {
+            val existing = MultiActionStore.get(configPrefs(), multiActionId) ?: run { finish(); return }
+            multiActionName = existing.name
+            steps = existing.steps
+            currentIconRef = existing.iconRef
+        }
 
         tvTitle = findViewById(R.id.tv_title)
         tvTitle.text = multiActionName
         tvTitle.setOnClickListener { showRenameDialog() }
+
+        ivIconPreview = findViewById(R.id.iv_icon_preview)
+        MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
+        findViewById<View>(R.id.btn_icon).setOnClickListener { openIconPicker() }
 
         recyclerView = findViewById(R.id.recycler_view)
         tvEmpty = findViewById(R.id.tv_empty)
@@ -73,7 +104,16 @@ class MultiActionEditActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { handleBack() }
         findViewById<View>(R.id.btn_save).setOnClickListener { saveAndShowToast() }
-        findViewById<View>(R.id.btn_add_step).setOnClickListener { startAddStep() }
+
+        val fab = findViewById<View>(R.id.btn_fab)
+        fab.setOnClickListener { startAddStep() }
+        fab.setOnApplyWindowInsetsListener { view, insets ->
+            val navBottom = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            val lp = view.layoutParams as android.widget.FrameLayout.LayoutParams
+            lp.bottomMargin = (16 * resources.displayMetrics.density + navBottom).toInt()
+            view.layoutParams = lp
+            insets
+        }
 
         updateEmpty()
     }
@@ -81,6 +121,7 @@ class MultiActionEditActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         ThemeManager.applyToActivity(this)
+        MultiActionIconUtils.applyTo(this, ivIconPreview, currentIconRef)
         consumeTempStep()
     }
 
@@ -142,12 +183,12 @@ class MultiActionEditActivity : AppCompatActivity() {
     private fun showStepOptions(index: Int) {
         val step = steps[index]
         val options = arrayOf(
-            getString(R.string.multi_action_step_edit_action),
+            getString(R.string.action_edit),
             getString(R.string.multi_action_step_edit_icon_name),
-            getString(R.string.multi_action_step_copy),
-            getString(R.string.multi_action_step_execute),
+            getString(R.string.copy_copy),
+            getString(R.string.action_execute),
             getString(R.string.multi_action_step_info),
-            getString(R.string.multi_action_step_delete),
+            getString(R.string.action_delete),
         )
         AlertDialog.Builder(this)
             .setTitle(step.label)
@@ -178,7 +219,7 @@ class MultiActionEditActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.multi_action_step_edit_icon_name)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newLabel = editText.text.toString().trim().ifBlank { step.label }
                 steps[index] = step.copy(label = newLabel)
                 adapter.notifyItemChanged(index)
@@ -197,23 +238,7 @@ class MultiActionEditActivity : AppCompatActivity() {
     }
 
     private fun executeStep(step: MultiActionStep) {
-        when {
-            step.code.startsWith("launch_app:") -> {
-                val pkg = step.code.removePrefix("launch_app:")
-                try {
-                    val intent = packageManager.getLaunchIntentForPackage(pkg)
-                    if (intent != null) startActivity(intent)
-                    else Toast.makeText(this, getString(R.string.toast_app_not_found), Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(this, getString(R.string.toast_cannot_launch), Toast.LENGTH_SHORT).show()
-                }
-            }
-            else -> Toast.makeText(
-                this,
-                getString(R.string.multi_action_execute_not_supported, step.label),
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
+        requestHookActionExecution(step.code)
     }
 
     private fun showStepInfo(step: MultiActionStep) {
@@ -245,9 +270,9 @@ class MultiActionEditActivity : AppCompatActivity() {
             addView(editText)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.multi_action_edit_name_title)
+            .setTitle(R.string.action_rename)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newName = editText.text.toString().trim().ifBlank { multiActionName }
                 multiActionName = newName
                 tvTitle.text = multiActionName
@@ -263,14 +288,19 @@ class MultiActionEditActivity : AppCompatActivity() {
 
     private fun saveAndShowToast() {
         doSave()
-        Toast.makeText(this, R.string.multi_action_saved, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.action_saved, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openIconPicker() {
+        iconPickerLauncher.launch(Intent(this, AppIconPickerActivity::class.java))
     }
 
     private fun doSave() {
-        val updated = MultiAction(multiActionId, multiActionName, steps)
+        val updated = MultiAction(multiActionId, multiActionName, steps, currentIconRef)
         MultiActionStore.save(configPrefs(), updated)
         broadcastFullConfigSnapshot()
         isModified = false
+        isNew = false
     }
 
     private fun handleBack() {
@@ -281,11 +311,12 @@ class MultiActionEditActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.multi_action_unsaved_title)
             .setMessage(R.string.multi_action_unsaved_message)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 doSave()
                 finish()
             }
             .setNegativeButton(R.string.multi_action_discard) { _, _ ->
+                if (isNew) MultiActionStore.delete(configPrefs(), multiActionId)
                 finish()
             }
             .setNeutralButton(android.R.string.cancel, null)

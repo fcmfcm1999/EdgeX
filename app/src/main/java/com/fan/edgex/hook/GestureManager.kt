@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.PanelOverlayManager
 import de.robv.android.xposed.XposedBridge
 
@@ -95,6 +96,22 @@ object GestureManager {
                 override fun log(message: String) {
                     gestureLog(message)
                 }
+
+                override fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String) {
+                    mainHandler().post { actionDispatcher.showPie(context, anchorX, anchorY, edge) }
+                }
+
+                override fun updatePie(x: Float, y: Float) {
+                    mainHandler().post { PieManager.update(x, y) }
+                }
+
+                override fun commitPie(context: Context) {
+                    mainHandler().post { actionDispatcher.commitPieAction(context) }
+                }
+
+                override fun cancelPie() {
+                    mainHandler().post { PieManager.dismiss() }
+                }
             },
         )
     }
@@ -153,7 +170,10 @@ object GestureManager {
                     Intent.ACTION_SCREEN_OFF -> {
                         gestureDetector.reset()
                         KeyManager.reset()
-                        PanelOverlayManager.dismiss()
+                        mainHandler().post {
+                            PieManager.dismiss()
+                            PanelOverlayManager.dismiss()
+                        }
                     }
                     Intent.ACTION_USER_UNLOCKED -> {
                         configRepository.invalidate()
@@ -182,26 +202,38 @@ object GestureManager {
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.action != HookConfigSnapshot.ACTION_CONFIG_CHANGED) return
+                when (intent.action) {
+                    HookConfigSnapshot.ACTION_CONFIG_CHANGED -> {
+                        val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
+                        val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
+                        if (keys != null && values != null) {
+                            configRepository.updateFromBroadcast(
+                                keys,
+                                values,
+                                intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
+                            )
+                            refreshDebugOverlay()
+                        } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
+                            configRepository.invalidate()
+                            configRepository.reloadAsync(::refreshDebugOverlay)
+                        }
+                    }
+                    HookConfigSnapshot.ACTION_EXECUTE_ACTION -> {
+                        val action = intent.getStringExtra(HookConfigSnapshot.EXTRA_ACTION_CODE).orEmpty()
+                        if (action.isBlank() || action == "none") return
 
-                val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
-                val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
-                if (keys != null && values != null) {
-                    configRepository.updateFromBroadcast(
-                        keys,
-                        values,
-                        intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false),
-                    )
-                    refreshDebugOverlay()
-                } else if (intent.getBooleanExtra(HookConfigSnapshot.EXTRA_FULL_SNAPSHOT, false)) {
-                    configRepository.invalidate()
-                    configRepository.reloadAsync(::refreshDebugOverlay)
+                        log("Execute action request from UI: $action")
+                        actionDispatcher.executeKeyAction(action, ctx)
+                    }
                 }
             }
         }
 
         try {
-            val filter = IntentFilter(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+            val filter = IntentFilter().apply {
+                addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+                addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+            }
             context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } catch (e: Exception) {
             systemConfigReceiverRegistered = false

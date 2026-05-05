@@ -42,6 +42,15 @@ fun Context.broadcastFullConfigSnapshot() {
     sendConfigBroadcast(values, fullSnapshot = true)
 }
 
+fun Context.requestHookActionExecution(actionCode: String) {
+    if (actionCode.isBlank() || actionCode == "none") return
+
+    HookConfigSnapshot.writeFromPreferences(this)
+    sendBroadcast(Intent(HookConfigSnapshot.ACTION_EXECUTE_ACTION).apply {
+        putExtra(HookConfigSnapshot.EXTRA_ACTION_CODE, actionCode)
+    })
+}
+
 // Reads for UI. Includes a legacy fallback for values previously stored as native booleans.
 fun Context.getConfigString(key: String, default: String = ""): String =
     configPrefs().run { getString(key, null) ?: default }

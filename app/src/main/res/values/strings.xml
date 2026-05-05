@@ -117,6 +117,15 @@
     <string name="action_clear_background">Clear Background Apps</string>
     <string name="action_launch_app">Launch App</string>
     <string name="action_music_control">Music Control</string>
+    <string name="action_pie">Pie Menu</string>
+    <string name="header_pie_settings">Pie Menu</string>
+    <string name="menu_pie">Pie</string>
+    <string name="menu_pie_desc">Configure pie menu</string>
+    <string name="pie_edge_left">Left Edge</string>
+    <string name="pie_edge_right">Right Edge</string>
+    <string name="pie_edge_top">Top Edge</string>
+    <string name="pie_edge_bottom">Bottom Edge</string>
+    <string name="pie_ring_slot_label">Ring %1$d · Slot %2$d</string>
     <string name="action_music_play_pause">Play / Pause</string>
     <string name="action_music_stop">Stop</string>
     <string name="action_music_previous">Previous Track</string>
@@ -130,6 +139,13 @@
     <string name="panel_row_title">Row %d</string>
     <string name="panel_column_title">Column %d</string>
     <string name="panel_slot_title">Slot %d</string>
+
+    <!-- Common Action Verbs -->
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_execute">Execute</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_saved">Saved</string>
 
     <!-- Music Control / App Selection Configuration -->
     <string name="header_music_control">Music Control</string>
@@ -237,39 +253,31 @@
     <string name="copy_selected_count">%d selected</string>
 
     <!-- Saved Multi-Actions -->
-    <string name="menu_multi_actions">Saved Actions</string>
+    <string name="menu_multi_actions">Saved Multi-Actions</string>
     <string name="menu_multi_actions_desc">Reusable action sequences</string>
-    <string name="header_multi_actions">Saved Actions</string>
+    <string name="header_multi_actions">Saved Multi-Actions</string>
     <string name="header_multi_action_edit">Edit Action Set</string>
     <string name="action_multi_action">Multi-Action</string>
     <string name="multi_action_add">Add New</string>
     <string name="multi_action_add_step">Add Action</string>
-    <string name="multi_action_empty">No saved actions yet\nTap \"Add New\" to create one</string>
+    <string name="multi_action_empty">No saved multi-actions yet\nTap \"Add New\" to create one</string>
     <string name="multi_action_empty_steps">No steps added yet\nTap \"Add Action\" below</string>
     <string name="multi_action_unsaved_title">Unsaved Changes</string>
     <string name="multi_action_unsaved_message">Save changes before leaving?</string>
-    <string name="multi_action_save">Save</string>
     <string name="multi_action_discard">Discard</string>
-    <string name="multi_action_saved">Saved</string>
-    <string name="multi_action_step_edit_action">Edit Action</string>
-    <string name="multi_action_step_edit_icon_name">Edit Icon &amp; Name</string>
-    <string name="multi_action_step_copy">Copy</string>
-    <string name="multi_action_step_execute">Execute</string>
+    <string name="multi_action_step_edit_icon_name">Edit Name</string>
     <string name="multi_action_step_info">Action Info</string>
-    <string name="multi_action_step_delete">Delete</string>
-    <string name="multi_action_option_edit">Edit</string>
-    <string name="multi_action_option_rename">Rename</string>
-    <string name="multi_action_option_delete">Delete</string>
+    <string name="multi_action_option_edit_icon">Edit Icon</string>
     <string name="multi_action_option_delete_confirm">Delete \"%s\"?</string>
-    <string name="multi_action_option_delete_confirm_btn">Delete</string>
     <string name="multi_action_info_title">Action Info</string>
     <string name="multi_action_info_code">Code: %s</string>
     <string name="multi_action_info_label">Name: %s</string>
-    <string name="multi_action_edit_name_title">Rename</string>
     <string name="multi_action_edit_name_hint">Action set name</string>
     <string name="multi_action_step_edit_label_hint">Step name</string>
     <string name="multi_action_execute_not_supported">Cannot execute \"%s\" from app context</string>
     <string name="multi_action_step_count">%d step(s)</string>
+    <string name="icon_picker_title">Choose Icon</string>
+    <string name="icon_picker_from_gallery">Choose from Gallery</string>
 
     <!-- Keys Feature -->
     <string name="menu_keys">Keys</string>
