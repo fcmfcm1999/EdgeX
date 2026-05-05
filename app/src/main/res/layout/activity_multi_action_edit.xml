@@ -75,7 +75,7 @@
                 android:paddingEnd="8dp"
                 android:paddingTop="8dp"
                 android:paddingBottom="8dp"
-                android:text="@string/multi_action_save"
+                android:text="@string/btn_save"
                 android:textColor="@color/ui_header_text"
                 android:textSize="14sp"
                 android:textStyle="bold" />

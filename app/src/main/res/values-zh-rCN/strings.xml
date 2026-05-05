@@ -130,6 +130,13 @@
     <string name="action_music_previous">上一曲</string>
     <string name="action_music_next">下一曲</string>
 
+    <!-- 通用动作动词 -->
+    <string name="action_delete">删除</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_execute">执行</string>
+    <string name="action_rename">重命名</string>
+    <string name="action_saved">已保存</string>
+
     <!-- 音乐控制 / 应用选择配置 -->
     <string name="header_music_control">音乐控制</string>
     <string name="header_app_selection">选择应用</string>
@@ -257,4 +264,31 @@
     <string name="key_mode_click">单击</string>
     <string name="key_mode_double_click">双击</string>
     <string name="key_mode_long_press">长按</string>
+
+    <!-- 保存的组合动作 -->
+    <string name="menu_multi_actions">保存的组合动作</string>
+    <string name="menu_multi_actions_desc">可复用的动作序列</string>
+    <string name="header_multi_actions">保存的组合动作</string>
+    <string name="header_multi_action_edit">编辑动作集</string>
+    <string name="action_multi_action">组合动作</string>
+    <string name="multi_action_add">新建</string>
+    <string name="multi_action_add_step">添加动作</string>
+    <string name="multi_action_empty">还没有保存的组合动作\n点击\"新建\"来创建</string>
+    <string name="multi_action_empty_steps">还没有添加步骤\n点击下方\"添加动作\"</string>
+    <string name="multi_action_unsaved_title">未保存的更改</string>
+    <string name="multi_action_unsaved_message">离开前保存更改？</string>
+    <string name="multi_action_discard">放弃</string>
+    <string name="multi_action_step_edit_icon_name">编辑名称</string>
+    <string name="multi_action_step_info">动作信息</string>
+    <string name="multi_action_option_edit_icon">编辑图标</string>
+    <string name="multi_action_option_delete_confirm">删除「%s」？</string>
+    <string name="multi_action_info_title">动作信息</string>
+    <string name="multi_action_info_code">代码：%s</string>
+    <string name="multi_action_info_label">名称：%s</string>
+    <string name="multi_action_edit_name_hint">动作集名称</string>
+    <string name="multi_action_step_edit_label_hint">步骤名称</string>
+    <string name="multi_action_execute_not_supported">无法在应用上下文中执行「%s」</string>
+    <string name="multi_action_step_count">%d 个步骤</string>
+    <string name="icon_picker_title">选择图标</string>
+    <string name="icon_picker_from_gallery">从相册选择</string>
 </resources>

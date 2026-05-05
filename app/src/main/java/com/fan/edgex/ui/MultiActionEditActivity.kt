@@ -183,12 +183,12 @@ class MultiActionEditActivity : AppCompatActivity() {
     private fun showStepOptions(index: Int) {
         val step = steps[index]
         val options = arrayOf(
-            getString(R.string.multi_action_step_edit_action),
+            getString(R.string.action_edit),
             getString(R.string.multi_action_step_edit_icon_name),
-            getString(R.string.multi_action_step_copy),
-            getString(R.string.multi_action_step_execute),
+            getString(R.string.copy_copy),
+            getString(R.string.action_execute),
             getString(R.string.multi_action_step_info),
-            getString(R.string.multi_action_step_delete),
+            getString(R.string.action_delete),
         )
         AlertDialog.Builder(this)
             .setTitle(step.label)
@@ -219,7 +219,7 @@ class MultiActionEditActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.multi_action_step_edit_icon_name)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newLabel = editText.text.toString().trim().ifBlank { step.label }
                 steps[index] = step.copy(label = newLabel)
                 adapter.notifyItemChanged(index)
@@ -270,9 +270,9 @@ class MultiActionEditActivity : AppCompatActivity() {
             addView(editText)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.multi_action_edit_name_title)
+            .setTitle(R.string.action_rename)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newName = editText.text.toString().trim().ifBlank { multiActionName }
                 multiActionName = newName
                 tvTitle.text = multiActionName
@@ -288,7 +288,7 @@ class MultiActionEditActivity : AppCompatActivity() {
 
     private fun saveAndShowToast() {
         doSave()
-        Toast.makeText(this, R.string.multi_action_saved, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.action_saved, Toast.LENGTH_SHORT).show()
     }
 
     private fun openIconPicker() {
@@ -311,7 +311,7 @@ class MultiActionEditActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.multi_action_unsaved_title)
             .setMessage(R.string.multi_action_unsaved_message)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 doSave()
                 finish()
             }

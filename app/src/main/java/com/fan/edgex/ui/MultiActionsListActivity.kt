@@ -143,11 +143,11 @@ class MultiActionsListActivity : AppCompatActivity() {
 
     private fun showItemOptions(multiAction: MultiAction) {
         val options = arrayOf(
-            getString(R.string.multi_action_option_edit),
-            getString(R.string.multi_action_option_rename),
+            getString(R.string.action_edit),
+            getString(R.string.action_rename),
             getString(R.string.multi_action_option_edit_icon),
-            getString(R.string.multi_action_option_execute),
-            getString(R.string.multi_action_option_delete),
+            getString(R.string.action_execute),
+            getString(R.string.action_delete),
         )
         AlertDialog.Builder(this)
             .setTitle(multiAction.name)
@@ -179,9 +179,9 @@ class MultiActionsListActivity : AppCompatActivity() {
             addView(editText)
         }
         AlertDialog.Builder(this)
-            .setTitle(R.string.multi_action_edit_name_title)
+            .setTitle(R.string.action_rename)
             .setView(container)
-            .setPositiveButton(R.string.multi_action_save) { _, _ ->
+            .setPositiveButton(R.string.btn_save) { _, _ ->
                 val newName = editText.text.toString().trim().ifBlank { multiAction.name }
                 val updated = multiAction.copy(name = newName)
                 MultiActionStore.save(configPrefs(), updated)
@@ -195,7 +195,7 @@ class MultiActionsListActivity : AppCompatActivity() {
     private fun showDeleteConfirm(multiAction: MultiAction) {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.multi_action_option_delete_confirm, multiAction.name))
-            .setPositiveButton(R.string.multi_action_option_delete_confirm_btn) { _, _ ->
+            .setPositiveButton(R.string.action_delete) { _, _ ->
                 MultiActionStore.delete(configPrefs(), multiAction.id)
                 broadcastFullConfigSnapshot()
                 loadData()
