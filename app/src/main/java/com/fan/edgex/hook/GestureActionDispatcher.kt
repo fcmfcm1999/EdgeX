@@ -4,6 +4,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.drawable.Drawable
+import android.media.AudioManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -19,7 +21,10 @@ import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.overlay.DrawerManager
+import com.fan.edgex.overlay.PieManager
+import com.fan.edgex.overlay.PieView
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 
@@ -251,6 +256,102 @@ internal class GestureActionDispatcher(
     // Everything else (brightness, volume, media) is near-instant.
     private fun stepSettleDuration(code: String): Long =
         com.fan.edgex.action.AppActionExecutor.stepSettleDuration(code)
+
+    fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String) {
+        val rings = (1..AppConfig.PIE_RINGS).map { ring ->
+            PieView.Ring((0 until AppConfig.PIE_SLOTS_PER_RING).mapNotNull { slot ->
+                val action = resolveConfig(AppConfig.pieSlot(edge, ring, slot))
+                if (action.isEmpty() || action == "none") null
+                else {
+                    val label = resolveConfig(AppConfig.pieSlotLabel(edge, ring, slot)).ifEmpty { pieActionToLabel(action) }
+                    val icon = loadActionIcon(context, action)
+                    PieView.Slot(label, action, icon)
+                }
+            })
+        }
+        if (rings.all { it.slots.isEmpty() }) return
+        PieManager.show(context, anchorX, anchorY, edge, rings, resolveAccentColor())
+    }
+
+    private fun resolveAccentColor(): Int {
+        val presetId = resolveConfig(AppConfig.THEME_PRESET).ifEmpty { ThemeManager.PRESET_DEFAULT }
+        if (presetId == ThemeManager.PRESET_CUSTOM) {
+            val hex = resolveConfig(AppConfig.THEME_CUSTOM_COLOR).ifEmpty { "#326D32" }
+            return try { android.graphics.Color.parseColor(hex) } catch (_: Exception) { android.graphics.Color.parseColor("#326D32") }
+        }
+        return ThemeManager.presets.firstOrNull { it.id == presetId }?.accentColor
+            ?: ThemeManager.presets.first().accentColor
+    }
+
+    private fun loadActionIcon(context: Context, action: String): Drawable? {
+        if (action.startsWith("launch_app:")) {
+            val pkg = action.substringAfter("launch_app:")
+            try { return context.packageManager.getApplicationIcon(pkg) } catch (_: Exception) {}
+        }
+        val resId = actionToIconRes(action)
+        if (resId == 0) return null
+        return ModuleRes.getDrawable(resId)
+    }
+
+    private fun actionToIconRes(action: String): Int = when {
+        action == "back"                     -> R.drawable.ic_arrow_back
+        action == "home"                     -> R.drawable.ic_home
+        action == "recents"                  -> R.drawable.ic_recents
+        action == "screenshot"               -> R.drawable.ic_camera
+        action == "lock_screen"              -> R.drawable.ic_power
+        action == "expand_notifications"     -> R.drawable.ic_notifications
+        action == "kill_app"                 -> R.drawable.ic_kill_app
+        action == "clipboard"                -> R.drawable.ic_paste
+        action == "universal_copy"           -> R.drawable.ic_content_copy
+        action == "freezer_drawer"           -> R.drawable.ic_freezer
+        action == "refreeze"                 -> R.drawable.ic_refreeze
+        action == "brightness_up"            -> R.drawable.ic_brightness_up
+        action == "brightness_down"          -> R.drawable.ic_brightness_down
+        action == "volume_up"                -> R.drawable.ic_volume_up
+        action == "volume_down"              -> R.drawable.ic_volume_down
+        action == "clear_background"         -> R.drawable.ic_clear_recent
+        action == "sub_gesture"              -> R.drawable.ic_sub_gesture
+        action.startsWith("music_control:")  -> when (action.substringAfter("music_control:")) {
+            "play_pause" -> R.drawable.ic_music_play_pause
+            "stop"       -> R.drawable.ic_music_stop
+            "previous"   -> R.drawable.ic_music_previous
+            "next"       -> R.drawable.ic_music_next
+            else         -> R.drawable.ic_music
+        }
+        action.startsWith("shell:")          -> R.drawable.ic_terminal
+        action.startsWith("app_shortcut:")   -> R.drawable.ic_app_shortcut
+        action.startsWith("launch_app:")     -> R.drawable.ic_launch_app
+        else                                 -> 0
+    }
+
+    fun commitPieAction(context: Context) {
+        val action = PieManager.commit() ?: return
+        performAction(action, context, 0f, 0f)
+    }
+
+    private fun pieActionToLabel(action: String): String = when {
+        action == "back"              -> "Back"
+        action == "home"              -> "Home"
+        action == "recents" || action == "recent" -> "Recents"
+        action == "screenshot"        -> "Screenshot"
+        action == "lock_screen"       -> "Lock"
+        action == "expand_notifications" -> "Notifs"
+        action == "kill_app"          -> "Kill App"
+        action == "clipboard"         -> "Clipboard"
+        action == "universal_copy"    -> "Copy"
+        action == "freezer_drawer"    -> "Freezer"
+        action == "refreeze"          -> "Refreeze"
+        action == "brightness_up"     -> "Bright+"
+        action == "brightness_down"   -> "Bright-"
+        action == "volume_up"         -> "Vol+"
+        action == "volume_down"       -> "Vol-"
+        action == "clear_background"  -> "Clear"
+        action.startsWith("music_control:") -> "Music"
+        action.startsWith("shell:")   -> "Shell"
+        action.startsWith("launch_app:") -> "Launch"
+        action.startsWith("app_shortcut:") -> "Shortcut"
+        else                          -> action.take(8)
+    }
 
     private fun killForegroundApp(context: Context) {
         try {

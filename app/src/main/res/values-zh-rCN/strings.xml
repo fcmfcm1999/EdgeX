@@ -116,6 +116,15 @@
     <string name="action_clear_background">清除后台应用</string>
     <string name="action_launch_app">启动应用</string>
     <string name="action_music_control">音乐控制</string>
+    <string name="action_pie">Pie 菜单</string>
+    <string name="header_pie_settings">Pie 菜单</string>
+    <string name="menu_pie">Pie</string>
+    <string name="menu_pie_desc">配置 Pie 菜单</string>
+    <string name="pie_edge_left">左边缘</string>
+    <string name="pie_edge_right">右边缘</string>
+    <string name="pie_edge_top">上边缘</string>
+    <string name="pie_edge_bottom">下边缘</string>
+    <string name="pie_ring_slot_label">第%1$d层 第%2$d项</string>
     <string name="action_music_play_pause">播放 / 暂停</string>
     <string name="action_music_stop">停止</string>
     <string name="action_music_previous">上一曲</string>

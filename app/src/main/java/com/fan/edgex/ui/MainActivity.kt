@@ -63,6 +63,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, FreezerActivity::class.java))
         }
 
+        findViewById<View>(R.id.item_pie).setOnClickListener {
+            startActivity(android.content.Intent(this, PieSettingsActivity::class.java))
+        }
+
         findViewById<View>(R.id.item_theme).setOnClickListener {
             startActivity(android.content.Intent(this, ThemeActivity::class.java))
         }
