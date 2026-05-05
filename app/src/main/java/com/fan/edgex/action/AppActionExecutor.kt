@@ -136,6 +136,7 @@ object AppActionExecutor {
             || code == "quick_settings" -> 600L
         code.startsWith("launch_app:") || code.startsWith("app_shortcut:") -> 500L
         code == "screenshot" || code == "clear_background" || code == "refreeze" -> 300L
+        code == "prev_app" || code == "next_app" -> 500L
         else -> 150L
     }
 

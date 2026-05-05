@@ -37,6 +37,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
         ActionItem(getString(R.string.action_lock_screen), "lock_screen", R.drawable.ic_power),
         ActionItem(getString(R.string.action_kill_app), "kill_app", R.drawable.ic_kill_app),
+        ActionItem(getString(R.string.action_prev_app), "prev_app", R.drawable.ic_prev_app),
+        ActionItem(getString(R.string.action_next_app), "next_app", R.drawable.ic_next_app),
         ActionItem(getString(R.string.action_brightness_up), "brightness_up", R.drawable.ic_brightness_up),
         ActionItem(getString(R.string.action_brightness_down), "brightness_down", R.drawable.ic_brightness_down),
         ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
