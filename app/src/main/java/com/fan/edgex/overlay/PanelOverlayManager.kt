@@ -91,7 +91,7 @@ private class PanelOverlayWindow(
 
         rootView = object : FrameLayout(context) {
             override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-                if (ev.action == MotionEvent.ACTION_DOWN && isOutsidePanel(ev.x, ev.y)) {
+                if (ev.action == MotionEvent.ACTION_DOWN && isOutsidePanel(ev.rawX, ev.rawY)) {
                     animateOut()
                     return true
                 }
