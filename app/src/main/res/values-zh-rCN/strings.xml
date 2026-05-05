@@ -129,6 +129,15 @@
     <string name="action_music_stop">停止</string>
     <string name="action_music_previous">上一曲</string>
     <string name="action_music_next">下一曲</string>
+    <string name="action_custom_panel">自定义面板</string>
+    <string name="action_left_side_bar">左侧边栏</string>
+    <string name="action_right_side_bar">右侧边栏</string>
+    <string name="menu_custom_panel">自定义面板</string>
+    <string name="menu_left_side_bar">左侧边栏</string>
+    <string name="menu_right_side_bar">右侧边栏</string>
+    <string name="panel_row_title">第%d行</string>
+    <string name="panel_column_title">第%d列</string>
+    <string name="panel_slot_title">第%d项</string>
 
     <!-- 通用动作动词 -->
     <string name="action_delete">删除</string>

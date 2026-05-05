@@ -195,6 +195,108 @@
 
             </LinearLayout>
 
+            <!-- Item: Custom Panel -->
+            <LinearLayout
+                    android:id="@+id/item_custom_panel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:tag="theme_icon_bg"
+                        android:background="@drawable/circle_background_teal">
+                    <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_apps"
+                            app:tint="@color/ui_icon_tint" />
+                </FrameLayout>
+
+                <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:text="@string/menu_custom_panel"
+                        android:textColor="@color/ui_text_primary"
+                        android:textSize="16sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                    android:id="@+id/item_left_side_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:tag="theme_icon_bg"
+                        android:background="@drawable/circle_background_teal">
+                    <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_edge_left_full"
+                            app:tint="@color/ui_icon_tint" />
+                </FrameLayout>
+
+                <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:text="@string/menu_left_side_bar"
+                        android:textColor="@color/ui_text_primary"
+                        android:textSize="16sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                    android:id="@+id/item_right_side_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="16dp">
+
+                <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:tag="theme_icon_bg"
+                        android:background="@drawable/circle_background_teal">
+                    <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_edge_right_full"
+                            app:tint="@color/ui_icon_tint" />
+                </FrameLayout>
+
+                <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_weight="1"
+                        android:text="@string/menu_right_side_bar"
+                        android:textColor="@color/ui_text_primary"
+                        android:textSize="16sp" />
+            </LinearLayout>
             <LinearLayout
                 android:id="@+id/item_theme"
                 android:layout_width="match_parent"

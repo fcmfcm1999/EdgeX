@@ -23,6 +23,7 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.overlay.DrawerManager
+import com.fan.edgex.overlay.PanelOverlayManager
 import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.PieView
 import de.robv.android.xposed.XposedBridge
@@ -220,6 +221,21 @@ internal class GestureActionDispatcher(
             }
             action == "freezer_drawer" -> {
                 DrawerManager.showDrawer(context, resolveConfig)
+            }
+            action == AppConfig.CUSTOM_PANEL_ACTION -> {
+                PanelOverlayManager.showCustomPanel(context, resolveConfig) { selected ->
+                    dispatchAction(selected, context, touchX, touchY)
+                }
+            }
+            action == AppConfig.SIDE_BAR_LEFT_ACTION -> {
+                PanelOverlayManager.showSideBar(context, resolveConfig, "left") { selected ->
+                    dispatchAction(selected, context, touchX, touchY)
+                }
+            }
+            action == AppConfig.SIDE_BAR_RIGHT_ACTION -> {
+                PanelOverlayManager.showSideBar(context, resolveConfig, "right") { selected ->
+                    dispatchAction(selected, context, touchX, touchY)
+                }
             }
             action.startsWith("multi_action:") -> {
                 executeMultiAction(action, context, touchX, touchY)

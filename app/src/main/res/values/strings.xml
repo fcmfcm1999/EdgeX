@@ -130,6 +130,15 @@
     <string name="action_music_stop">Stop</string>
     <string name="action_music_previous">Previous Track</string>
     <string name="action_music_next">Next Track</string>
+    <string name="action_custom_panel">Custom Panel</string>
+    <string name="action_left_side_bar">Left Side Bar</string>
+    <string name="action_right_side_bar">Right Side Bar</string>
+    <string name="menu_custom_panel">Custom Panel</string>
+    <string name="menu_left_side_bar">Left Side Bar</string>
+    <string name="menu_right_side_bar">Right Side Bar</string>
+    <string name="panel_row_title">Row %d</string>
+    <string name="panel_column_title">Column %d</string>
+    <string name="panel_slot_title">Slot %d</string>
 
     <!-- Common Action Verbs -->
     <string name="action_delete">Delete</string>
