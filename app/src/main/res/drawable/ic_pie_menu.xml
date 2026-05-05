@@ -3,20 +3,29 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Two-ring pie menu: 160° fan with 3 outer + 3 inner sectors, accent teal -->
     <!-- Center dot -->
     <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,11 A1,1 0 1,0 12,13 A1,1 0 1,0 12,11 Z" />
-    <!-- Fan arc top-left -->
+        android:fillColor="#FF0286B4"
+        android:pathData="M12,10.8 A1.2,1.2 0 1,1 12,13.2 A1.2,1.2 0 1,1 12,10.8 Z" />
+    <!-- Outer ring (r 6.5–11): 3 sectors with 4° gaps -->
     <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,12 L5.5,5.5 A9,9 0 0,1 12,3 Z" />
-    <!-- Fan arc top -->
+        android:fillColor="#FF0286B4"
+        android:pathData="M8.47,5.91 L4.05,2.70 A11,11 0 0,1 7.66,1.19 L10.36,5.53 A6.5,6.5 0 0,0 8.47,5.91 Z" />
     <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,12 L12,3 A9,9 0 0,1 18.5,5.5 Z" />
-    <!-- Fan arc top-right -->
+        android:fillColor="#FF0286B4"
+        android:pathData="M10.83,5.60 L8.53,1.16 A11,11 0 0,1 13.00,1.00 L13.00,5.50 A6.5,6.5 0 0,0 10.83,5.60 Z" />
     <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,12 L18.5,5.5 A9,9 0 0,1 21,12 Z" />
+        android:fillColor="#FF0286B4"
+        android:pathData="M13.00,5.50 L13.00,1.00 A11,11 0 0,1 17.11,2.29 L14.55,6.17 A6.5,6.5 0 0,0 13.00,5.50 Z" />
+    <!-- Inner ring (r 3.5–5.5): 3 sectors with 4° gaps -->
+    <path
+        android:fillColor="#FF0286B4"
+        android:pathData="M8.25,8.99 L6.77,7.05 A5.5,5.5 0 0,1 8.67,6.38 L9.49,8.45 A3.5,3.5 0 0,0 8.25,8.99 Z" />
+    <path
+        android:fillColor="#FF0286B4"
+        android:pathData="M9.78,8.32 L9.16,6.31 A5.5,5.5 0 0,1 14.84,6.31 L14.22,8.32 A3.5,3.5 0 0,0 9.78,8.32 Z" />
+    <path
+        android:fillColor="#FF0286B4"
+        android:pathData="M14.51,8.45 L15.33,6.38 A5.5,5.5 0 0,1 17.23,7.05 L15.75,8.99 A3.5,3.5 0 0,0 14.51,8.45 Z" />
 </vector>
