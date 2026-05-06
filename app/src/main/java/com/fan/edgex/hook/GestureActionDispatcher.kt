@@ -1,5 +1,7 @@
 package com.fan.edgex.hook
 
+import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -412,9 +414,10 @@ internal class GestureActionDispatcher(
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun switchApp(context: Context, forward: Boolean) {
         try {
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             @Suppress("DEPRECATION")
             val tasks = activityManager.getRunningTasks(50)
             if (tasks.isNullOrEmpty()) return
