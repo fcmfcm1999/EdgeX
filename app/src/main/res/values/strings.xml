@@ -106,6 +106,8 @@
     <string name="action_universal_copy">Global Copy</string>
     <string name="action_lock_screen">Lock Screen</string>
     <string name="action_kill_app">Kill Foreground App</string>
+    <string name="action_prev_app">Previous App</string>
+    <string name="action_next_app">Next App</string>
     <string name="action_brightness_up">Brightness Up</string>
     <string name="action_brightness_down">Brightness Down</string>
     <string name="action_volume_up">Volume Up</string>

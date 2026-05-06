@@ -174,6 +174,12 @@ internal class GestureActionDispatcher(
             action == "kill_app" -> {
                 killForegroundApp(context)
             }
+            action == "prev_app" -> {
+                switchApp(context, forward = false)
+            }
+            action == "next_app" -> {
+                switchApp(context, forward = true)
+            }
             action == "clear_background" -> {
                 clearBackgroundApps(context)
             }
@@ -336,6 +342,8 @@ internal class GestureActionDispatcher(
         action == "lock_screen"              -> R.drawable.ic_power
         action == "expand_notifications"     -> R.drawable.ic_notifications
         action == "kill_app"                 -> R.drawable.ic_kill_app
+        action == "prev_app"                 -> R.drawable.ic_prev_app
+        action == "next_app"                 -> R.drawable.ic_next_app
         action == "clipboard"                -> R.drawable.ic_paste
         action == "universal_copy"           -> R.drawable.ic_content_copy
         action == "freezer_drawer"           -> R.drawable.ic_freezer
@@ -372,6 +380,8 @@ internal class GestureActionDispatcher(
         action == "lock_screen"       -> "Lock"
         action == "expand_notifications" -> "Notifs"
         action == "kill_app"          -> "Kill App"
+        action == "prev_app"          -> "Prev App"
+        action == "next_app"          -> "Next App"
         action == "clipboard"         -> "Clipboard"
         action == "universal_copy"    -> "Copy"
         action == "freezer_drawer"    -> "Freezer"
@@ -399,6 +409,55 @@ internal class GestureActionDispatcher(
             XposedHelpers.callMethod(activityManager, "forceStopPackage", pkg)
         } catch (e: Exception) {
             log("killForegroundApp failed: ${e.message}")
+        }
+    }
+
+    private fun switchApp(context: Context, forward: Boolean) {
+        try {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            val tasks = activityManager.getRunningTasks(50)
+            if (tasks.isNullOrEmpty()) return
+
+            val homePkgs = getHomeLauncherPackages(context)
+            val filtered = tasks.filter { task ->
+                val pkg = task.topActivity?.packageName ?: return@filter false
+                pkg != context.packageName && pkg !in homePkgs
+            }
+            if (filtered.size < 2) return
+
+            val currentTask = filtered[0]
+            val currentPkg = currentTask.topActivity?.packageName ?: return
+
+            val atm = getActivityTaskManagerService()
+
+            if (!forward) {
+                // prev_app: switch to most recently used app before current (MRU index 1)
+                val target = filtered[1]
+                XposedHelpers.callMethod(atm, "moveTaskToFront", target.taskId, 0, null)
+                return
+            }
+
+            // next_app: cycle through tasks sorted by package name, go to next after current
+            val sorted = filtered.sortedBy { it.topActivity?.packageName ?: "" }
+            val idx = sorted.indexOfFirst { it.topActivity?.packageName == currentPkg }
+            val nextIdx = if (idx < 0) 0 else (idx + 1) % sorted.size
+            val target = sorted[nextIdx]
+            if (target.topActivity?.packageName == currentPkg) return
+            XposedHelpers.callMethod(atm, "moveTaskToFront", target.taskId, 0, null)
+        } catch (t: Throwable) {
+            log("switchApp failed: ${t.message}")
+        }
+    }
+
+    private fun getHomeLauncherPackages(context: Context): Set<String> {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        return try {
+            context.packageManager.queryIntentActivities(intent, 0)
+                .mapNotNull { it.activityInfo?.packageName }
+                .toSet()
+        } catch (_: Throwable) {
+            emptySet()
         }
     }
 
