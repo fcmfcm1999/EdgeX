@@ -63,6 +63,8 @@ class AppSelectionActivity : AppCompatActivity() {
         val etSearch = findViewById<EditText>(R.id.et_search)
         val tvTitle = findViewById<TextView>(R.id.tv_title)
 
+        etSearch.setHint(R.string.hint_search_apps)
+
         btnSearch.setOnClickListener {
             if (etSearch.isGone) {
                 tvTitle.isGone = true
