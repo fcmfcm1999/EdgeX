@@ -19,18 +19,18 @@ class ConditionPickerActivity : AppCompatActivity() {
 
     private val conditions get() = listOf(
         ConditionItem(getString(R.string.cond_auto_brightness),  "auto_brightness",  R.drawable.ic_brightness_up),
-        ConditionItem(getString(R.string.cond_auto_rotate),      "auto_rotate",      R.drawable.ic_settings),
-        ConditionItem(getString(R.string.cond_wifi_enabled),     "wifi_enabled",     R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_mobile_data),      "mobile_data",      R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_location),         "location",         R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_bluetooth),        "bluetooth",        R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_nfc),              "nfc",              R.drawable.ic_condition),
+        ConditionItem(getString(R.string.cond_auto_rotate),      "auto_rotate",      R.drawable.ic_screen_rotation),
+        ConditionItem(getString(R.string.cond_wifi_enabled),     "wifi_enabled",     R.drawable.ic_wifi),
+        ConditionItem(getString(R.string.cond_mobile_data),      "mobile_data",      R.drawable.ic_mobile_data),
+        ConditionItem(getString(R.string.cond_location),         "location",         R.drawable.ic_location),
+        ConditionItem(getString(R.string.cond_bluetooth),        "bluetooth",        R.drawable.ic_bluetooth),
+        ConditionItem(getString(R.string.cond_nfc),              "nfc",              R.drawable.ic_nfc),
         ConditionItem(getString(R.string.cond_power_connected),  "power_connected",  R.drawable.ic_power),
-        ConditionItem(getString(R.string.cond_wifi_connected),   "wifi_connected",   R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_network_connected),"network_connected",R.drawable.ic_condition),
+        ConditionItem(getString(R.string.cond_wifi_connected),   "wifi_connected",   R.drawable.ic_wifi),
+        ConditionItem(getString(R.string.cond_network_connected),"network_connected",R.drawable.ic_link),
         ConditionItem(getString(R.string.cond_media_playing),    "media_playing",    R.drawable.ic_music),
-        ConditionItem(getString(R.string.cond_screen_portrait),  "screen_portrait",  R.drawable.ic_condition),
-        ConditionItem(getString(R.string.cond_screen_landscape), "screen_landscape", R.drawable.ic_condition),
+        ConditionItem(getString(R.string.cond_screen_portrait),  "screen_portrait",  R.drawable.ic_screen_portrait),
+        ConditionItem(getString(R.string.cond_screen_landscape), "screen_landscape", R.drawable.ic_screen_landscape),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

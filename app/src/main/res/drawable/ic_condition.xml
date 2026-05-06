@@ -1,22 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-  <!-- Diamond / condition branch -->
+        android:width="24dp"
+        android:height="24dp"
+        android:viewportWidth="1024"
+        android:viewportHeight="1024">
   <path
-      android:fillColor="@android:color/white"
-      android:pathData="M12,2 L20,9 L12,16 L4,9 Z"/>
-  <!-- Stem down -->
+          android:pathData="M889.173333 267.52L757.76 136.533333a33.706667 33.706667 0 0 0-58.026667 23.893334v262.4a34.133333 34.133333 0 0 0 58.026667 23.893333l131.413333-130.986667a34.133333 34.133333 0 0 0 0-48.213333zM889.173333 736.853333l-131.413333-130.986666a33.706667 33.706667 0 0 0-58.026667 23.893333v262.4a34.133333 34.133333 0 0 0 58.026667 23.893333l131.413333-130.986666a34.133333 34.133333 0 0 0 0-48.213334z"
+          android:fillColor="@android:color/white"
+          />
   <path
-      android:fillColor="@android:color/white"
-      android:pathData="M11,16 h2 v4 h-2 z"/>
-  <!-- Left branch -->
+          android:pathData="M102.4 426.666667m42.666667 0l256 0q42.666667 0 42.666666 42.666666l0 0q0 42.666667-42.666666 42.666667l-256 0q-42.666667 0-42.666667-42.666667l0 0q0-42.666667 42.666667-42.666666Z"
+          android:fillColor="@android:color/white"
+          />
   <path
-      android:fillColor="@android:color/white"
-      android:pathData="M4,9 h-2 v4 h2 z"/>
-  <!-- Right branch -->
-  <path
-      android:fillColor="@android:color/white"
-      android:pathData="M20,9 h2 v4 h-2 z"/>
+          android:pathData="M742.4 810.666667h-170.666667a42.666667 42.666667 0 0 1-30.293333-12.373334l-170.666667-170.666666a42.666667 42.666667 0 1 1 60.586667-60.586667l157.866667 158.293333h153.173333a42.666667 42.666667 0 0 1 0 85.333334zM401.066667 512a42.666667 42.666667 0 0 1-30.293334-12.373333 42.666667 42.666667 0 0 1 0-60.586667l170.666667-170.666667A42.666667 42.666667 0 0 1 571.733333 256h170.666667a42.666667 42.666667 0 0 1 0 85.333333h-153.173333l-157.866667 158.293334a42.666667 42.666667 0 0 1-30.293333 12.373333z"
+          android:fillColor="@android:color/white"
+          />
 </vector>
