@@ -203,6 +203,8 @@ internal class EdgeGestureDetector(
         }
 
         if (session.subGestureMode) {
+            updateSubGestureAnchor(session, event.rawX, event.rawY, event.eventTime)
+
             // The anchor follows the first swipe to its farthest primary point. Child
             // direction is selected only by movement after that point, so the first swipe
             // itself does not get mistaken for a same-direction child gesture.
