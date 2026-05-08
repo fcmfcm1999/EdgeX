@@ -1,6 +1,9 @@
 package com.fan.edgex.ui
 
+import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -49,6 +52,22 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
             code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
             else -> R.drawable.ic_action_dot
+        }
+
+        fun applyActionIcon(context: Context, code: String, imageView: ImageView) {
+            if (code.startsWith("launch_app:")) {
+                val pkg = code.removePrefix("launch_app:")
+                val icon = runCatching {
+                    context.packageManager.getApplicationIcon(pkg)
+                }.getOrNull()
+                if (icon != null) {
+                    imageView.setImageDrawable(icon)
+                    imageView.imageTintList = null
+                    return
+                }
+            }
+            imageView.setImageResource(actionIconRes(code))
+            imageView.imageTintList = ColorStateList.valueOf(Color.WHITE)
         }
     }
 

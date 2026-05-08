@@ -127,8 +127,7 @@ class KeysActivity : AppCompatActivity() {
         val prefKey = AppConfig.keyAction(keyCode, mode)
 
         subtitleView.text = getConfigString("${prefKey}_label", getString(R.string.action_none))
-        actionView.findViewById<ImageView>(R.id.action_icon)
-            .setImageResource(ActionSelectionActivity.actionIconRes(getConfigString(prefKey, "none")))
+        ActionSelectionActivity.applyActionIcon(this, getConfigString(prefKey, "none"), actionView.findViewById(R.id.action_icon))
 
         actionView.setOnClickListener {
             val intent = Intent(this, ActionSelectionActivity::class.java)
@@ -179,7 +178,6 @@ class KeysActivity : AppCompatActivity() {
         val prefKey = AppConfig.keyAction(keyCode, mode)
         actionView.findViewById<TextView>(R.id.action_subtitle).text =
             getConfigString("${prefKey}_label", getString(R.string.action_none))
-        actionView.findViewById<ImageView>(R.id.action_icon)
-            .setImageResource(ActionSelectionActivity.actionIconRes(getConfigString(prefKey, "none")))
+        ActionSelectionActivity.applyActionIcon(this, getConfigString(prefKey, "none"), actionView.findViewById(R.id.action_icon))
     }
 }
