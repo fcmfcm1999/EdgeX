@@ -5,9 +5,12 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -51,6 +54,8 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
             code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+            code == "toggle_flashlight" -> R.drawable.ic_flashlight
+            code == "game_mode" -> R.drawable.ic_game_mode
             else -> R.drawable.ic_action_dot
         }
 
@@ -104,6 +109,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_custom_panel), AppConfig.CUSTOM_PANEL_ACTION, R.drawable.ic_apps),
         ActionItem(getString(R.string.action_left_side_bar), AppConfig.SIDE_BAR_LEFT_ACTION, R.drawable.ic_side_bar_left),
         ActionItem(getString(R.string.action_right_side_bar), AppConfig.SIDE_BAR_RIGHT_ACTION, R.drawable.ic_side_bar_right),
+        ActionItem(getString(R.string.action_toggle_flashlight), "toggle_flashlight", R.drawable.ic_flashlight),
+        ActionItem(getString(R.string.action_game_mode), "game_mode", R.drawable.ic_game_mode),
     ).let { list -> if (isPieSlot) list.filter { it.code != "pie" } else list }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -127,7 +134,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         // List
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = ActionAdapter(actions(prefKey.startsWith("pie_"))) { item ->
+        val adapter = ActionAdapter(actions(prefKey.startsWith("pie_"))) { item ->
             when (item.code) {
                 "app_shortcut" -> {
                     startActivity(Intent(this, ShortcutSelectionActivity::class.java)
@@ -182,9 +189,34 @@ class ActionSelectionActivity : AppCompatActivity() {
                 }
             }
         }
+        recyclerView.adapter = adapter
+
+        val etSearch = findViewById<EditText>(R.id.et_search)
+        etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                adapter.filter(s?.toString().orEmpty())
+            }
+        })
     }
 
-    inner class ActionAdapter(val items: List<ActionItem>, val onClick: (ActionItem) -> Unit) : RecyclerView.Adapter<ActionAdapter.ViewHolder>() {
+    inner class ActionAdapter(
+        private val allItems: List<ActionItem>,
+        val onClick: (ActionItem) -> Unit,
+    ) : RecyclerView.Adapter<ActionAdapter.ViewHolder>() {
+
+        private var displayItems = allItems.toMutableList()
+
+        fun filter(query: String) {
+            displayItems = if (query.isBlank()) {
+                allItems.toMutableList()
+            } else {
+                allItems.filter { it.label.contains(query, ignoreCase = true) }.toMutableList()
+            }
+            notifyDataSetChanged()
+        }
+
         inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
             val icon: ImageView = v.findViewById(R.id.icon)
             val title: TextView = v.findViewById(R.id.title)
@@ -196,13 +228,13 @@ class ActionSelectionActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val item = items[position]
+            val item = displayItems[position]
             holder.title.text = item.label
             holder.icon.setImageResource(item.iconRes)
             ThemeManager.applyToView(holder.itemView, this@ActionSelectionActivity)
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
-        override fun getItemCount() = items.size
+        override fun getItemCount() = displayItems.size
     }
 }

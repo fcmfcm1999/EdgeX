@@ -262,6 +262,12 @@ internal class GestureActionDispatcher(
             action.startsWith("condition:") -> {
                 executeConditionAction(action, context, touchX, touchY)
             }
+            action == "toggle_flashlight" -> {
+                FlashlightManager.toggle(context)
+            }
+            action == "game_mode" -> {
+                GameModeManager.enable(context)
+            }
         }
     }
 
@@ -379,6 +385,8 @@ internal class GestureActionDispatcher(
         action.startsWith("launch_app:")     -> R.drawable.ic_launch_app
         action == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
         action == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+        action == "toggle_flashlight"            -> R.drawable.ic_flashlight
+        action == "game_mode"                    -> R.drawable.ic_game_mode
         else                                 -> 0
     }
 
@@ -410,6 +418,8 @@ internal class GestureActionDispatcher(
         action.startsWith("shell:")   -> "Shell"
         action.startsWith("launch_app:") -> "Launch"
         action.startsWith("app_shortcut:") -> "Shortcut"
+        action == "toggle_flashlight" -> "Flashlight"
+        action == "game_mode"         -> "GameMode"
         else                          -> action.take(8)
     }
 

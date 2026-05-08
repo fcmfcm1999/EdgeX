@@ -137,6 +137,7 @@ object GestureManager {
             mainHandler().post {
                 debugOverlayController.initialize(context)
                 addWindowAnchor(context)
+                FlashlightManager.initialize(context, mainHandler())
                 configRepository.reloadAsync(::refreshDebugOverlay)
             }
             actionDispatcher.bindShellService(context)
@@ -225,6 +226,10 @@ object GestureManager {
                         log("Execute action request from UI: $action")
                         actionDispatcher.executeKeyAction(action, ctx)
                     }
+                    GameModeManager.ACTION_DISABLE -> {
+                        val sysCtx = systemContext ?: ctx
+                        mainHandler().post { GameModeManager.disable(sysCtx) }
+                    }
                 }
             }
         }
@@ -233,6 +238,7 @@ object GestureManager {
             val filter = IntentFilter().apply {
                 addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
                 addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+                addAction(GameModeManager.ACTION_DISABLE)
             }
             context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } catch (e: Exception) {
@@ -250,6 +256,7 @@ object GestureManager {
         ensureSystemServerInitialized(context, initializeKeys = false)
 
         if (!configRepository.isGesturesEnabled()) return false
+        if (GameModeManager.isActive) return false
 
         // Skip gestures when keyguard (lockscreen) is showing to avoid intercepting unlock swipes
         try {
@@ -267,6 +274,7 @@ object GestureManager {
     fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
         ensureSystemServerInitialized(context, initializeKeys = true)
 
+        if (GameModeManager.isActive) return false
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }
 
