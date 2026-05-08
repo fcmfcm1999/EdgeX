@@ -263,7 +263,7 @@ internal class GestureActionDispatcher(
                 executeConditionAction(action, context, touchX, touchY)
             }
             action == "toggle_flashlight" -> {
-                FlashlightManager.toggle(context)
+                FlashlightManager.toggle(context, handlerProvider())
             }
             action == "game_mode" -> {
                 GameModeManager.enable(context, handlerProvider())

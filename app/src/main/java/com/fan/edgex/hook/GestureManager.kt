@@ -231,6 +231,11 @@ object GestureManager {
                         val h = mainHandler()
                         h.post { GameModeManager.disable(sysCtx, h) }
                     }
+                    FlashlightManager.ACTION_TURN_OFF -> {
+                        val sysCtx = systemContext ?: ctx
+                        val h = mainHandler()
+                        h.post { FlashlightManager.turnOff(sysCtx, h) }
+                    }
                 }
             }
         }
@@ -240,6 +245,7 @@ object GestureManager {
                 addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
                 addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
                 addAction(GameModeManager.ACTION_DISABLE)
+                addAction(FlashlightManager.ACTION_TURN_OFF)
             }
             context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } catch (e: Exception) {
