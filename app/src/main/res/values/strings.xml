@@ -156,10 +156,10 @@
     <string name="action_toggle_flashlight">Flashlight</string>
     <string name="action_game_mode">Game Mode</string>
     <string name="hint_search_actions">Search actions…</string>
-    <string name="game_mode_notification_title">Game Mode Active</string>
-    <string name="game_mode_notification_text">All gestures are disabled</string>
+    <string name="game_mode_notification_text">关闭游戏模式</string>
     <string name="game_mode_stop">Exit Game Mode</string>
     <string name="game_mode_channel_name">Game Mode</string>
+    <string name="game_mode_toast_on">游戏模式开启</string>
     <string name="menu_custom_panel">Custom Panel</string>
     <string name="menu_left_side_bar">Left Side Bar</string>
     <string name="menu_right_side_bar">Right Side Bar</string>

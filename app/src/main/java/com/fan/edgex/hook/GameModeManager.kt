@@ -9,6 +9,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Icon
+import android.os.Handler
+import android.widget.Toast
 import com.fan.edgex.R
 import de.robv.android.xposed.XposedBridge
 
@@ -21,9 +23,14 @@ object GameModeManager {
     @Volatile var isActive = false
         private set
 
-    fun enable(context: Context) {
+    fun enable(context: Context, handler: Handler) {
         if (isActive) return
         isActive = true
+        handler.post {
+            try {
+                Toast.makeText(context, ModuleRes.getString(R.string.game_mode_toast_on), Toast.LENGTH_SHORT).show()
+            } catch (_: Throwable) {}
+        }
         showNotification(context)
     }
 
@@ -38,7 +45,7 @@ object GameModeManager {
             val nm = context.getSystemService(NotificationManager::class.java) ?: return
             ensureChannel(nm)
 
-            val pi = PendingIntent.getBroadcast(
+            val disablePi = PendingIntent.getBroadcast(
                 context,
                 0,
                 Intent(ACTION_DISABLE),
@@ -47,16 +54,9 @@ object GameModeManager {
 
             val notification = Notification.Builder(context, CHANNEL_ID)
                 .setSmallIcon(buildIcon())
-                .setContentTitle(ModuleRes.getString(R.string.game_mode_notification_title))
+                .setContentTitle("EdgeX")
                 .setContentText(ModuleRes.getString(R.string.game_mode_notification_text))
-                .setOngoing(true)
-                .addAction(
-                    Notification.Action.Builder(
-                        null,
-                        ModuleRes.getString(R.string.game_mode_stop),
-                        pi,
-                    ).build()
-                )
+                .setDeleteIntent(disablePi)
                 .build()
 
             nm.notify(NOTIFICATION_ID, notification)
@@ -79,7 +79,7 @@ object GameModeManager {
             NotificationChannel(
                 CHANNEL_ID,
                 ModuleRes.getString(R.string.game_mode_channel_name),
-                NotificationManager.IMPORTANCE_LOW,
+                NotificationManager.IMPORTANCE_DEFAULT,
             ).apply { setShowBadge(false) }
         )
     }

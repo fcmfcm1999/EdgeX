@@ -266,7 +266,7 @@ internal class GestureActionDispatcher(
                 FlashlightManager.toggle(context)
             }
             action == "game_mode" -> {
-                GameModeManager.enable(context)
+                GameModeManager.enable(context, handlerProvider())
             }
         }
     }

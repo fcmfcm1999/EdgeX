@@ -5,8 +5,6 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +12,9 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
@@ -192,13 +193,25 @@ class ActionSelectionActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
 
         val etSearch = findViewById<EditText>(R.id.et_search)
-        etSearch.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                adapter.filter(s?.toString().orEmpty())
+        val titleBlock = findViewById<View>(R.id.title_block)
+        val btnSearch = findViewById<ImageView>(R.id.btn_search)
+
+        etSearch.addTextChangedListener { adapter.filter(it?.toString().orEmpty()) }
+
+        btnSearch.setOnClickListener {
+            if (etSearch.isGone) {
+                titleBlock.isGone = true
+                etSearch.isVisible = true
+                etSearch.requestFocus()
+            } else {
+                if (etSearch.text.isEmpty()) {
+                    etSearch.isGone = true
+                    titleBlock.isVisible = true
+                } else {
+                    etSearch.text.clear()
+                }
             }
-        })
+        }
     }
 
     inner class ActionAdapter(
