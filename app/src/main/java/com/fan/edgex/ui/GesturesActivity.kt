@@ -155,6 +155,10 @@ class GesturesActivity : AppCompatActivity() {
         val savedLabel = getConfigString("${fullKey}_label", getString(R.string.action_none))
         actionView.findViewById<TextView>(R.id.action_subtitle).text = savedLabel
 
+        val savedCode = getConfigString(fullKey, "none")
+        actionView.findViewById<ImageView>(R.id.action_icon)
+            .setImageResource(ActionSelectionActivity.actionIconRes(savedCode))
+
         actionView.setOnClickListener {
             startActivity(
                 android.content.Intent(this, ActionSelectionActivity::class.java)

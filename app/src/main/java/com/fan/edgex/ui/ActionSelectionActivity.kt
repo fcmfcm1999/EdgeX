@@ -16,6 +16,42 @@ import com.fan.edgex.config.putConfig
 
 class ActionSelectionActivity : AppCompatActivity() {
 
+    companion object {
+        fun actionIconRes(code: String): Int = when {
+            code.isEmpty() || code == "none" -> R.drawable.ic_action_dot
+            code == "back" -> R.drawable.ic_arrow_back
+            code == "home" -> R.drawable.ic_home
+            code == "recents" -> R.drawable.ic_recents
+            code == "expand_notifications" -> R.drawable.ic_notifications
+            code.startsWith("shell:") -> R.drawable.ic_terminal
+            code == "sub_gesture" -> R.drawable.ic_sub_gesture
+            code == "pie" -> R.drawable.ic_pie_menu
+            code.startsWith("launch_app:") -> R.drawable.ic_launch_app
+            code.startsWith("app_shortcut:") -> R.drawable.ic_app_shortcut
+            code == "clear_background" -> R.drawable.ic_clear_recent
+            code == "freezer_drawer" -> R.drawable.ic_freezer
+            code == "refreeze" -> R.drawable.ic_refreeze
+            code == "screenshot" -> R.drawable.ic_camera
+            code == "clipboard" -> R.drawable.ic_paste
+            code == "universal_copy" -> R.drawable.ic_content_copy
+            code == "lock_screen" -> R.drawable.ic_power
+            code == "kill_app" -> R.drawable.ic_kill_app
+            code == "prev_app" -> R.drawable.ic_prev_app
+            code == "next_app" -> R.drawable.ic_next_app
+            code == "brightness_up" -> R.drawable.ic_brightness_up
+            code == "brightness_down" -> R.drawable.ic_brightness_down
+            code == "volume_up" -> R.drawable.ic_volume_up
+            code == "volume_down" -> R.drawable.ic_volume_down
+            code.startsWith("music_control:") -> R.drawable.ic_music
+            code.startsWith("multi_action:") -> R.drawable.ic_multi_action
+            code.startsWith("condition:") -> R.drawable.ic_condition
+            code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
+            code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
+            code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+            else -> R.drawable.ic_action_dot
+        }
+    }
+
     data class ActionItem(val label: String, val code: String, val iconRes: Int)
 
     private fun actions(isPieSlot: Boolean) = listOf(
