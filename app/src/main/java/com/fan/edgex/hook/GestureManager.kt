@@ -228,7 +228,8 @@ object GestureManager {
                     }
                     GameModeManager.ACTION_DISABLE -> {
                         val sysCtx = systemContext ?: ctx
-                        mainHandler().post { GameModeManager.disable(sysCtx) }
+                        val h = mainHandler()
+                        h.post { GameModeManager.disable(sysCtx, h) }
                     }
                 }
             }

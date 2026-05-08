@@ -160,6 +160,7 @@
     <string name="game_mode_stop">Exit Game Mode</string>
     <string name="game_mode_channel_name">Game Mode</string>
     <string name="game_mode_toast_on">游戏模式开启</string>
+    <string name="game_mode_toast_off">游戏模式关闭</string>
     <string name="menu_custom_panel">Custom Panel</string>
     <string name="menu_left_side_bar">Left Side Bar</string>
     <string name="menu_right_side_bar">Right Side Bar</string>
