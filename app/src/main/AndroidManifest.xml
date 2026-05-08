@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".App"
@@ -129,6 +130,15 @@
             android:name=".ui.ConditionPickerActivity"
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
+
+        <receiver
+            android:name=".GameModeNotificationReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.fan.edgex.GAME_MODE_SHOW_NOTIFICATION" />
+                <action android:name="com.fan.edgex.GAME_MODE_CANCEL_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".config.ConfigSnapshotReceiver"
