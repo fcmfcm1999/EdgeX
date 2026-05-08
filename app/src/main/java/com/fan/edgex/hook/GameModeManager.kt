@@ -17,7 +17,7 @@ import de.robv.android.xposed.XposedBridge
 object GameModeManager {
 
     const val ACTION_DISABLE = "com.fan.edgex.ACTION_DISABLE_GAME_MODE"
-    private const val CHANNEL_ID = "edgex_game_mode"
+    private const val CHANNEL_ID = "edgex_game_mode_2"
     private const val NOTIFICATION_ID = 7391
 
     @Volatile var isActive = false
