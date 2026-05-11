@@ -5,6 +5,7 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -158,6 +159,8 @@ class PanelConfigActivity : AppCompatActivity() {
         val subtitle = TextView(this).apply {
             textSize = 13f
             setTextColor(resources.getColor(R.color.ui_text_secondary, theme))
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
         }
         texts.addView(titleView)
         texts.addView(subtitle)
@@ -186,16 +189,18 @@ class PanelConfigActivity : AppCompatActivity() {
     private fun refreshSlots() {
         slotRows.forEach { slot ->
             val action = getConfigString(slot.prefKey, "none")
-            val label = getConfigString("${slot.prefKey}_label", getString(R.string.action_none))
+            val savedLabel = getConfigString("${slot.prefKey}_label", getString(R.string.action_none))
+            val label = displayTitleForAction(action, savedLabel)
             slot.subtitle.text = label
-            val iconSize = if (action.startsWith("launch_app:")) 34 else 24
+            val usesAppIcon = action.startsWith("launch_app:") || action.startsWith("app_shortcut:")
+            val iconSize = if (usesAppIcon) 34 else 24
             slot.icon.layoutParams = FrameLayout.LayoutParams(
                 (iconSize * resources.displayMetrics.density).toInt(),
                 (iconSize * resources.displayMetrics.density).toInt(),
                 Gravity.CENTER,
             )
             slot.icon.setImageDrawable(drawableForAction(action))
-            if (action.startsWith("launch_app:")) {
+            if (usesAppIcon) {
                 slot.icon.clearColorFilter()
             } else {
                 slot.icon.setColorFilter(resources.getColor(R.color.ui_icon_tint, theme))
@@ -205,9 +210,11 @@ class PanelConfigActivity : AppCompatActivity() {
 
     private fun syncRuntimeTitles() {
         slotRows.forEach { slot ->
+            val action = getConfigString(slot.prefKey, "none")
             val label = getConfigString("${slot.prefKey}_label")
-            if (label.isNotBlank()) {
-                putConfig("${slot.prefKey}_title", label)
+            val title = displayTitleForAction(action, label)
+            if (title.isNotBlank()) {
+                putConfig("${slot.prefKey}_title", title)
             }
         }
     }
@@ -228,7 +235,61 @@ class PanelConfigActivity : AppCompatActivity() {
             }.getOrNull()
             if (appIcon != null) return appIcon.foregroundOrSelf()
         }
+        if (action.startsWith("app_shortcut:")) {
+            val packageName = action.removePrefix("app_shortcut:").substringBefore(":")
+            val appIcon = runCatching {
+                packageManager.getApplicationIcon(packageName)
+            }.getOrNull()
+            if (appIcon != null) return appIcon.foregroundOrSelf()
+        }
         return resources.getDrawable(iconForAction(action), theme)
+    }
+
+    private fun displayTitleForAction(action: String, savedLabel: String): String {
+        if (action.isBlank() || action == "none") return getString(R.string.action_none)
+        return when {
+            action.startsWith("launch_app:") -> appLabel(action.removePrefix("launch_app:"))
+                ?: stripKnownPrefix(savedLabel, "App:", "App: ", "应用：", "应用:", "应用: ")
+                    .ifBlank { getString(R.string.action_launch_app) }
+            action.startsWith("app_shortcut:") -> stripKnownPrefix(
+                savedLabel,
+                "Shortcut:",
+                "Shortcut: ",
+                "快捷方式:",
+                "快捷方式: ",
+                "快捷方式：",
+            ).ifBlank {
+                val packageName = action.removePrefix("app_shortcut:").substringBefore(":")
+                appLabel(packageName) ?: getString(R.string.action_app_shortcut)
+            }
+            action.startsWith("shell:") -> shellCommandTitle(action, savedLabel)
+            else -> savedLabel.ifBlank { action }
+        }
+    }
+
+    private fun appLabel(packageName: String): String? = runCatching {
+        val appInfo = packageManager.getApplicationInfo(packageName, 0)
+        appInfo.loadLabel(packageManager).toString()
+    }.getOrNull()
+
+    private fun shellCommandTitle(action: String, savedLabel: String): String {
+        val command = action.removePrefix("shell:").split(":", limit = 2).getOrNull(1).orEmpty().trim()
+        val saved = savedLabel.trim()
+        return when {
+            saved.isNotBlank() &&
+                saved != getString(R.string.action_shell_command) &&
+                saved != "Shell" &&
+                saved != "Shell Command" &&
+                saved != "Shell 命令" -> saved
+            command.isNotBlank() -> command
+            else -> getString(R.string.action_shell_command)
+        }
+    }
+
+    private fun stripKnownPrefix(value: String, vararg prefixes: String): String {
+        val trimmed = value.trim()
+        val match = prefixes.firstOrNull { trimmed.startsWith(it) } ?: return trimmed
+        return trimmed.removePrefix(match).trim()
     }
 
     private fun Drawable.foregroundOrSelf(): Drawable =

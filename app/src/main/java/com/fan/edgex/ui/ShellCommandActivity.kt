@@ -8,7 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
 import com.fan.edgex.config.getConfigString
-import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 
 /**
  * Activity for configuring a shell command action.
@@ -70,8 +70,11 @@ class ShellCommandActivity : AppCompatActivity() {
         }
 
         val runAsRoot = checkRunAsRoot.isChecked
-        putConfig(prefKey, "shell:$runAsRoot:$command")
-        putConfig("${prefKey}_label", getString(R.string.action_shell_command))
+        putConfigsSync(
+            prefKey to "shell:$runAsRoot:$command",
+            "${prefKey}_label" to command,
+            "${prefKey}_title" to command,
+        )
 
         Toast.makeText(this, getString(R.string.toast_shell_command_saved), Toast.LENGTH_SHORT).show()
         finish()

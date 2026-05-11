@@ -8,6 +8,7 @@ import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -215,7 +216,7 @@ private class PanelOverlayWindow(
     private fun String.toPanelItem(): PanelItem? {
         val action = resolveConfig(this)
         if (action.isBlank() || action == "none") return null
-        val title = resolveConfig("${this}_title").ifBlank { shortTitle(action) }
+        val title = displayTitleForAction(action, resolveConfig("${this}_title"))
         return PanelItem(action, title)
     }
 
@@ -299,15 +300,15 @@ private class PanelOverlayWindow(
             }
         }
         val iconSize = when {
-            item.action.startsWith("launch_app:") && showText -> (42 * dp).toInt()
-            item.action.startsWith("launch_app:") -> (48 * dp).toInt()
+            item.action.usesAppIcon() && showText -> (42 * dp).toInt()
+            item.action.usesAppIcon() -> (48 * dp).toInt()
             showText -> (30 * dp).toInt()
             else -> (34 * dp).toInt()
         }
         container.addView(ImageView(context).apply {
             val icon = drawableForAction(item.action)
             setImageDrawable(icon)
-            if (!item.action.startsWith("launch_app:")) {
+            if (!item.action.usesAppIcon()) {
                 setColorFilter(Color.WHITE)
             }
         }, LinearLayout.LayoutParams(iconSize, iconSize))
@@ -316,6 +317,7 @@ private class PanelOverlayWindow(
                 text = item.title
                 textSize = 11f
                 maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(size, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -360,7 +362,55 @@ private class PanelOverlayWindow(
             }.getOrNull()
             if (appIcon != null) return appIcon.foregroundOrSelf()
         }
+        if (action.startsWith("app_shortcut:")) {
+            val packageName = action.removePrefix("app_shortcut:").substringBefore(":")
+            val appIcon = runCatching {
+                context.packageManager.getApplicationIcon(packageName)
+            }.getOrNull()
+            if (appIcon != null) return appIcon.foregroundOrSelf()
+        }
         return ModuleRes.getDrawable(iconForAction(action))?.mutate()
+    }
+
+    private fun displayTitleForAction(action: String, savedTitle: String): String {
+        return when {
+            action.startsWith("launch_app:") -> appLabel(action.removePrefix("launch_app:"))
+                ?: stripKnownPrefix(savedTitle, "App:", "App: ", "应用：", "应用:", "应用: ")
+                ?: shortTitle(action)
+            action.startsWith("app_shortcut:") -> stripKnownPrefix(
+                savedTitle,
+                "Shortcut:",
+                "Shortcut: ",
+                "快捷方式:",
+                "快捷方式: ",
+                "快捷方式：",
+            ) ?: appLabel(action.removePrefix("app_shortcut:").substringBefore(":"))
+                ?: shortTitle(action)
+            action.startsWith("shell:") -> shellCommandTitle(action, savedTitle)
+            else -> savedTitle.ifBlank { shortTitle(action) }
+        }
+    }
+
+    private fun appLabel(packageName: String): String? = runCatching {
+        val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+        appInfo.loadLabel(context.packageManager).toString()
+    }.getOrNull()
+
+    private fun shellCommandTitle(action: String, savedTitle: String): String {
+        val saved = savedTitle.trim()
+        if (saved.isNotBlank() && saved != "Shell" && saved != "Shell Command" && saved != "Shell 命令") {
+            return saved
+        }
+        return action.removePrefix("shell:").split(":", limit = 2).getOrNull(1)?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: shortTitle(action)
+    }
+
+    private fun stripKnownPrefix(value: String, vararg prefixes: String): String? {
+        val trimmed = value.trim()
+        if (trimmed.isBlank()) return null
+        val match = prefixes.firstOrNull { trimmed.startsWith(it) }
+        return (match?.let { trimmed.removePrefix(it).trim() } ?: trimmed).takeIf { it.isNotBlank() }
     }
 
     private fun Drawable.foregroundOrSelf(): Drawable =
@@ -369,6 +419,9 @@ private class PanelOverlayWindow(
         } else {
             mutate()
         }
+
+    private fun String.usesAppIcon(): Boolean =
+        startsWith("launch_app:") || startsWith("app_shortcut:")
 
     private fun iconForAction(action: String): Int = when {
         action == "back" -> R.drawable.ic_arrow_back

@@ -18,7 +18,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
-import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 import java.util.Locale
 
 class ShortcutSelectionActivity : AppCompatActivity() {
@@ -54,8 +54,11 @@ class ShortcutSelectionActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         adapter = ShortcutAdapter(displayedShortcuts) { item ->
-            putConfig(prefKey, "app_shortcut:${item.packageName}:${item.shortcutId}")
-            putConfig("${prefKey}_label", getString(R.string.label_shortcut_prefix, item.label))
+            putConfigsSync(
+                prefKey to "app_shortcut:${item.packageName}:${item.shortcutId}",
+                "${prefKey}_label" to item.label,
+                "${prefKey}_title" to item.label,
+            )
             finish()
         }
         recyclerView.adapter = adapter

@@ -16,7 +16,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
-import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 import java.util.Locale
 
 class AppSelectionActivity : AppCompatActivity() {
@@ -48,8 +48,11 @@ class AppSelectionActivity : AppCompatActivity() {
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
         adapter = AppAdapter(displayedApps) { item ->
-            putConfig(prefKey, "launch_app:${item.packageName}")
-            putConfig("${prefKey}_label", getString(R.string.label_app_prefix, item.label))
+            putConfigsSync(
+                prefKey to "launch_app:${item.packageName}",
+                "${prefKey}_label" to item.label,
+                "${prefKey}_title" to item.label,
+            )
             finish()
         }
         recyclerView.adapter = adapter
