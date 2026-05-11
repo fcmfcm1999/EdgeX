@@ -29,14 +29,16 @@
             android:src="@drawable/ic_arrow_back"
             app:tint="@color/ui_header_text" />
 
+        <!-- Title block (visible by default) -->
         <LinearLayout
+            android:id="@+id/title_block"
             android:layout_width="0dp"
             android:layout_height="?attr/actionBarSize"
             android:layout_marginStart="32dp"
             android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center_vertical">
-            
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -44,7 +46,7 @@
                 android:textColor="@color/ui_header_text"
                 android:textSize="20sp"
                 android:textStyle="normal" />
-            
+
             <TextView
                 android:id="@+id/tv_subtitle"
                 android:layout_width="wrap_content"
@@ -53,6 +55,33 @@
                 android:textColor="#B3FFFFFF"
                 android:textSize="14sp" />
         </LinearLayout>
+
+        <!-- Search field (hidden by default) -->
+        <EditText
+            android:id="@+id/et_search"
+            android:layout_width="0dp"
+            android:layout_height="?attr/actionBarSize"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:hint="@string/hint_search_actions"
+            android:gravity="center_vertical"
+            android:textColor="@color/ui_header_text"
+            android:textColorHint="#80FFFFFF"
+            android:maxLines="1"
+            android:inputType="text"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/btn_search"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="12dp"
+            android:background="?selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:src="@drawable/ic_search"
+            app:tint="@color/ui_header_text" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView

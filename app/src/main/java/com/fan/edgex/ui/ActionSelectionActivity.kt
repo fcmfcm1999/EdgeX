@@ -8,9 +8,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isGone
+import androidx.core.view.isVisible
+import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
@@ -53,6 +57,8 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
             code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+            code == "toggle_flashlight" -> R.drawable.ic_flashlight
+            code == "game_mode" -> R.drawable.ic_game_mode
             else -> R.drawable.ic_action_dot
         }
 
@@ -106,6 +112,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_custom_panel), AppConfig.CUSTOM_PANEL_ACTION, R.drawable.ic_apps),
         ActionItem(getString(R.string.action_left_side_bar), AppConfig.SIDE_BAR_LEFT_ACTION, R.drawable.ic_side_bar_left),
         ActionItem(getString(R.string.action_right_side_bar), AppConfig.SIDE_BAR_RIGHT_ACTION, R.drawable.ic_side_bar_right),
+        ActionItem(getString(R.string.action_toggle_flashlight), "toggle_flashlight", R.drawable.ic_flashlight),
+        ActionItem(getString(R.string.action_game_mode), "game_mode", R.drawable.ic_game_mode),
     ).filter { it.code !in excludedCodes }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -132,7 +140,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         }
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = ActionAdapter(actions(excludedCodes)) { item ->
+        val adapter = ActionAdapter(actions(excludedCodes)) { item ->
             when (item.code) {
                 "app_shortcut" -> {
                     startActivity(Intent(this, ShortcutSelectionActivity::class.java)
@@ -187,9 +195,46 @@ class ActionSelectionActivity : AppCompatActivity() {
                 }
             }
         }
+        recyclerView.adapter = adapter
+
+        val etSearch = findViewById<EditText>(R.id.et_search)
+        val titleBlock = findViewById<View>(R.id.title_block)
+        val btnSearch = findViewById<ImageView>(R.id.btn_search)
+
+        etSearch.addTextChangedListener { adapter.filter(it?.toString().orEmpty()) }
+
+        btnSearch.setOnClickListener {
+            if (etSearch.isGone) {
+                titleBlock.isGone = true
+                etSearch.isVisible = true
+                etSearch.requestFocus()
+            } else {
+                if (etSearch.text.isEmpty()) {
+                    etSearch.isGone = true
+                    titleBlock.isVisible = true
+                } else {
+                    etSearch.text.clear()
+                }
+            }
+        }
     }
 
-    inner class ActionAdapter(val items: List<ActionItem>, val onClick: (ActionItem) -> Unit) : RecyclerView.Adapter<ActionAdapter.ViewHolder>() {
+    inner class ActionAdapter(
+        private val allItems: List<ActionItem>,
+        val onClick: (ActionItem) -> Unit,
+    ) : RecyclerView.Adapter<ActionAdapter.ViewHolder>() {
+
+        private var displayItems = allItems.toMutableList()
+
+        fun filter(query: String) {
+            displayItems = if (query.isBlank()) {
+                allItems.toMutableList()
+            } else {
+                allItems.filter { it.label.contains(query, ignoreCase = true) }.toMutableList()
+            }
+            notifyDataSetChanged()
+        }
+
         inner class ViewHolder(v: View) : RecyclerView.ViewHolder(v) {
             val icon: ImageView = v.findViewById(R.id.icon)
             val title: TextView = v.findViewById(R.id.title)
@@ -201,13 +246,13 @@ class ActionSelectionActivity : AppCompatActivity() {
         }
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val item = items[position]
+            val item = displayItems[position]
             holder.title.text = item.label
             holder.icon.setImageResource(item.iconRes)
             ThemeManager.applyToView(holder.itemView, this@ActionSelectionActivity)
             holder.itemView.setOnClickListener { onClick(item) }
         }
 
-        override fun getItemCount() = items.size
+        override fun getItemCount() = displayItems.size
     }
 }
