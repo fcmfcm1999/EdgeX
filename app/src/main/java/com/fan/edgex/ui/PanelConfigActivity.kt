@@ -166,7 +166,8 @@ class PanelConfigActivity : AppCompatActivity() {
         row.setOnClickListener {
             startActivity(Intent(this, ActionSelectionActivity::class.java)
                 .putExtra("pref_key", prefKey)
-                .putExtra("title", title))
+                .putExtra("title", title)
+                .putExtra(ActionSelectionActivity.EXTRA_EXCLUDED_CODES, excludedActionCodes()))
         }
         slotRows += SlotRow(prefKey, icon, subtitle)
         ThemeManager.applyToView(row, this)
@@ -219,6 +220,12 @@ class PanelConfigActivity : AppCompatActivity() {
     }
 
     private fun sideForMode(): String = if (mode == MODE_SIDE_RIGHT) "right" else "left"
+
+    private fun excludedActionCodes(): Array<String> = when (mode) {
+        MODE_SIDE_LEFT -> arrayOf(AppConfig.SIDE_BAR_LEFT_ACTION, AppConfig.SIDE_BAR_RIGHT_ACTION, AppConfig.PIE_ACTION, "sub_gesture")
+        MODE_SIDE_RIGHT -> arrayOf(AppConfig.SIDE_BAR_LEFT_ACTION, AppConfig.SIDE_BAR_RIGHT_ACTION, AppConfig.PIE_ACTION, "sub_gesture")
+        else -> arrayOf(AppConfig.CUSTOM_PANEL_ACTION, AppConfig.PIE_ACTION, "sub_gesture")
+    }
 
     private fun drawableForAction(action: String): android.graphics.drawable.Drawable? {
         if (action.startsWith("launch_app:")) {

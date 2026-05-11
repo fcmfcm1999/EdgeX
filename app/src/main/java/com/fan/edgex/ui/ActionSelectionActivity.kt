@@ -20,6 +20,8 @@ import com.fan.edgex.config.putConfig
 class ActionSelectionActivity : AppCompatActivity() {
 
     companion object {
+        const val EXTRA_EXCLUDED_CODES = "excluded_codes"
+
         fun actionIconRes(code: String): Int = when {
             code.isEmpty() || code == "none" -> R.drawable.ic_action_dot
             code == "back" -> R.drawable.ic_arrow_back
@@ -73,7 +75,7 @@ class ActionSelectionActivity : AppCompatActivity() {
 
     data class ActionItem(val label: String, val code: String, val iconRes: Int)
 
-    private fun actions(isPieSlot: Boolean) = listOf(
+    private fun actions(excludedCodes: Set<String>) = listOf(
         ActionItem(getString(R.string.action_none), "none", R.drawable.ic_action_dot),
         ActionItem(getString(R.string.action_back), "back", R.drawable.ic_arrow_back),
         ActionItem(getString(R.string.action_home), "home", R.drawable.ic_home),
@@ -104,7 +106,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_custom_panel), AppConfig.CUSTOM_PANEL_ACTION, R.drawable.ic_apps),
         ActionItem(getString(R.string.action_left_side_bar), AppConfig.SIDE_BAR_LEFT_ACTION, R.drawable.ic_side_bar_left),
         ActionItem(getString(R.string.action_right_side_bar), AppConfig.SIDE_BAR_RIGHT_ACTION, R.drawable.ic_side_bar_right),
-    ).let { list -> if (isPieSlot) list.filter { it.code != "pie" } else list }
+    ).filter { it.code !in excludedCodes }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,9 +127,12 @@ class ActionSelectionActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tv_subtitle).text = title
 
         // List
+        val excludedCodes = (intent.getStringArrayExtra(EXTRA_EXCLUDED_CODES)?.toSet() ?: emptySet()).let { base ->
+            if (prefKey.startsWith("pie_")) base + "pie" else base
+        }
         val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = ActionAdapter(actions(prefKey.startsWith("pie_"))) { item ->
+        recyclerView.adapter = ActionAdapter(actions(excludedCodes)) { item ->
             when (item.code) {
                 "app_shortcut" -> {
                     startActivity(Intent(this, ShortcutSelectionActivity::class.java)
