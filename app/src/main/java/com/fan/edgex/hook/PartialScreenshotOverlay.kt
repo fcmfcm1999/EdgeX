@@ -167,8 +167,10 @@ internal object PartialScreenshotOverlay {
     private fun captureDisplayBitmap(context: Context): Bitmap? {
         val sc = Class.forName("android.view.SurfaceControl")
 
-        val displayToken = XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken")
-            as? android.os.IBinder ?: return null
+        val displayToken = resolveDisplayToken(sc, context) ?: run {
+            XposedBridge.log("$TAG could not resolve display token")
+            return null
+        }
 
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val bounds = wm.currentWindowMetrics.bounds
@@ -200,6 +202,32 @@ internal object PartialScreenshotOverlay {
         val soft = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
         hwBitmap.recycle()
         return soft
+    }
+
+    private fun resolveDisplayToken(sc: Class<*>, context: Context): android.os.IBinder? {
+        // Android 14+: getPhysicalDisplayIds() + getPhysicalDisplayToken(id)
+        runCatching {
+            val ids = XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayIds") as? LongArray
+            if (ids != null && ids.isNotEmpty()) {
+                return XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayToken", ids[0])
+                    as? android.os.IBinder
+            }
+        }.onFailure { XposedBridge.log("$TAG getPhysicalDisplayIds failed: ${it.message}") }
+
+        // Pre-Android 14 fallback
+        runCatching {
+            return XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken")
+                as? android.os.IBinder
+        }.onFailure { XposedBridge.log("$TAG getInternalDisplayToken failed: ${it.message}") }
+
+        // Last resort: Display.getDisplayToken() via DisplayManager
+        runCatching {
+            val dm = context.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+            val display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            return XposedHelpers.callMethod(display, "getDisplayToken") as? android.os.IBinder
+        }.onFailure { XposedBridge.log("$TAG Display.getDisplayToken failed: ${it.message}") }
+
+        return null
     }
 
     private fun saveToGallery(context: Context, bitmap: Bitmap) {
