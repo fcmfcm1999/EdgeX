@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.hardware.HardwareBuffer
+import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -162,72 +163,110 @@ internal object PartialScreenshotOverlay {
         }, 250)
     }
 
-    // SurfaceControl.captureDisplay() — works from system_server without SELinux restriction.
-    // screencap is blocked (error=13) in this process context.
+    // screencap blocked by SELinux; SurfaceControl token getters removed in Android 14+.
+    // Use DisplayManagerGlobal.getDisplayInfo().displayToken → android.window.ScreenCapture.captureDisplay().
     private fun captureDisplayBitmap(context: Context): Bitmap? {
-        val sc = Class.forName("android.view.SurfaceControl")
-
-        val displayToken = resolveDisplayToken(sc, context) ?: run {
-            XposedBridge.log("$TAG could not resolve display token")
-            return null
-        }
-
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val bounds = wm.currentWindowMetrics.bounds
         val w = bounds.width()
         val h = bounds.height()
 
-        // Build DisplayCaptureArgs
-        val builderClass = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
-        val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
-        XposedHelpers.callMethod(builder, "setSize", w, h)
-        val captureArgs = XposedHelpers.callMethod(builder, "build")
+        val displayToken = resolveDisplayToken(context)
+        if (displayToken == null) {
+            XposedBridge.log("$TAG display token unavailable")
+            return null
+        }
 
-        // captureDisplay returns ScreenshotHardwareBuffer
-        val screenshotHwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
-            ?: return null
+        // Try android.window.ScreenCapture (Android 14+)
+        runCatching {
+            val sc = Class.forName("android.window.ScreenCapture")
+            logRelevantMethods("ScreenCapture", sc)
+            val builderClass = Class.forName("android.window.ScreenCapture\$DisplayCaptureArgs\$Builder")
+            val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
+            XposedHelpers.callMethod(builder, "setSize", w, h)
+            val captureArgs = XposedHelpers.callMethod(builder, "build")
+            val hwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
+                ?: return null
+            return hwBufToBitmap(hwBuf)
+        }.onFailure { XposedBridge.log("$TAG android.window.ScreenCapture failed: ${it.message}") }
 
-        // Unwrap HardwareBuffer → Bitmap
+        // Fallback: android.view.SurfaceControl (Android 12–13)
+        runCatching {
+            val sc = Class.forName("android.view.SurfaceControl")
+            val builderClass = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
+            val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
+            XposedHelpers.callMethod(builder, "setSize", w, h)
+            val captureArgs = XposedHelpers.callMethod(builder, "build")
+            val hwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
+                ?: return null
+            return hwBufToBitmap(hwBuf)
+        }.onFailure { XposedBridge.log("$TAG SurfaceControl.captureDisplay failed: ${it.message}") }
+
+        return null
+    }
+
+    private fun hwBufToBitmap(screenshotHwBuf: Any): Bitmap? {
         val hwBuf = XposedHelpers.callMethod(screenshotHwBuf, "getHardwareBuffer") as? HardwareBuffer
             ?: return null
         val colorSpace = runCatching {
             XposedHelpers.callMethod(screenshotHwBuf, "getColorSpace") as? ColorSpace
         }.getOrNull()
-
-        val hwBitmap = Bitmap.wrapHardwareBuffer(hwBuf, colorSpace)
+        val hw = Bitmap.wrapHardwareBuffer(hwBuf, colorSpace)
         hwBuf.close()
-        hwBitmap ?: return null
-
-        // Copy to software bitmap so createBitmap(crop) works
-        val soft = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
-        hwBitmap.recycle()
+        hw ?: return null
+        val soft = hw.copy(Bitmap.Config.ARGB_8888, false)
+        hw.recycle()
         return soft
     }
 
-    private fun resolveDisplayToken(sc: Class<*>, context: Context): android.os.IBinder? {
-        // Android 14+: getPhysicalDisplayIds() + getPhysicalDisplayToken(id)
+    private fun resolveDisplayToken(context: Context): android.os.IBinder? {
+        // Primary: DisplayManagerGlobal.getDisplayInfo(0).displayToken — works Android 12+
         runCatching {
+            val dmg = Class.forName("android.hardware.display.DisplayManagerGlobal")
+            val instance = XposedHelpers.callStaticMethod(dmg, "getInstance")
+            val info = XposedHelpers.callMethod(instance, "getDisplayInfo", android.view.Display.DEFAULT_DISPLAY)
+            if (info != null) {
+                (XposedHelpers.getObjectField(info, "displayToken") as? android.os.IBinder)
+                    ?.let { return it }
+            }
+        }.onFailure { XposedBridge.log("$TAG DisplayManagerGlobal.displayToken failed: ${it.message}") }
+
+        // Fallback A: SurfaceControl.getPhysicalDisplayIds + getPhysicalDisplayToken
+        runCatching {
+            val sc = Class.forName("android.view.SurfaceControl")
             val ids = XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayIds") as? LongArray
             if (ids != null && ids.isNotEmpty()) {
-                return XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayToken", ids[0])
-                    as? android.os.IBinder
+                return XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayToken", ids[0]) as? android.os.IBinder
             }
-        }.onFailure { XposedBridge.log("$TAG getPhysicalDisplayIds failed: ${it.message}") }
+        }.onFailure { XposedBridge.log("$TAG SC.getPhysicalDisplayIds failed: ${it.message}") }
 
-        // Pre-Android 14 fallback
+        // Fallback B: SurfaceControl.getInternalDisplayToken (pre-14)
         runCatching {
-            return XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken")
-                as? android.os.IBinder
-        }.onFailure { XposedBridge.log("$TAG getInternalDisplayToken failed: ${it.message}") }
+            val sc = Class.forName("android.view.SurfaceControl")
+            return XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken") as? android.os.IBinder
+        }.onFailure { XposedBridge.log("$TAG SC.getInternalDisplayToken failed: ${it.message}") }
 
-        // Last resort: Display.getDisplayToken() via DisplayManager
+        // Fallback C: Display.getDisplayToken()
         runCatching {
-            val dm = context.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+            val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             val display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
             return XposedHelpers.callMethod(display, "getDisplayToken") as? android.os.IBinder
         }.onFailure { XposedBridge.log("$TAG Display.getDisplayToken failed: ${it.message}") }
 
+        // Log SurfaceControl methods to help diagnose on unknown API levels
+        runCatching {
+            val sc = Class.forName("android.view.SurfaceControl")
+            logRelevantMethods("SurfaceControl", sc)
+        }
+
         return null
+    }
+
+    private fun logRelevantMethods(tag: String, cls: Class<*>) {
+        val names = cls.declaredMethods
+            .filter { m -> listOf("display", "physical", "capture", "screenshot", "token").any { m.name.lowercase().contains(it) } }
+            .map { "${it.name}(${it.parameterTypes.joinToString { p -> p.simpleName }})" }
+        XposedBridge.log("$TAG $tag methods: $names")
     }
 
     private fun saveToGallery(context: Context, bitmap: Bitmap) {
