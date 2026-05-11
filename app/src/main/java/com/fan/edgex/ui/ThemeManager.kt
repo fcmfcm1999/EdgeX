@@ -16,6 +16,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.widget.CompoundButtonCompat
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
@@ -75,6 +76,8 @@ object ThemeManager {
 
     fun applyToActivity(activity: AppCompatActivity) {
         val root = activity.findViewById<View>(android.R.id.content) ?: return
+        val accent = currentAccent(activity)
+        applyToSystemBars(activity, onAccentColor(accent))
         applyToView(root, activity)
     }
 
@@ -152,4 +155,9 @@ object ThemeManager {
 
     private fun parseColorOrDefault(value: String): Int =
         runCatching { value.toColorInt() }.getOrElse { DEFAULT_CUSTOM_COLOR.toColorInt() }
+
+    private fun applyToSystemBars(activity: AppCompatActivity, onAccent: Int) {
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            .isAppearanceLightStatusBars = onAccent == Color.BLACK
+    }
 }

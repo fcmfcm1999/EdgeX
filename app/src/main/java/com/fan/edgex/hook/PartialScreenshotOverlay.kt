@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
+import android.hardware.HardwareBuffer
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -11,6 +12,7 @@ import android.view.*
 import android.widget.*
 import com.fan.edgex.R
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.XposedHelpers
 import java.lang.ref.WeakReference
 import java.text.SimpleDateFormat
 import java.util.*
@@ -129,28 +131,26 @@ internal object PartialScreenshotOverlay {
         handler.postDelayed({
             Thread {
                 try {
-                    val process = Runtime.getRuntime().exec(arrayOf("screencap", "-p"))
-                    val bitmap = BitmapFactory.decodeStream(process.inputStream)
-                    process.waitFor()
-
-                    if (bitmap == null) {
+                    val full = captureDisplayBitmap(context)
+                    if (full == null) {
+                        XposedBridge.log("$TAG captureDisplayBitmap returned null")
                         showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
                         return@Thread
                     }
 
                     val metrics = context.resources.displayMetrics
-                    val scaleX = bitmap.width.toFloat() / metrics.widthPixels
-                    val scaleY = bitmap.height.toFloat() / metrics.heightPixels
+                    val scaleX = full.width.toFloat() / metrics.widthPixels
+                    val scaleY = full.height.toFloat() / metrics.heightPixels
 
-                    val left = (selectionRect.left * scaleX).toInt().coerceIn(0, bitmap.width)
-                    val top = (selectionRect.top * scaleY).toInt().coerceIn(0, bitmap.height)
-                    val right = (selectionRect.right * scaleX).toInt().coerceIn(0, bitmap.width)
-                    val bottom = (selectionRect.bottom * scaleY).toInt().coerceIn(0, bitmap.height)
-                    val w = (right - left).coerceAtLeast(1)
-                    val h = (bottom - top).coerceAtLeast(1)
+                    val left   = (selectionRect.left   * scaleX).toInt().coerceIn(0, full.width)
+                    val top    = (selectionRect.top    * scaleY).toInt().coerceIn(0, full.height)
+                    val right  = (selectionRect.right  * scaleX).toInt().coerceIn(0, full.width)
+                    val bottom = (selectionRect.bottom * scaleY).toInt().coerceIn(0, full.height)
+                    val w = (right  - left).coerceAtLeast(1)
+                    val h = (bottom - top ).coerceAtLeast(1)
 
-                    val cropped = Bitmap.createBitmap(bitmap, left, top, w, h)
-                    bitmap.recycle()
+                    val cropped = Bitmap.createBitmap(full, left, top, w, h)
+                    full.recycle()
 
                     saveToGallery(context, cropped)
                     cropped.recycle()
@@ -160,6 +160,46 @@ internal object PartialScreenshotOverlay {
                 }
             }.start()
         }, 250)
+    }
+
+    // SurfaceControl.captureDisplay() — works from system_server without SELinux restriction.
+    // screencap is blocked (error=13) in this process context.
+    private fun captureDisplayBitmap(context: Context): Bitmap? {
+        val sc = Class.forName("android.view.SurfaceControl")
+
+        val displayToken = XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken")
+            as? android.os.IBinder ?: return null
+
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val bounds = wm.currentWindowMetrics.bounds
+        val w = bounds.width()
+        val h = bounds.height()
+
+        // Build DisplayCaptureArgs
+        val builderClass = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
+        val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
+        XposedHelpers.callMethod(builder, "setSize", w, h)
+        val captureArgs = XposedHelpers.callMethod(builder, "build")
+
+        // captureDisplay returns ScreenshotHardwareBuffer
+        val screenshotHwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
+            ?: return null
+
+        // Unwrap HardwareBuffer → Bitmap
+        val hwBuf = XposedHelpers.callMethod(screenshotHwBuf, "getHardwareBuffer") as? HardwareBuffer
+            ?: return null
+        val colorSpace = runCatching {
+            XposedHelpers.callMethod(screenshotHwBuf, "getColorSpace") as? ColorSpace
+        }.getOrNull()
+
+        val hwBitmap = Bitmap.wrapHardwareBuffer(hwBuf, colorSpace)
+        hwBuf.close()
+        hwBitmap ?: return null
+
+        // Copy to software bitmap so createBitmap(crop) works
+        val soft = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        hwBitmap.recycle()
+        return soft
     }
 
     private fun saveToGallery(context: Context, bitmap: Bitmap) {
