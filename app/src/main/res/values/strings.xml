@@ -102,6 +102,12 @@
     <string name="action_freezer_drawer">Freezer Drawer</string>
     <string name="action_refreeze">Refreeze</string>
     <string name="action_screenshot">Screenshot</string>
+    <string name="action_partial_screenshot">Partial Screenshot</string>
+    <string name="partial_screenshot_hint">Drag to select area</string>
+    <string name="partial_screenshot_capture">Capture</string>
+    <string name="partial_screenshot_cancel">Cancel</string>
+    <string name="partial_screenshot_saved">Screenshot saved</string>
+    <string name="partial_screenshot_failed">Screenshot failed</string>
     <string name="action_clipboard">Clipboard</string>
     <string name="action_universal_copy">Global Copy</string>
     <string name="action_lock_screen">Lock Screen</string>

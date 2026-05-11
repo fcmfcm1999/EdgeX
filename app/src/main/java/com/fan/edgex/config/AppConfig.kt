@@ -54,6 +54,7 @@ object AppConfig {
     fun subGestureChildKey(parentKey: String, direction: String) = "${parentKey}_sub_${direction}"
 
     const val PIE_ACTION = "pie"
+    const val PARTIAL_SCREENSHOT_ACTION = "partial_screenshot"
     const val PIE_RINGS = 2
     const val PIE_SLOTS_PER_RING = 6
     val PIE_EDGES = listOf("left", "right", "top", "bottom")

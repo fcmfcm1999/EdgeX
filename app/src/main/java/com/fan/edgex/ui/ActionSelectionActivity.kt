@@ -39,6 +39,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == "freezer_drawer" -> R.drawable.ic_freezer
             code == "refreeze" -> R.drawable.ic_refreeze
             code == "screenshot" -> R.drawable.ic_camera
+            code == AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.drawable.ic_partial_screenshot
             code == "clipboard" -> R.drawable.ic_paste
             code == "universal_copy" -> R.drawable.ic_content_copy
             code == "lock_screen" -> R.drawable.ic_power
@@ -94,6 +95,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_freezer_drawer), "freezer_drawer", R.drawable.ic_freezer),
         ActionItem(getString(R.string.action_refreeze), "refreeze", R.drawable.ic_refreeze),
         ActionItem(getString(R.string.action_screenshot), "screenshot", R.drawable.ic_camera),
+        ActionItem(getString(R.string.action_partial_screenshot), AppConfig.PARTIAL_SCREENSHOT_ACTION, R.drawable.ic_partial_screenshot),
         ActionItem(getString(R.string.action_clipboard), "clipboard", R.drawable.ic_paste),
         ActionItem(getString(R.string.action_universal_copy), "universal_copy", R.drawable.ic_content_copy),
         ActionItem(getString(R.string.action_lock_screen), "lock_screen", R.drawable.ic_power),

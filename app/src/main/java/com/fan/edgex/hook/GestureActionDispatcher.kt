@@ -208,6 +208,9 @@ internal class GestureActionDispatcher(
             action == "screenshot" -> {
                 performScreenshot(context)
             }
+            action == AppConfig.PARTIAL_SCREENSHOT_ACTION -> {
+                PartialScreenshotOverlay.show(context)
+            }
             action == "refreeze" -> {
                 performRefreeze(context)
             }
@@ -358,6 +361,7 @@ internal class GestureActionDispatcher(
         action == "home"                     -> R.drawable.ic_home
         action == "recents"                  -> R.drawable.ic_recents
         action == "screenshot"               -> R.drawable.ic_camera
+        action == AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.drawable.ic_partial_screenshot
         action == "lock_screen"              -> R.drawable.ic_power
         action == "expand_notifications"     -> R.drawable.ic_notifications
         action == "kill_app"                 -> R.drawable.ic_kill_app
@@ -400,6 +404,7 @@ internal class GestureActionDispatcher(
         action == "home"              -> "Home"
         action == "recents" || action == "recent" -> "Recents"
         action == "screenshot"        -> "Screenshot"
+        action == AppConfig.PARTIAL_SCREENSHOT_ACTION -> "Partial SS"
         action == "lock_screen"       -> "Lock"
         action == "expand_notifications" -> "Notifs"
         action == "kill_app"          -> "Kill App"
