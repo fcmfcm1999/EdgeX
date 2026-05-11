@@ -47,7 +47,7 @@ class PanelConfigActivity : AppCompatActivity() {
         }
 
         val header = LinearLayout(this).apply {
-            id = View.generateViewId()
+            id = R.id.header_container
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(resources.getColor(R.color.ui_header_background, theme))
