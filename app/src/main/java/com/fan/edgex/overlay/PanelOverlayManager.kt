@@ -158,8 +158,11 @@ private class PanelOverlayWindow(
                 panel.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(140).start()
             }
             is PanelMode.SideBar -> {
-                val offset = if (currentMode.side == "left") -panel.measuredWidth else panel.measuredWidth
-                panel.translationX = offset.toFloat()
+                // measuredWidth is 0 before layout; use screen width to guarantee
+                // the panel is off-screen on the very first draw frame.
+                val screenWidth = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
+                    .currentWindowMetrics.bounds.width().toFloat()
+                panel.translationX = if (currentMode.side == "left") -screenWidth else screenWidth
                 panel.post {
                     val start = if (currentMode.side == "left") -panel.width.toFloat() else panel.width.toFloat()
                     ValueAnimator.ofFloat(start, 0f).apply {

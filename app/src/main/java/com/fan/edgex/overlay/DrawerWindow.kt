@@ -41,6 +41,7 @@ class DrawerWindow(
     private var rootView: FrameLayout? = null
     private var drawerPanel: View? = null
     private var contentLeftBound = 0
+    private var drawerPanelWidth = 0
     private var configReceiver: android.content.BroadcastReceiver? = null
 
     private val MOCK_MODE = false
@@ -97,6 +98,7 @@ class DrawerWindow(
             val panelFraction = if (isLandscape) 0.62f else 0.70f
             val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
             contentLeftBound = displayMetrics.widthPixels - panelWidth
+            drawerPanelWidth = panelWidth
             setupModernLayout(displayApps, pm, panelWidth)
         }
 
@@ -116,9 +118,8 @@ class DrawerWindow(
             windowManager.addView(rootView, params)
             if (!useArcDrawer) {
                 drawerPanel?.let { panel ->
-                    val panelWidth = (displayMetrics.widthPixels * 0.62f).toInt()
-                    panel.translationX = panelWidth.toFloat()
-                    ValueAnimator.ofFloat(panelWidth.toFloat(), 0f).apply {
+                    panel.translationX = drawerPanelWidth.toFloat()
+                    ValueAnimator.ofFloat(drawerPanelWidth.toFloat(), 0f).apply {
                         duration = 340
                         interpolator = DecelerateInterpolator(2.2f)
                         addUpdateListener { panel.translationX = it.animatedValue as Float }
