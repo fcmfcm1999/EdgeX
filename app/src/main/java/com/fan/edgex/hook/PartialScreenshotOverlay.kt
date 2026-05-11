@@ -163,44 +163,64 @@ internal object PartialScreenshotOverlay {
         }, 250)
     }
 
-    // screencap blocked by SELinux; SurfaceControl token getters removed in Android 14+.
-    // Use DisplayManagerGlobal.getDisplayInfo().displayToken → android.window.ScreenCapture.captureDisplay().
+    // Android 16+: ScreenCapture.capture(ScreenCaptureParams(displayId), Executor, OutcomeReceiver)
+    // Android 12–15: ScreenCapture.captureDisplay(DisplayCaptureArgs(IBinder token))
     private fun captureDisplayBitmap(context: Context): Bitmap? {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val bounds = wm.currentWindowMetrics.bounds
         val w = bounds.width()
         val h = bounds.height()
 
-        val displayToken = resolveDisplayToken(context)
-        if (displayToken == null) {
-            XposedBridge.log("$TAG display token unavailable")
-            return null
-        }
+        val scClass = runCatching { Class.forName("android.window.ScreenCapture") }.getOrNull()
+            ?: return null
 
-        // Try android.window.ScreenCapture (Android 14+)
+        // Android 16+: ScreenCaptureParams.Builder(int displayId)
         runCatching {
-            val sc = Class.forName("android.window.ScreenCapture")
-            logRelevantMethods("ScreenCapture", sc)
-            val builderClass = Class.forName("android.window.ScreenCapture\$DisplayCaptureArgs\$Builder")
-            val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
-            XposedHelpers.callMethod(builder, "setSize", w, h)
-            val captureArgs = XposedHelpers.callMethod(builder, "build")
-            val hwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
-                ?: return null
-            return hwBufToBitmap(hwBuf)
-        }.onFailure { XposedBridge.log("$TAG android.window.ScreenCapture failed: ${it.message}") }
+            val paramsClass = scClass.declaredClasses.firstOrNull { "ScreenCaptureParams" in it.simpleName }
+                ?: Class.forName("android.window.ScreenCaptureParams")
+            val builderClass = paramsClass.declaredClasses.firstOrNull { "Builder" in it.simpleName }!!
+            val builder = builderClass.getConstructor(Int::class.javaPrimitiveType).newInstance(android.view.Display.DEFAULT_DISPLAY)
+            val params = XposedHelpers.callMethod(builder, "build")
 
-        // Fallback: android.view.SurfaceControl (Android 12–13)
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var captureResultObj: Any? = null
+            val receiver = java.lang.reflect.Proxy.newProxyInstance(
+                scClass.classLoader, arrayOf(Class.forName("android.os.OutcomeReceiver"))
+            ) { _, method, args ->
+                when (method.name) {
+                    "onResult" -> { captureResultObj = args?.get(0); latch.countDown() }
+                    "onError"  -> { XposedBridge.log("$TAG onError: ${args?.get(0)}"); latch.countDown() }
+                }
+                null
+            }
+            XposedHelpers.callStaticMethod(scClass, "capture", params,
+                java.util.concurrent.Executors.newSingleThreadExecutor(), receiver)
+            if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                XposedBridge.log("$TAG capture timed out")
+                return null
+            }
+            return captureResultObj?.let { hwBufToBitmap(it) }
+        }.onFailure { XposedBridge.log("$TAG Android16 capture failed: ${it.message}") }
+
+        // Android 12–15: DisplayCaptureArgs(IBinder token)
+        val token = resolveDisplayToken(context) ?: return null
         runCatching {
-            val sc = Class.forName("android.view.SurfaceControl")
-            val builderClass = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
-            val builder = builderClass.getConstructor(android.os.IBinder::class.java).newInstance(displayToken)
+            val bc = Class.forName("android.window.ScreenCapture\$DisplayCaptureArgs\$Builder")
+            val builder = bc.getConstructor(android.os.IBinder::class.java).newInstance(token)
             XposedHelpers.callMethod(builder, "setSize", w, h)
-            val captureArgs = XposedHelpers.callMethod(builder, "build")
-            val hwBuf = XposedHelpers.callStaticMethod(sc, "captureDisplay", captureArgs)
-                ?: return null
-            return hwBufToBitmap(hwBuf)
-        }.onFailure { XposedBridge.log("$TAG SurfaceControl.captureDisplay failed: ${it.message}") }
+            val args = XposedHelpers.callMethod(builder, "build")
+            return hwBufToBitmap(XposedHelpers.callStaticMethod(scClass, "captureDisplay", args) ?: return null)
+        }.onFailure { XposedBridge.log("$TAG captureDisplay(IBinder) failed: ${it.message}") }
+
+        // android.view.SurfaceControl fallback (Android 12–13)
+        runCatching {
+            val sc2 = Class.forName("android.view.SurfaceControl")
+            val bc = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
+            val builder = bc.getConstructor(android.os.IBinder::class.java).newInstance(token)
+            XposedHelpers.callMethod(builder, "setSize", w, h)
+            val args = XposedHelpers.callMethod(builder, "build")
+            return hwBufToBitmap(XposedHelpers.callStaticMethod(sc2, "captureDisplay", args) ?: return null)
+        }.onFailure { XposedBridge.log("$TAG SurfaceControl fallback failed: ${it.message}") }
 
         return null
     }
@@ -220,53 +240,29 @@ internal object PartialScreenshotOverlay {
     }
 
     private fun resolveDisplayToken(context: Context): android.os.IBinder? {
-        // Primary: DisplayManagerGlobal.getDisplayInfo(0).displayToken — works Android 12+
         runCatching {
             val dmg = Class.forName("android.hardware.display.DisplayManagerGlobal")
             val instance = XposedHelpers.callStaticMethod(dmg, "getInstance")
             val info = XposedHelpers.callMethod(instance, "getDisplayInfo", android.view.Display.DEFAULT_DISPLAY)
             if (info != null) {
-                (XposedHelpers.getObjectField(info, "displayToken") as? android.os.IBinder)
-                    ?.let { return it }
+                (XposedHelpers.getObjectField(info, "displayToken") as? android.os.IBinder)?.let { return it }
             }
-        }.onFailure { XposedBridge.log("$TAG DisplayManagerGlobal.displayToken failed: ${it.message}") }
-
-        // Fallback A: SurfaceControl.getPhysicalDisplayIds + getPhysicalDisplayToken
+        }
         runCatching {
             val sc = Class.forName("android.view.SurfaceControl")
             val ids = XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayIds") as? LongArray
             if (ids != null && ids.isNotEmpty()) {
                 return XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayToken", ids[0]) as? android.os.IBinder
             }
-        }.onFailure { XposedBridge.log("$TAG SC.getPhysicalDisplayIds failed: ${it.message}") }
-
-        // Fallback B: SurfaceControl.getInternalDisplayToken (pre-14)
+        }
         runCatching {
-            val sc = Class.forName("android.view.SurfaceControl")
-            return XposedHelpers.callStaticMethod(sc, "getInternalDisplayToken") as? android.os.IBinder
-        }.onFailure { XposedBridge.log("$TAG SC.getInternalDisplayToken failed: ${it.message}") }
-
-        // Fallback C: Display.getDisplayToken()
+            return XposedHelpers.callStaticMethod(Class.forName("android.view.SurfaceControl"), "getInternalDisplayToken") as? android.os.IBinder
+        }
         runCatching {
             val dm = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-            val display = dm.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-            return XposedHelpers.callMethod(display, "getDisplayToken") as? android.os.IBinder
-        }.onFailure { XposedBridge.log("$TAG Display.getDisplayToken failed: ${it.message}") }
-
-        // Log SurfaceControl methods to help diagnose on unknown API levels
-        runCatching {
-            val sc = Class.forName("android.view.SurfaceControl")
-            logRelevantMethods("SurfaceControl", sc)
+            return XposedHelpers.callMethod(dm.getDisplay(android.view.Display.DEFAULT_DISPLAY), "getDisplayToken") as? android.os.IBinder
         }
-
         return null
-    }
-
-    private fun logRelevantMethods(tag: String, cls: Class<*>) {
-        val names = cls.declaredMethods
-            .filter { m -> listOf("display", "physical", "capture", "screenshot", "token").any { m.name.lowercase().contains(it) } }
-            .map { "${it.name}(${it.parameterTypes.joinToString { p -> p.simpleName }})" }
-        XposedBridge.log("$TAG $tag methods: $names")
     }
 
     private fun saveToGallery(context: Context, bitmap: Bitmap) {
