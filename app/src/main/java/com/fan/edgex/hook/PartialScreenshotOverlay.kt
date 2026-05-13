@@ -109,15 +109,21 @@ internal object PartialScreenshotOverlay {
             setColor(Color.argb(80, 255, 255, 255)); cornerRadius = 10 * dp
         }
 
+        // Will be set after colorDivider is created below
+        var colorDivider: View? = null
+
         fun updateHighlight() {
             selectBtn.background  = if (currentMode == CombinedView.Mode.SELECT)  activeBg() else null
             brushBtn.background   = if (currentMode == CombinedView.Mode.BRUSH && hasSelection) activeBg() else null
             mosaicBtn.background  = if (currentMode == CombinedView.Mode.MOSAIC && hasSelection) activeBg() else null
-            // Brush/mosaic and colors are greyed until a region is selected
             val annotAlpha = if (hasSelection) 1f else 0.35f
             brushBtn.alpha  = annotAlpha
             mosaicBtn.alpha = annotAlpha
-            colorViews.forEach { it.alpha = if (hasSelection && currentMode == CombinedView.Mode.BRUSH) 1f else annotAlpha }
+            // Colors (and their divider) only visible when Brush is active
+            val showColors = hasSelection && currentMode == CombinedView.Mode.BRUSH
+            val colorVis = if (showColors) View.VISIBLE else View.GONE
+            colorDivider?.visibility = colorVis
+            colorViews.forEach { it.visibility = colorVis }
         }
         updateHighlight()
 
@@ -167,7 +173,7 @@ internal object PartialScreenshotOverlay {
             }
         }
 
-        // Row 1: [Select][Brush][Mosaic] | [colors]
+        // Row 1: [Select][Brush][Mosaic] | [colors — only when Brush active]
         val toolRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -175,13 +181,15 @@ internal object PartialScreenshotOverlay {
             addView(selectBtn)
             addView(brushBtn)
             addView(mosaicBtn)
-            addView(View(context).apply {
+            colorDivider = View(context).apply {
                 setBackgroundColor(Color.argb(60, 255, 255, 255))
+                visibility = View.GONE
                 layoutParams = LinearLayout.LayoutParams(1, (24 * dp).toInt()).apply {
                     setMargins((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
                 }
-            })
-            colorViews.forEach { addView(it) }
+            }
+            addView(colorDivider)
+            colorViews.forEach { it.visibility = View.GONE; addView(it) }
         }
 
         // Row 2: [Undo] ——— [Cancel] [Save]
