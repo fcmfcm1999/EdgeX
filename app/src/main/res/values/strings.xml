@@ -108,6 +108,10 @@
     <string name="partial_screenshot_cancel">Cancel</string>
     <string name="partial_screenshot_saved">Screenshot saved</string>
     <string name="partial_screenshot_failed">Screenshot failed</string>
+    <string name="partial_screenshot_save">Save</string>
+    <string name="partial_screenshot_tool_brush">Brush</string>
+    <string name="partial_screenshot_tool_mosaic">Mosaic</string>
+    <string name="partial_screenshot_undo">Undo</string>
     <string name="action_clipboard">Clipboard</string>
     <string name="action_universal_copy">Global Copy</string>
     <string name="action_lock_screen">Lock Screen</string>
