@@ -648,30 +648,35 @@ internal object PartialScreenshotOverlay {
                 canvas.restore()
             }
 
-            // SELECT mode dim + rect + handles
+            // SELECT mode: dim everything outside selection (or full screen if no selection yet)
             if (mode == Mode.SELECT) {
                 if (!hasSelection) {
                     canvas.drawColor(Color.argb(155, 0, 0, 0))
                 } else {
                     selRect.set(normalizedRect())
                     val vw = width.toFloat(); val vh = height.toFloat()
-                    val l = selRect.left; val t = selRect.top
-                    val r = selRect.right; val b = selRect.bottom
+                    val l = selRect.left; val t = selRect.top; val r = selRect.right; val b = selRect.bottom
                     dimRect.set(0f, 0f, vw, t);  canvas.drawRect(dimRect, darkPaint)
                     dimRect.set(0f, b, vw, vh);  canvas.drawRect(dimRect, darkPaint)
                     dimRect.set(0f, t, l,  b);   canvas.drawRect(dimRect, darkPaint)
                     dimRect.set(r, t, vw,  b);   canvas.drawRect(dimRect, darkPaint)
-                    canvas.drawRect(selRect, borderPaint)
-                    val hs = 18f
-                    canvas.drawRect(l - 2f, t - 2f, l + hs, t + 2f, handlePaint)
-                    canvas.drawRect(l - 2f, t - 2f, l + 2f, t + hs, handlePaint)
-                    canvas.drawRect(r - hs, t - 2f, r + 2f, t + 2f, handlePaint)
-                    canvas.drawRect(r - 2f, t - 2f, r + 2f, t + hs, handlePaint)
-                    canvas.drawRect(l - 2f, b - 2f, l + hs, b + 2f, handlePaint)
-                    canvas.drawRect(l - 2f, b - hs, l + 2f, b + 2f, handlePaint)
-                    canvas.drawRect(r - hs, b - 2f, r + 2f, b + 2f, handlePaint)
-                    canvas.drawRect(r - 2f, b - hs, r + 2f, b + 2f, handlePaint)
                 }
+            }
+
+            // Always draw selection border + handles when a selection exists
+            if (hasSelection) {
+                selRect.set(normalizedRect())
+                val l = selRect.left; val t = selRect.top; val r = selRect.right; val b = selRect.bottom
+                canvas.drawRect(selRect, borderPaint)
+                val hs = 18f
+                canvas.drawRect(l - 2f, t - 2f, l + hs, t + 2f, handlePaint)
+                canvas.drawRect(l - 2f, t - 2f, l + 2f, t + hs, handlePaint)
+                canvas.drawRect(r - hs, t - 2f, r + 2f, t + 2f, handlePaint)
+                canvas.drawRect(r - 2f, t - 2f, r + 2f, t + hs, handlePaint)
+                canvas.drawRect(l - 2f, b - 2f, l + hs, b + 2f, handlePaint)
+                canvas.drawRect(l - 2f, b - hs, l + 2f, b + 2f, handlePaint)
+                canvas.drawRect(r - hs, b - 2f, r + 2f, b + 2f, handlePaint)
+                canvas.drawRect(r - 2f, b - hs, r + 2f, b + 2f, handlePaint)
             }
         }
     }
