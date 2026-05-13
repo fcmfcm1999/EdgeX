@@ -78,58 +78,72 @@ internal object PartialScreenshotOverlay {
         combinedView.setBrushColor(brushColors[0])
         combinedView.setMode(CombinedView.Mode.SELECT)
 
-        fun makeToolBtn(label: String) = TextView(context).apply {
-            text = label
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
-        }
-
-        val selectBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_select))
-        val brushBtn  = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
-        val mosaicBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
-
-        val colorViews = brushColors.mapIndexed { i, color ->
+        // ── Color circles ──────────────────────────────────────────────────
+        val colorCircles = brushColors.mapIndexed { i, color ->
             View(context).apply {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(color)
                     setStroke((2 * dp).toInt(), if (i == 0) Color.WHITE else Color.argb(80, 255, 255, 255))
                 }
-                layoutParams = LinearLayout.LayoutParams((22 * dp).toInt(), (22 * dp).toInt()).apply {
-                    setMargins((5 * dp).toInt(), 0, (5 * dp).toInt(), 0)
+                layoutParams = LinearLayout.LayoutParams((26 * dp).toInt(), (26 * dp).toInt()).apply {
+                    setMargins((9 * dp).toInt(), 0, (9 * dp).toInt(), 0)
                 }
             }
         }
 
-        fun activeBg() = GradientDrawable().apply {
-            setColor(Color.argb(80, 255, 255, 255)); cornerRadius = 10 * dp
+        // Color row — appears above tool row when Brush is active
+        val colorRowHairline = View(context).apply {
+            setBackgroundColor(Color.argb(35, 255, 255, 255))
+            visibility = View.GONE
+        }
+        val colorRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, (12 * dp).toInt(), 0, (10 * dp).toInt())
+            visibility = View.GONE
+            colorCircles.forEach { addView(it) }
         }
 
-        // Will be set after colorDivider is created below
-        var colorDivider: View? = null
+        // ── Tool chips ─────────────────────────────────────────────────────
+        fun makeChip(label: String) = TextView(context).apply {
+            text = label
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(140, 255, 255, 255))
+            setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
+        }
+
+        val selectChip = makeChip(ModuleRes.getString(R.string.partial_screenshot_tool_select))
+        val brushChip  = makeChip(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
+        val mosaicChip = makeChip(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
+
+        fun activeBg() = GradientDrawable().apply {
+            setColor(Color.argb(55, 255, 255, 255)); cornerRadius = 20 * dp
+        }
+
+        fun chipStyle(chip: TextView, active: Boolean, available: Boolean) {
+            chip.alpha = if (available) 1f else 0.35f
+            chip.background = if (active) activeBg() else null
+            chip.setTextColor(if (active) Color.WHITE else Color.argb(140, 255, 255, 255))
+        }
 
         fun updateHighlight() {
-            selectBtn.background  = if (currentMode == CombinedView.Mode.SELECT)  activeBg() else null
-            brushBtn.background   = if (currentMode == CombinedView.Mode.BRUSH && hasSelection) activeBg() else null
-            mosaicBtn.background  = if (currentMode == CombinedView.Mode.MOSAIC && hasSelection) activeBg() else null
-            val annotAlpha = if (hasSelection) 1f else 0.35f
-            brushBtn.alpha  = annotAlpha
-            mosaicBtn.alpha = annotAlpha
-            // Colors (and their divider) only visible when Brush is active
+            chipStyle(selectChip, currentMode == CombinedView.Mode.SELECT, true)
+            chipStyle(brushChip,  currentMode == CombinedView.Mode.BRUSH,  hasSelection)
+            chipStyle(mosaicChip, currentMode == CombinedView.Mode.MOSAIC, hasSelection)
             val showColors = hasSelection && currentMode == CombinedView.Mode.BRUSH
-            val colorVis = if (showColors) View.VISIBLE else View.GONE
-            colorDivider?.visibility = colorVis
-            colorViews.forEach { it.visibility = colorVis }
+            val vis = if (showColors) View.VISIBLE else View.GONE
+            colorRow.visibility        = vis
+            colorRowHairline.visibility = vis
         }
         updateHighlight()
 
         combinedView.onSelectionChanged = { sel ->
             hasSelection = sel
-            // Clear selection → return to SELECT mode
             if (!sel && currentMode != CombinedView.Mode.SELECT) {
                 currentMode = CombinedView.Mode.SELECT
                 combinedView.setMode(CombinedView.Mode.SELECT)
@@ -137,99 +151,96 @@ internal object PartialScreenshotOverlay {
             updateHighlight()
         }
 
-        selectBtn.setOnClickListener {
+        selectChip.setOnClickListener {
             currentMode = CombinedView.Mode.SELECT
             combinedView.setMode(CombinedView.Mode.SELECT)
             updateHighlight()
         }
-        brushBtn.setOnClickListener {
+        brushChip.setOnClickListener {
             if (!hasSelection) return@setOnClickListener
             currentMode = CombinedView.Mode.BRUSH
             combinedView.setMode(CombinedView.Mode.BRUSH)
             updateHighlight()
         }
-        mosaicBtn.setOnClickListener {
+        mosaicChip.setOnClickListener {
             if (!hasSelection) return@setOnClickListener
             currentMode = CombinedView.Mode.MOSAIC
             combinedView.setMode(CombinedView.Mode.MOSAIC)
             updateHighlight()
         }
 
-        colorViews.forEachIndexed { i, v ->
+        colorCircles.forEachIndexed { i, v ->
             v.setOnClickListener {
                 if (!hasSelection) return@setOnClickListener
                 combinedView.setBrushColor(brushColors[i])
-                if (currentMode != CombinedView.Mode.BRUSH) {
-                    currentMode = CombinedView.Mode.BRUSH
-                    combinedView.setMode(CombinedView.Mode.BRUSH)
-                }
-                colorViews.forEachIndexed { j, cv ->
+                colorCircles.forEachIndexed { j, cv ->
                     (cv.background as? GradientDrawable)?.setStroke(
                         (2 * dp).toInt(),
                         if (j == i) Color.WHITE else Color.argb(80, 255, 255, 255)
                     )
                 }
-                updateHighlight()
+                if (currentMode != CombinedView.Mode.BRUSH) {
+                    currentMode = CombinedView.Mode.BRUSH
+                    combinedView.setMode(CombinedView.Mode.BRUSH)
+                    updateHighlight()
+                }
             }
         }
 
-        // Row 1: [Select][Brush][Mosaic] | [colors — only when Brush active]
+        // ── Tool row: chips left, actions right ────────────────────────────
+        val undoBtn = TextView(context).apply {
+            text = "↩"
+            textSize = 17f
+            gravity = Gravity.CENTER
+            setTextColor(Color.argb(200, 255, 255, 255))
+            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (2 * dp).toInt(), 0) }
+            setOnClickListener { combinedView.undo() }
+        }
+        val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
+        val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
+
+        cancelBtn.setOnClickListener { combinedView.release(); dismiss() }
+        saveBtn.setOnClickListener {
+            val finalBitmap = combinedView.getFinalBitmap()
+            combinedView.release()
+            dismiss()
+            Thread {
+                try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
+                catch (t: Throwable) {
+                    XposedBridge.log("$TAG save failed: ${t.message}")
+                    showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
+                }
+            }.start()
+        }
+
         val toolRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((8 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
-            addView(selectBtn)
-            addView(brushBtn)
-            addView(mosaicBtn)
-            colorDivider = View(context).apply {
-                setBackgroundColor(Color.argb(60, 255, 255, 255))
-                visibility = View.GONE
-                layoutParams = LinearLayout.LayoutParams(1, (24 * dp).toInt()).apply {
-                    setMargins((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
-                }
-            }
-            addView(colorDivider)
-            colorViews.forEach { it.visibility = View.GONE; addView(it) }
-        }
-
-        // Row 2: [Undo] ——— [Cancel] [Save]
-        val actionRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding((8 * dp).toInt(), (6 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt())
-
-            val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
-            val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
-            val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
-
-            undoBtn.setOnClickListener { combinedView.undo() }
-            cancelBtn.setOnClickListener { combinedView.release(); dismiss() }
-            saveBtn.setOnClickListener {
-                val finalBitmap = combinedView.getFinalBitmap()
-                combinedView.release()
-                dismiss()
-                Thread {
-                    try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
-                    catch (t: Throwable) {
-                        XposedBridge.log("$TAG save failed: ${t.message}")
-                        showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
-                    }
-                }.start()
-            }
-
-            addView(undoBtn)
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
+            addView(selectChip)
+            addView(brushChip)
+            addView(mosaicChip)
             addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            addView(undoBtn)
             addView(cancelBtn)
             addView(saveBtn)
         }
 
+        // ── Panel: color row (GONE/VISIBLE) + hairline + tool row ──────────
         val panel = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.argb(210, 20, 20, 20))
-            addView(toolRow,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(View(context).apply { setBackgroundColor(Color.argb(40, 255, 255, 255)) },
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-            addView(actionRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            background = GradientDrawable().apply {
+                setColor(Color.argb(230, 18, 18, 20))
+                cornerRadii = floatArrayOf(20 * dp, 20 * dp, 20 * dp, 20 * dp, 0f, 0f, 0f, 0f)
+            }
+            val mp = ViewGroup.LayoutParams.MATCH_PARENT
+            val wc = ViewGroup.LayoutParams.WRAP_CONTENT
+            addView(colorRow,        LinearLayout.LayoutParams(mp, wc))
+            addView(colorRowHairline, LinearLayout.LayoutParams(mp, 1))
+            addView(toolRow,         LinearLayout.LayoutParams(mp, wc))
         }
 
         return object : FrameLayout(context) {
