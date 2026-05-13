@@ -183,111 +183,125 @@ internal object PartialScreenshotOverlay {
         val dp = context.resources.displayMetrics.density
         val annotationView = AnnotationView(context, bitmap)
 
-        // Color palette row (visible only when brush tool is active)
         val brushColors = listOf(Color.RED, Color.parseColor("#FF9800"), Color.BLUE, Color.BLACK, Color.WHITE)
-        val paletteRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
-            setBackgroundColor(Color.argb(210, 20, 20, 20))
-            visibility = View.VISIBLE
+        var currentTool = AnnotationView.Tool.BRUSH
 
-            for ((idx, color) in brushColors.withIndex()) {
-                val circle = View(context).apply {
-                    val strokeColor = if (idx == 0) Color.WHITE else Color.argb(100, 255, 255, 255)
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(color)
-                        setStroke((2 * dp).toInt(), strokeColor)
-                    }
-                    layoutParams = LinearLayout.LayoutParams((28 * dp).toInt(), (28 * dp).toInt()).apply {
-                        setMargins((8 * dp).toInt(), 0, (8 * dp).toInt(), 0)
-                    }
-                    setOnClickListener {
-                        annotationView.setBrushColor(color)
-                        (parent as? LinearLayout)?.let { row ->
-                            for (i in 0 until row.childCount) {
-                                val v = row.getChildAt(i)
-                                (v.background as? GradientDrawable)?.setStroke(
-                                    (2 * dp).toInt(),
-                                    if (v == this) Color.WHITE else Color.argb(100, 255, 255, 255)
-                                )
-                            }
-                        }
-                    }
-                }
-                addView(circle)
-            }
-        }
-        // Default brush color: red (first)
+        annotationView.setTool(AnnotationView.Tool.BRUSH)
         annotationView.setBrushColor(brushColors[0])
 
-        val btnBar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.argb(210, 20, 20, 20))
-            setPadding((8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt(), (8 * dp).toInt())
-            gravity = Gravity.CENTER_VERTICAL
+        // Tool toggle buttons
+        val brushBtn = TextView(context).apply {
+            text = ModuleRes.getString(R.string.partial_screenshot_tool_brush)
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
+        }
+        val mosaicBtn = TextView(context).apply {
+            text = ModuleRes.getString(R.string.partial_screenshot_tool_mosaic)
+            textSize = 13f
+            setTextColor(Color.argb(150, 255, 255, 255))
+            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
+        }
 
-            val brushBtn = TextView(context).apply {
-                text = ModuleRes.getString(R.string.partial_screenshot_tool_brush)
-                textSize = 14f
-                setTextColor(Color.WHITE)
-                setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
+        // Color circles (always visible)
+        val colorViews = brushColors.mapIndexed { i, color ->
+            View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                    setStroke((2 * dp).toInt(), if (i == 0) Color.WHITE else Color.argb(80, 255, 255, 255))
+                }
+                layoutParams = LinearLayout.LayoutParams((22 * dp).toInt(), (22 * dp).toInt()).apply {
+                    setMargins((5 * dp).toInt(), 0, (5 * dp).toInt(), 0)
+                }
             }
-            val mosaicBtn = TextView(context).apply {
-                text = ModuleRes.getString(R.string.partial_screenshot_tool_mosaic)
-                textSize = 14f
-                setTextColor(Color.argb(150, 255, 255, 255))
-                setPadding((16 * dp).toInt(), (8 * dp).toInt(), (16 * dp).toInt(), (8 * dp).toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
-            }
+        }
 
+        fun updateToolHighlight() {
+            val activeBg: () -> GradientDrawable = {
+                GradientDrawable().apply { setColor(Color.argb(80, 255, 255, 255)); cornerRadius = 10 * dp }
+            }
+            brushBtn.background  = if (currentTool == AnnotationView.Tool.BRUSH)  activeBg() else null
+            mosaicBtn.background = if (currentTool == AnnotationView.Tool.MOSAIC) activeBg() else null
+            brushBtn.setTextColor(Color.WHITE)
+            mosaicBtn.setTextColor(Color.WHITE)
+            // Dim colors when mosaic is active so user knows they apply to brush
+            val alpha = if (currentTool == AnnotationView.Tool.BRUSH) 1f else 0.4f
+            colorViews.forEach { it.alpha = alpha }
+        }
+        updateToolHighlight()
+
+        // Tapping a color always activates brush first
+        colorViews.forEachIndexed { i, v ->
+            v.setOnClickListener {
+                annotationView.setBrushColor(brushColors[i])
+                if (currentTool != AnnotationView.Tool.BRUSH) {
+                    currentTool = AnnotationView.Tool.BRUSH
+                    annotationView.setTool(AnnotationView.Tool.BRUSH)
+                }
+                colorViews.forEachIndexed { j, cv ->
+                    (cv.background as? GradientDrawable)?.setStroke(
+                        (2 * dp).toInt(),
+                        if (j == i) Color.WHITE else Color.argb(80, 255, 255, 255)
+                    )
+                }
+                updateToolHighlight()
+            }
+        }
+
+        brushBtn.setOnClickListener {
+            currentTool = AnnotationView.Tool.BRUSH
             annotationView.setTool(AnnotationView.Tool.BRUSH)
+            updateToolHighlight()
+        }
+        mosaicBtn.setOnClickListener {
+            currentTool = AnnotationView.Tool.MOSAIC
+            annotationView.setTool(AnnotationView.Tool.MOSAIC)
+            updateToolHighlight()
+        }
 
-            val updateToolHighlight: (AnnotationView.Tool) -> Unit = { tool ->
-                brushBtn.setTextColor(if (tool == AnnotationView.Tool.BRUSH) Color.WHITE else Color.argb(150, 255, 255, 255))
-                mosaicBtn.setTextColor(if (tool == AnnotationView.Tool.MOSAIC) Color.WHITE else Color.argb(150, 255, 255, 255))
-                paletteRow.visibility = if (tool == AnnotationView.Tool.BRUSH) View.VISIBLE else View.GONE
-            }
-
-            brushBtn.setOnClickListener {
-                annotationView.setTool(AnnotationView.Tool.BRUSH)
-                updateToolHighlight(AnnotationView.Tool.BRUSH)
-            }
-            mosaicBtn.setOnClickListener {
-                annotationView.setTool(AnnotationView.Tool.MOSAIC)
-                updateToolHighlight(AnnotationView.Tool.MOSAIC)
-            }
-
+        // Row 1: tool toggles + thin divider + color circles
+        val toolRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
             addView(brushBtn)
             addView(mosaicBtn)
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            // vertical rule
+            addView(View(context).apply {
+                setBackgroundColor(Color.argb(60, 255, 255, 255))
+                layoutParams = LinearLayout.LayoutParams((1).toInt(), (24 * dp).toInt()).apply {
+                    setMargins((8 * dp).toInt(), 0, (8 * dp).toInt(), 0)
+                }
+            })
+            colorViews.forEach { addView(it) }
+        }
 
-            val undoBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
+        // Row 2: undo (left) + cancel + save (right)
+        val actionRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+
+            val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
             val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
-            val saveBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
+            val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
 
             undoBtn.setOnClickListener { annotationView.undo() }
-            cancelBtn.setOnClickListener {
-                annotationView.release()
-                dismissAnnotation()
-            }
+            cancelBtn.setOnClickListener { annotationView.release(); dismissAnnotation() }
             saveBtn.setOnClickListener {
                 val finalBitmap = annotationView.getFinalBitmap()
                 annotationView.release()
                 dismissAnnotation()
                 Thread {
-                    try {
-                        saveToGallery(context, finalBitmap)
-                        finalBitmap.recycle()
-                    } catch (t: Throwable) {
+                    try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
+                    catch (t: Throwable) {
                         XposedBridge.log("$TAG save failed: ${t.message}")
                         showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
                     }
@@ -295,20 +309,31 @@ internal object PartialScreenshotOverlay {
             }
 
             addView(undoBtn)
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
             addView(cancelBtn)
             addView(saveBtn)
+        }
+
+        // Single card panel with rounded top corners
+        val panel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.argb(230, 20, 20, 20))
+                cornerRadii = floatArrayOf(16 * dp, 16 * dp, 16 * dp, 16 * dp, 0f, 0f, 0f, 0f)
+            }
+            addView(toolRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(
+                View(context).apply { setBackgroundColor(Color.argb(40, 255, 255, 255)) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
+            )
+            addView(actionRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
 
         return object : FrameLayout(context) {
             init {
                 setBackgroundColor(Color.BLACK)
                 addView(annotationView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                val bottomContainer = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(paletteRow, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-                    addView(btnBar, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-                }
-                addView(bottomContainer, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                addView(panel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                     gravity = Gravity.BOTTOM
                 })
             }
