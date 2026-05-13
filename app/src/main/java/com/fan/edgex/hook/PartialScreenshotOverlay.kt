@@ -187,23 +187,38 @@ internal object PartialScreenshotOverlay {
             }
         }
 
-        // ── Tool row: chips left, actions right ────────────────────────────
-        val undoBtn = TextView(context).apply {
-            text = "↩"
-            textSize = 17f
+        // ── Tool row: centered chips ───────────────────────────────────────
+        val toolRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setTextColor(Color.argb(200, 255, 255, 255))
-            setPadding((12 * dp).toInt(), (8 * dp).toInt(), (12 * dp).toInt(), (8 * dp).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (2 * dp).toInt(), 0) }
-            setOnClickListener { combinedView.undo() }
+            setPadding((12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            addView(selectChip)
+            addView(brushChip)
+            addView(mosaicChip)
         }
-        val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
-        val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
 
-        cancelBtn.setOnClickListener { combinedView.release(); dismiss() }
-        saveBtn.setOnClickListener {
+        // ── Action row: Cancel | Undo | Save  (equal-width icon buttons) ──
+        fun makeIconBtn(icon: String, primary: Boolean = false) = TextView(context).apply {
+            text = icon
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            if (primary) {
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(220, 33, 150, 243))
+                    cornerRadius = 14 * dp
+                }
+            }
+            layoutParams = LinearLayout.LayoutParams(0, (48 * dp).toInt(), 1f)
+        }
+
+        val cancelIconBtn = makeIconBtn("✕")
+        val undoIconBtn   = makeIconBtn("↩")
+        val saveIconBtn   = makeIconBtn("✓", primary = true)
+
+        cancelIconBtn.setOnClickListener { combinedView.release(); dismiss() }
+        undoIconBtn.setOnClickListener   { combinedView.undo() }
+        saveIconBtn.setOnClickListener   {
             val finalBitmap = combinedView.getFinalBitmap()
             combinedView.release()
             dismiss()
@@ -216,20 +231,16 @@ internal object PartialScreenshotOverlay {
             }.start()
         }
 
-        val toolRow = LinearLayout(context).apply {
+        val actionRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
-            addView(selectChip)
-            addView(brushChip)
-            addView(mosaicChip)
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(undoBtn)
-            addView(cancelBtn)
-            addView(saveBtn)
+            setPadding((16 * dp).toInt(), (6 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+            addView(cancelIconBtn)
+            addView(undoIconBtn)
+            addView(saveIconBtn)
         }
 
-        // ── Panel: color row (GONE/VISIBLE) + hairline + tool row ──────────
+        // ── Panel: color row + hairline + tool row + hairline + action row ─
         val panel = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
@@ -238,9 +249,12 @@ internal object PartialScreenshotOverlay {
             }
             val mp = ViewGroup.LayoutParams.MATCH_PARENT
             val wc = ViewGroup.LayoutParams.WRAP_CONTENT
-            addView(colorRow,        LinearLayout.LayoutParams(mp, wc))
+            addView(colorRow,         LinearLayout.LayoutParams(mp, wc))
             addView(colorRowHairline, LinearLayout.LayoutParams(mp, 1))
-            addView(toolRow,         LinearLayout.LayoutParams(mp, wc))
+            addView(toolRow,          LinearLayout.LayoutParams(mp, wc))
+            addView(View(context).apply { setBackgroundColor(Color.argb(35, 255, 255, 255)) },
+                LinearLayout.LayoutParams(mp, 1))
+            addView(actionRow,        LinearLayout.LayoutParams(mp, wc))
         }
 
         return object : FrameLayout(context) {
