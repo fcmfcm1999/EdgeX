@@ -231,13 +231,11 @@ internal object PartialScreenshotOverlay {
             mosaicBtn.background = if (currentTool == AnnotationView.Tool.MOSAIC) activeBg() else null
             brushBtn.setTextColor(Color.WHITE)
             mosaicBtn.setTextColor(Color.WHITE)
-            // Dim colors when mosaic is active so user knows they apply to brush
             val alpha = if (currentTool == AnnotationView.Tool.BRUSH) 1f else 0.4f
             colorViews.forEach { it.alpha = alpha }
         }
         updateToolHighlight()
 
-        // Tapping a color always activates brush first
         colorViews.forEachIndexed { i, v ->
             v.setOnClickListener {
                 annotationView.setBrushColor(brushColors[i])
@@ -266,28 +264,27 @@ internal object PartialScreenshotOverlay {
             updateToolHighlight()
         }
 
-        // Row 1: tool toggles + thin divider + color circles
-        val toolRow = LinearLayout(context).apply {
+        // Single bar: [Brush][Mosaic][|][colors...][flex spacer][Undo][Cancel][Save]
+        // mirrors the selection-stage bar layout
+        val bottomBar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Color.argb(210, 20, 20, 20))
+            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+
             addView(brushBtn)
             addView(mosaicBtn)
-            // vertical rule
+            // thin vertical rule
             addView(View(context).apply {
                 setBackgroundColor(Color.argb(60, 255, 255, 255))
-                layoutParams = LinearLayout.LayoutParams((1).toInt(), (24 * dp).toInt()).apply {
-                    setMargins((8 * dp).toInt(), 0, (8 * dp).toInt(), 0)
+                layoutParams = LinearLayout.LayoutParams(1, (24 * dp).toInt()).apply {
+                    setMargins((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
                 }
             })
             colorViews.forEach { addView(it) }
-        }
 
-        // Row 2: undo (left) + cancel + save (right)
-        val actionRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            // flex spacer
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
 
             val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
             val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
@@ -309,31 +306,15 @@ internal object PartialScreenshotOverlay {
             }
 
             addView(undoBtn)
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
             addView(cancelBtn)
             addView(saveBtn)
-        }
-
-        // Single card panel with rounded top corners
-        val panel = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(Color.argb(230, 20, 20, 20))
-                cornerRadii = floatArrayOf(16 * dp, 16 * dp, 16 * dp, 16 * dp, 0f, 0f, 0f, 0f)
-            }
-            addView(toolRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(
-                View(context).apply { setBackgroundColor(Color.argb(40, 255, 255, 255)) },
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1)
-            )
-            addView(actionRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
 
         return object : FrameLayout(context) {
             init {
                 setBackgroundColor(Color.BLACK)
                 addView(annotationView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                addView(panel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                addView(bottomBar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                     gravity = Gravity.BOTTOM
                 })
             }
