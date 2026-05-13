@@ -648,19 +648,17 @@ internal object PartialScreenshotOverlay {
                 canvas.restore()
             }
 
-            // SELECT mode: dim everything outside selection (or full screen if no selection yet)
-            if (mode == Mode.SELECT) {
-                if (!hasSelection) {
-                    canvas.drawColor(Color.argb(155, 0, 0, 0))
-                } else {
-                    selRect.set(normalizedRect())
-                    val vw = width.toFloat(); val vh = height.toFloat()
-                    val l = selRect.left; val t = selRect.top; val r = selRect.right; val b = selRect.bottom
-                    dimRect.set(0f, 0f, vw, t);  canvas.drawRect(dimRect, darkPaint)
-                    dimRect.set(0f, b, vw, vh);  canvas.drawRect(dimRect, darkPaint)
-                    dimRect.set(0f, t, l,  b);   canvas.drawRect(dimRect, darkPaint)
-                    dimRect.set(r, t, vw,  b);   canvas.drawRect(dimRect, darkPaint)
-                }
+            // Dim overlay: always applied (all modes)
+            if (!hasSelection) {
+                canvas.drawColor(Color.argb(155, 0, 0, 0))
+            } else {
+                selRect.set(normalizedRect())
+                val vw = width.toFloat(); val vh = height.toFloat()
+                val l = selRect.left; val t = selRect.top; val r = selRect.right; val b = selRect.bottom
+                dimRect.set(0f, 0f, vw, t);  canvas.drawRect(dimRect, darkPaint)
+                dimRect.set(0f, b, vw, vh);  canvas.drawRect(dimRect, darkPaint)
+                dimRect.set(0f, t, l,  b);   canvas.drawRect(dimRect, darkPaint)
+                dimRect.set(r, t, vw,  b);   canvas.drawRect(dimRect, darkPaint)
             }
 
             // Always draw selection border + handles when a selection exists
