@@ -24,27 +24,38 @@ internal object PartialScreenshotOverlay {
 
     private var overlayRef: WeakReference<View>? = null
     private var wmRef: WeakReference<WindowManager>? = null
-    private var annotOverlayRef: WeakReference<View>? = null
-    private var annotWmRef: WeakReference<WindowManager>? = null
     private val handler = Handler(Looper.getMainLooper())
 
+    // Capture first, then show a single unified overlay.
+    // No dismiss-before-capture needed because the overlay isn't shown yet.
     fun show(context: Context) {
         if (overlayRef?.get() != null) return
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         wmRef = WeakReference(wm)
-        val root = buildRoot(context, wm)
-        overlayRef = WeakReference(root)
-        @Suppress("DEPRECATION")
-        wm.addView(root, WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
-            format = PixelFormat.TRANSLUCENT
-            width = WindowManager.LayoutParams.MATCH_PARENT
-            height = WindowManager.LayoutParams.MATCH_PARENT
-            flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        })
+        Thread {
+            val bitmap = captureDisplayBitmap(context)
+            if (bitmap == null) {
+                XposedBridge.log("$TAG captureDisplayBitmap returned null")
+                showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
+                wmRef = null
+                return@Thread
+            }
+            handler.post {
+                val root = buildRoot(context, bitmap, wm)
+                overlayRef = WeakReference(root)
+                @Suppress("DEPRECATION")
+                wm.addView(root, WindowManager.LayoutParams().apply {
+                    type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
+                    format = PixelFormat.TRANSLUCENT
+                    width = WindowManager.LayoutParams.MATCH_PARENT
+                    height = WindowManager.LayoutParams.MATCH_PARENT
+                    flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                    layoutInDisplayCutoutMode =
+                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                })
+            }
+        }.start()
     }
 
     private fun dismiss() {
@@ -57,52 +68,137 @@ internal object PartialScreenshotOverlay {
         wmRef = null
     }
 
-    private fun dismissAnnotation() {
-        val wm = annotWmRef?.get() ?: return
-        val view = annotOverlayRef?.get() ?: return
-        try { wm.removeView(view) } catch (t: Throwable) {
-            XposedBridge.log("$TAG dismissAnnotation failed: ${t.message}")
-        }
-        annotOverlayRef = null
-        annotWmRef = null
-    }
+    // ---- Single unified overlay (select + annotate in one place) ----
 
-    // ---- Selection stage ----
-
-    private fun buildRoot(context: Context, wm: WindowManager): FrameLayout {
+    private fun buildRoot(context: Context, bitmap: Bitmap, wm: WindowManager): FrameLayout {
         val dp = context.resources.displayMetrics.density
-        val selectionView = SelectionView(context)
+        val combinedView = CombinedView(context, bitmap)
 
-        val btnBar = LinearLayout(context).apply {
+        val brushColors = listOf(Color.RED, Color.parseColor("#FF9800"), Color.BLUE, Color.BLACK, Color.WHITE)
+        var currentMode = CombinedView.Mode.SELECT
+        combinedView.setBrushColor(brushColors[0])
+        combinedView.setMode(CombinedView.Mode.SELECT)
+
+        // Tool buttons
+        fun makeToolBtn(label: String) = TextView(context).apply {
+            text = label
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
+        }
+        val selectBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_select))
+        val brushBtn  = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
+        val mosaicBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
+
+        // Color circles (always visible; dimmed when not in BRUSH mode)
+        val colorViews = brushColors.mapIndexed { i, color ->
+            View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                    setStroke((2 * dp).toInt(), if (i == 0) Color.WHITE else Color.argb(80, 255, 255, 255))
+                }
+                layoutParams = LinearLayout.LayoutParams((22 * dp).toInt(), (22 * dp).toInt()).apply {
+                    setMargins((5 * dp).toInt(), 0, (5 * dp).toInt(), 0)
+                }
+            }
+        }
+
+        fun activeBg() = GradientDrawable().apply {
+            setColor(Color.argb(80, 255, 255, 255)); cornerRadius = 10 * dp
+        }
+
+        fun updateHighlight() {
+            selectBtn.background = if (currentMode == CombinedView.Mode.SELECT) activeBg() else null
+            brushBtn.background  = if (currentMode == CombinedView.Mode.BRUSH)  activeBg() else null
+            mosaicBtn.background = if (currentMode == CombinedView.Mode.MOSAIC) activeBg() else null
+            colorViews.forEach { it.alpha = if (currentMode == CombinedView.Mode.BRUSH) 1f else 0.4f }
+        }
+        updateHighlight()
+
+        colorViews.forEachIndexed { i, v ->
+            v.setOnClickListener {
+                combinedView.setBrushColor(brushColors[i])
+                if (currentMode != CombinedView.Mode.BRUSH) {
+                    currentMode = CombinedView.Mode.BRUSH
+                    combinedView.setMode(CombinedView.Mode.BRUSH)
+                }
+                colorViews.forEachIndexed { j, cv ->
+                    (cv.background as? GradientDrawable)?.setStroke(
+                        (2 * dp).toInt(),
+                        if (j == i) Color.WHITE else Color.argb(80, 255, 255, 255)
+                    )
+                }
+                updateHighlight()
+            }
+        }
+
+        selectBtn.setOnClickListener {
+            currentMode = CombinedView.Mode.SELECT
+            combinedView.setMode(CombinedView.Mode.SELECT)
+            updateHighlight()
+        }
+        brushBtn.setOnClickListener {
+            currentMode = CombinedView.Mode.BRUSH
+            combinedView.setMode(CombinedView.Mode.BRUSH)
+            updateHighlight()
+        }
+        mosaicBtn.setOnClickListener {
+            currentMode = CombinedView.Mode.MOSAIC
+            combinedView.setMode(CombinedView.Mode.MOSAIC)
+            updateHighlight()
+        }
+
+        // Single bottom bar: [Select][Brush][Mosaic][|][colors][spacer][Undo][Cancel][Save]
+        val bottomBar = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.argb(210, 20, 20, 20))
             setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
+            gravity = Gravity.CENTER_VERTICAL
 
-            val hintView = TextView(context).apply {
-                text = ModuleRes.getString(R.string.partial_screenshot_hint)
-                textSize = 13f
-                setTextColor(Color.argb(200, 255, 255, 255))
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding((16 * dp).toInt(), 0, 0, 0)
-            }
-            addView(hintView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(selectBtn)
+            addView(brushBtn)
+            addView(mosaicBtn)
+            addView(View(context).apply {
+                setBackgroundColor(Color.argb(60, 255, 255, 255))
+                layoutParams = LinearLayout.LayoutParams(1, (24 * dp).toInt()).apply {
+                    setMargins((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
+                }
+            })
+            colorViews.forEach { addView(it) }
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
 
+            val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
             val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
-            val captureBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_capture), true)
+            val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
 
-            cancelBtn.setOnClickListener { dismiss() }
-            captureBtn.setOnClickListener {
-                val rect = selectionView.getSelectionRect()
-                if (rect != null) captureRegion(context, rect, wm)
+            undoBtn.setOnClickListener { combinedView.undo() }
+            cancelBtn.setOnClickListener { combinedView.release(); dismiss() }
+            saveBtn.setOnClickListener {
+                val finalBitmap = combinedView.getFinalBitmap()
+                combinedView.release()
+                dismiss()
+                Thread {
+                    try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
+                    catch (t: Throwable) {
+                        XposedBridge.log("$TAG save failed: ${t.message}")
+                        showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
+                    }
+                }.start()
             }
+
+            addView(undoBtn)
             addView(cancelBtn)
-            addView(captureBtn)
+            addView(saveBtn)
         }
 
         return object : FrameLayout(context) {
             init {
-                addView(selectionView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                addView(btnBar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                addView(combinedView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+                addView(bottomBar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                     gravity = Gravity.BOTTOM
                 })
             }
@@ -126,198 +222,6 @@ internal object PartialScreenshotOverlay {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { setMargins(0, 0, (8 * dp).toInt(), 0) }
-        }
-    }
-
-    private fun captureRegion(context: Context, selectionRect: RectF, wm: WindowManager) {
-        dismiss()
-        handler.postDelayed({
-            Thread {
-                try {
-                    val full = captureDisplayBitmap(context) ?: run {
-                        XposedBridge.log("$TAG captureDisplayBitmap returned null")
-                        showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
-                        return@Thread
-                    }
-                    val metrics = context.resources.displayMetrics
-                    val scaleX = full.width.toFloat() / metrics.widthPixels
-                    val scaleY = full.height.toFloat() / metrics.heightPixels
-                    val left   = (selectionRect.left   * scaleX).toInt().coerceIn(0, full.width)
-                    val top    = (selectionRect.top    * scaleY).toInt().coerceIn(0, full.height)
-                    val right  = (selectionRect.right  * scaleX).toInt().coerceIn(0, full.width)
-                    val bottom = (selectionRect.bottom * scaleY).toInt().coerceIn(0, full.height)
-                    val w = (right - left).coerceAtLeast(1)
-                    val h = (bottom - top).coerceAtLeast(1)
-                    val cropped = Bitmap.createBitmap(full, left, top, w, h)
-                    full.recycle()
-                    handler.post { showAnnotationStage(context, cropped, wm) }
-                } catch (t: Throwable) {
-                    XposedBridge.log("$TAG capture failed: ${t.message}")
-                    showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
-                }
-            }.start()
-        }, 250)
-    }
-
-    // ---- Annotation stage ----
-
-    private fun showAnnotationStage(context: Context, bitmap: Bitmap, wm: WindowManager) {
-        if (annotOverlayRef?.get() != null) return
-        annotWmRef = WeakReference(wm)
-        val root = buildAnnotationRoot(context, bitmap)
-        annotOverlayRef = WeakReference(root)
-        @Suppress("DEPRECATION")
-        wm.addView(root, WindowManager.LayoutParams().apply {
-            type = WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
-            format = PixelFormat.TRANSLUCENT
-            width = WindowManager.LayoutParams.MATCH_PARENT
-            height = WindowManager.LayoutParams.MATCH_PARENT
-            flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-            layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-        })
-    }
-
-    private fun buildAnnotationRoot(context: Context, bitmap: Bitmap): FrameLayout {
-        val dp = context.resources.displayMetrics.density
-        val annotationView = AnnotationView(context, bitmap)
-
-        val brushColors = listOf(Color.RED, Color.parseColor("#FF9800"), Color.BLUE, Color.BLACK, Color.WHITE)
-        var currentTool = AnnotationView.Tool.BRUSH
-
-        annotationView.setTool(AnnotationView.Tool.BRUSH)
-        annotationView.setBrushColor(brushColors[0])
-
-        // Tool toggle buttons
-        val brushBtn = TextView(context).apply {
-            text = ModuleRes.getString(R.string.partial_screenshot_tool_brush)
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
-        }
-        val mosaicBtn = TextView(context).apply {
-            text = ModuleRes.getString(R.string.partial_screenshot_tool_mosaic)
-            textSize = 13f
-            setTextColor(Color.argb(150, 255, 255, 255))
-            setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
-        }
-
-        // Color circles (always visible)
-        val colorViews = brushColors.mapIndexed { i, color ->
-            View(context).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(color)
-                    setStroke((2 * dp).toInt(), if (i == 0) Color.WHITE else Color.argb(80, 255, 255, 255))
-                }
-                layoutParams = LinearLayout.LayoutParams((22 * dp).toInt(), (22 * dp).toInt()).apply {
-                    setMargins((5 * dp).toInt(), 0, (5 * dp).toInt(), 0)
-                }
-            }
-        }
-
-        fun updateToolHighlight() {
-            val activeBg: () -> GradientDrawable = {
-                GradientDrawable().apply { setColor(Color.argb(80, 255, 255, 255)); cornerRadius = 10 * dp }
-            }
-            brushBtn.background  = if (currentTool == AnnotationView.Tool.BRUSH)  activeBg() else null
-            mosaicBtn.background = if (currentTool == AnnotationView.Tool.MOSAIC) activeBg() else null
-            brushBtn.setTextColor(Color.WHITE)
-            mosaicBtn.setTextColor(Color.WHITE)
-            val alpha = if (currentTool == AnnotationView.Tool.BRUSH) 1f else 0.4f
-            colorViews.forEach { it.alpha = alpha }
-        }
-        updateToolHighlight()
-
-        colorViews.forEachIndexed { i, v ->
-            v.setOnClickListener {
-                annotationView.setBrushColor(brushColors[i])
-                if (currentTool != AnnotationView.Tool.BRUSH) {
-                    currentTool = AnnotationView.Tool.BRUSH
-                    annotationView.setTool(AnnotationView.Tool.BRUSH)
-                }
-                colorViews.forEachIndexed { j, cv ->
-                    (cv.background as? GradientDrawable)?.setStroke(
-                        (2 * dp).toInt(),
-                        if (j == i) Color.WHITE else Color.argb(80, 255, 255, 255)
-                    )
-                }
-                updateToolHighlight()
-            }
-        }
-
-        brushBtn.setOnClickListener {
-            currentTool = AnnotationView.Tool.BRUSH
-            annotationView.setTool(AnnotationView.Tool.BRUSH)
-            updateToolHighlight()
-        }
-        mosaicBtn.setOnClickListener {
-            currentTool = AnnotationView.Tool.MOSAIC
-            annotationView.setTool(AnnotationView.Tool.MOSAIC)
-            updateToolHighlight()
-        }
-
-        // Single bar: [Brush][Mosaic][|][colors...][flex spacer][Undo][Cancel][Save]
-        // mirrors the selection-stage bar layout
-        val bottomBar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.argb(210, 20, 20, 20))
-            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
-            gravity = Gravity.CENTER_VERTICAL
-
-            addView(brushBtn)
-            addView(mosaicBtn)
-            // thin vertical rule
-            addView(View(context).apply {
-                setBackgroundColor(Color.argb(60, 255, 255, 255))
-                layoutParams = LinearLayout.LayoutParams(1, (24 * dp).toInt()).apply {
-                    setMargins((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
-                }
-            })
-            colorViews.forEach { addView(it) }
-
-            // flex spacer
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-
-            val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
-            val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
-            val saveBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_save), true)
-
-            undoBtn.setOnClickListener { annotationView.undo() }
-            cancelBtn.setOnClickListener { annotationView.release(); dismissAnnotation() }
-            saveBtn.setOnClickListener {
-                val finalBitmap = annotationView.getFinalBitmap()
-                annotationView.release()
-                dismissAnnotation()
-                Thread {
-                    try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
-                    catch (t: Throwable) {
-                        XposedBridge.log("$TAG save failed: ${t.message}")
-                        showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
-                    }
-                }.start()
-            }
-
-            addView(undoBtn)
-            addView(cancelBtn)
-            addView(saveBtn)
-        }
-
-        return object : FrameLayout(context) {
-            init {
-                setBackgroundColor(Color.BLACK)
-                addView(annotationView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                addView(bottomBar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                    gravity = Gravity.BOTTOM
-                })
-            }
         }
     }
 
@@ -462,182 +366,65 @@ internal object PartialScreenshotOverlay {
         }
     }
 
-    // ---- Selection view ----
+    // ---- Combined view: SELECT / BRUSH / MOSAIC in one view ----
 
-    private class SelectionView(context: Context) : View(context) {
+    private class CombinedView(context: Context, sourceBitmap: Bitmap) : View(context) {
 
-        private enum class TouchMode { NONE, DRAW, MOVE }
-        private var touchMode = TouchMode.NONE
+        enum class Mode { SELECT, BRUSH, MOSAIC }
 
-        private var startX = 0f
-        private var startY = 0f
-        private var endX = 0f
-        private var endY = 0f
-        private var hasSelection = false
-
-        // Drag-move bookkeeping
-        private var dragAnchorX = 0f
-        private var dragAnchorY = 0f
-        private var moveBaseStartX = 0f
-        private var moveBaseStartY = 0f
-        private var moveBaseEndX = 0f
-        private var moveBaseEndY = 0f
-
-        private val darkPaint = Paint().apply {
-            color = Color.argb(155, 0, 0, 0)
-            style = Paint.Style.FILL
-        }
-        private val borderPaint = Paint().apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 2f
-            isAntiAlias = true
-        }
-        private val handlePaint = Paint().apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        private val dimRect = RectF()
-        private val selRect = RectF()
-
-        override fun onTouchEvent(event: MotionEvent): Boolean {
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    if (hasSelection && normalizedRect().contains(event.x, event.y)) {
-                        touchMode = TouchMode.MOVE
-                        dragAnchorX = event.x
-                        dragAnchorY = event.y
-                        moveBaseStartX = startX
-                        moveBaseStartY = startY
-                        moveBaseEndX = endX
-                        moveBaseEndY = endY
-                    } else {
-                        touchMode = TouchMode.DRAW
-                        startX = event.x; startY = event.y
-                        endX = event.x;   endY = event.y
-                        hasSelection = false
-                    }
-                    invalidate()
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    when (touchMode) {
-                        TouchMode.MOVE -> {
-                            val dx = event.x - dragAnchorX
-                            val dy = event.y - dragAnchorY
-                            startX = moveBaseStartX + dx; startY = moveBaseStartY + dy
-                            endX   = moveBaseEndX   + dx; endY   = moveBaseEndY   + dy
-                        }
-                        TouchMode.DRAW -> {
-                            endX = event.x; endY = event.y
-                            hasSelection = true
-                        }
-                        TouchMode.NONE -> {}
-                    }
-                    invalidate()
-                }
-                MotionEvent.ACTION_UP -> {
-                    when (touchMode) {
-                        TouchMode.MOVE -> {
-                            val dx = event.x - dragAnchorX
-                            val dy = event.y - dragAnchorY
-                            startX = moveBaseStartX + dx; startY = moveBaseStartY + dy
-                            endX   = moveBaseEndX   + dx; endY   = moveBaseEndY   + dy
-                        }
-                        TouchMode.DRAW -> {
-                            endX = event.x; endY = event.y
-                            hasSelection = normalizedRect().let { it.width() > 10f && it.height() > 10f }
-                        }
-                        TouchMode.NONE -> {}
-                    }
-                    touchMode = TouchMode.NONE
-                    invalidate()
-                }
-            }
-            return true
-        }
-
-        fun getSelectionRect(): RectF? {
-            if (!hasSelection) return null
-            return normalizedRect()
-        }
-
-        private fun normalizedRect() = RectF(
-            minOf(startX, endX), minOf(startY, endY),
-            maxOf(startX, endX), maxOf(startY, endY)
-        )
-
-        override fun onDraw(canvas: Canvas) {
-            if (!hasSelection) {
-                canvas.drawColor(Color.argb(155, 0, 0, 0))
-                return
-            }
-
-            selRect.set(normalizedRect())
-            val w = width.toFloat(); val h = height.toFloat()
-            val l = selRect.left; val t = selRect.top
-            val r = selRect.right; val b = selRect.bottom
-
-            dimRect.set(0f, 0f, w, t);  canvas.drawRect(dimRect, darkPaint)
-            dimRect.set(0f, b, w, h);   canvas.drawRect(dimRect, darkPaint)
-            dimRect.set(0f, t, l, b);   canvas.drawRect(dimRect, darkPaint)
-            dimRect.set(r, t, w, b);    canvas.drawRect(dimRect, darkPaint)
-
-            canvas.drawRect(selRect, borderPaint)
-
-            val hs = 18f
-            canvas.drawRect(l - 2f, t - 2f, l + hs, t + 2f, handlePaint)
-            canvas.drawRect(l - 2f, t - 2f, l + 2f, t + hs, handlePaint)
-            canvas.drawRect(r - hs, t - 2f, r + 2f, t + 2f, handlePaint)
-            canvas.drawRect(r - 2f, t - 2f, r + 2f, t + hs, handlePaint)
-            canvas.drawRect(l - 2f, b - 2f, l + hs, b + 2f, handlePaint)
-            canvas.drawRect(l - 2f, b - hs, l + 2f, b + 2f, handlePaint)
-            canvas.drawRect(r - hs, b - 2f, r + 2f, b + 2f, handlePaint)
-            canvas.drawRect(r - 2f, b - hs, r + 2f, b + 2f, handlePaint)
-        }
-    }
-
-    // ---- Annotation view ----
-
-    private class AnnotationView(context: Context, sourceBitmap: Bitmap) : View(context) {
-
-        enum class Tool { BRUSH, MOSAIC }
-
-        private var currentTool = Tool.BRUSH
+        private var mode = Mode.SELECT
         private var brushColor = Color.RED
 
+        // Mutable bitmap for annotations
         private val editBitmap: Bitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
         private val editCanvas = Canvas(editBitmap)
 
+        // Fit-center display transform
         private val displayMatrix = Matrix()
         private val inverseMatrix = Matrix()
         private var displayScale = 1f
 
+        // Undo (up to 5 snapshots)
         private val undoStack = ArrayDeque<Bitmap>()
         private val MAX_UNDO = 5
 
+        // --- SELECT state ---
+        private enum class TouchMode { NONE, DRAW, MOVE }
+        private var touchMode = TouchMode.NONE
+        private var startX = 0f; private var startY = 0f
+        private var endX   = 0f; private var endY   = 0f
+        private var hasSelection = false
+        private var dragAnchorX = 0f;   private var dragAnchorY = 0f
+        private var moveBaseStartX = 0f; private var moveBaseStartY = 0f
+        private var moveBaseEndX   = 0f; private var moveBaseEndY   = 0f
+
+        // --- BRUSH state ---
         private var currentPath: Path? = null
-        private var lastBitmapX = 0f
-        private var lastBitmapY = 0f
+        private var lastBitmapX = 0f; private var lastBitmapY = 0f
 
-        private val brushPaint = Paint().apply {
-            isAntiAlias = true
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-
-        // Stroke width in bitmap pixels that looks like 8dp on screen
+        // Stroke width: 8dp apparent on screen, converted to bitmap pixels
         private val brushStrokeWidthBitmap get() = (8f * resources.displayMetrics.density) / displayScale
+
+        // Paints
+        private val bitmapPaint  = Paint(Paint.FILTER_BITMAP_FLAG)
+        private val darkPaint    = Paint().apply { color = Color.argb(155, 0, 0, 0); style = Paint.Style.FILL }
+        private val borderPaint  = Paint().apply {
+            color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = true
+        }
+        private val handlePaint  = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true }
+        private val brushPaint   = Paint().apply {
+            isAntiAlias = true; style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+        }
+        private val dimRect = RectF()
+        private val selRect = RectF()
 
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
             super.onSizeChanged(w, h, oldw, oldh)
             if (w <= 0 || h <= 0) return
-            val scaleX = w / editBitmap.width.toFloat()
-            val scaleY = h / editBitmap.height.toFloat()
-            displayScale = minOf(scaleX, scaleY).coerceAtLeast(0.001f)
-            val dx = (w - editBitmap.width * displayScale) / 2f
+            displayScale = minOf(w / editBitmap.width.toFloat(), h / editBitmap.height.toFloat())
+                .coerceAtLeast(0.001f)
+            val dx = (w - editBitmap.width  * displayScale) / 2f
             val dy = (h - editBitmap.height * displayScale) / 2f
             displayMatrix.reset()
             displayMatrix.postScale(displayScale, displayScale)
@@ -645,10 +432,17 @@ internal object PartialScreenshotOverlay {
             displayMatrix.invert(inverseMatrix)
         }
 
-        fun setTool(tool: Tool) { currentTool = tool }
+        fun setMode(m: Mode) { mode = m; invalidate() }
         fun setBrushColor(color: Int) { brushColor = color }
 
-        fun getFinalBitmap(): Bitmap = editBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        fun undo() {
+            if (undoStack.isEmpty()) return
+            val prev = undoStack.removeLast()
+            editCanvas.drawBitmap(prev, 0f, 0f,
+                Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) })
+            if (!prev.isRecycled) prev.recycle()
+            invalidate()
+        }
 
         fun release() {
             if (!editBitmap.isRecycled) editBitmap.recycle()
@@ -656,13 +450,20 @@ internal object PartialScreenshotOverlay {
             undoStack.clear()
         }
 
-        fun undo() {
-            if (undoStack.isEmpty()) return
-            val prev = undoStack.removeLast()
-            val srcPaint = Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) }
-            editCanvas.drawBitmap(prev, 0f, 0f, srcPaint)
-            if (!prev.isRecycled) prev.recycle()
-            invalidate()
+        // Returns cropped bitmap if there's a selection, else full annotated bitmap.
+        fun getFinalBitmap(): Bitmap {
+            commitBrushPath()
+            if (!hasSelection) return editBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            val sel = normalizedRect()
+            val pts = floatArrayOf(sel.left, sel.top, sel.right, sel.bottom)
+            inverseMatrix.mapPoints(pts)
+            val left   = pts[0].toInt().coerceIn(0, editBitmap.width)
+            val top    = pts[1].toInt().coerceIn(0, editBitmap.height)
+            val right  = pts[2].toInt().coerceIn(0, editBitmap.width)
+            val bottom = pts[3].toInt().coerceIn(0, editBitmap.height)
+            val w = (right - left).coerceAtLeast(1)
+            val h = (bottom - top).coerceAtLeast(1)
+            return Bitmap.createBitmap(editBitmap, left, top, w, h)
         }
 
         private fun pushUndo() {
@@ -676,12 +477,65 @@ internal object PartialScreenshotOverlay {
             return pts
         }
 
+        private fun normalizedRect() = RectF(
+            minOf(startX, endX), minOf(startY, endY),
+            maxOf(startX, endX), maxOf(startY, endY)
+        )
+
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            when (currentTool) {
-                Tool.BRUSH  -> handleBrushTouch(event)
-                Tool.MOSAIC -> handleMosaicTouch(event)
+            when (mode) {
+                Mode.SELECT -> handleSelectTouch(event)
+                Mode.BRUSH  -> handleBrushTouch(event)
+                Mode.MOSAIC -> handleMosaicTouch(event)
             }
             return true
+        }
+
+        private fun handleSelectTouch(event: MotionEvent) {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (hasSelection && normalizedRect().contains(event.x, event.y)) {
+                        touchMode = TouchMode.MOVE
+                        dragAnchorX = event.x; dragAnchorY = event.y
+                        moveBaseStartX = startX; moveBaseStartY = startY
+                        moveBaseEndX   = endX;   moveBaseEndY   = endY
+                    } else {
+                        touchMode = TouchMode.DRAW
+                        startX = event.x; startY = event.y
+                        endX   = event.x; endY   = event.y
+                        hasSelection = false
+                    }
+                    invalidate()
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    when (touchMode) {
+                        TouchMode.MOVE -> {
+                            val dx = event.x - dragAnchorX; val dy = event.y - dragAnchorY
+                            startX = moveBaseStartX + dx; startY = moveBaseStartY + dy
+                            endX   = moveBaseEndX   + dx; endY   = moveBaseEndY   + dy
+                        }
+                        TouchMode.DRAW -> { endX = event.x; endY = event.y; hasSelection = true }
+                        TouchMode.NONE -> {}
+                    }
+                    invalidate()
+                }
+                MotionEvent.ACTION_UP -> {
+                    when (touchMode) {
+                        TouchMode.MOVE -> {
+                            val dx = event.x - dragAnchorX; val dy = event.y - dragAnchorY
+                            startX = moveBaseStartX + dx; startY = moveBaseStartY + dy
+                            endX   = moveBaseEndX   + dx; endY   = moveBaseEndY   + dy
+                        }
+                        TouchMode.DRAW -> {
+                            endX = event.x; endY = event.y
+                            hasSelection = normalizedRect().let { it.width() > 10f && it.height() > 10f }
+                        }
+                        TouchMode.NONE -> {}
+                    }
+                    touchMode = TouchMode.NONE
+                    invalidate()
+                }
+            }
         }
 
         private fun handleBrushTouch(event: MotionEvent) {
@@ -696,8 +550,7 @@ internal object PartialScreenshotOverlay {
                     invalidate()
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val midX = (bx + lastBitmapX) / 2f
-                    val midY = (by + lastBitmapY) / 2f
+                    val midX = (bx + lastBitmapX) / 2f; val midY = (by + lastBitmapY) / 2f
                     currentPath?.quadTo(lastBitmapX, lastBitmapY, midX, midY)
                     lastBitmapX = bx; lastBitmapY = by
                     invalidate()
@@ -728,19 +581,15 @@ internal object PartialScreenshotOverlay {
 
         private fun applyMosaic(vx: Float, vy: Float) {
             val pts = viewToBitmap(vx, vy)
-            val bx = pts[0].toInt()
-            val by = pts[1].toInt()
-
+            val bx = pts[0].toInt(); val by = pts[1].toInt()
             val blockSize = (20f / displayScale).toInt().coerceAtLeast(4)
             val halfBrush = (30f / displayScale).toInt().coerceAtLeast(4)
-
             val left   = (bx - halfBrush).coerceIn(0, editBitmap.width)
             val top    = (by - halfBrush).coerceIn(0, editBitmap.height)
             val right  = (bx + halfBrush).coerceIn(0, editBitmap.width)
             val bottom = (by + halfBrush).coerceIn(0, editBitmap.height)
             val rw = right - left; val rh = bottom - top
             if (rw <= 0 || rh <= 0) return
-
             val region = Bitmap.createBitmap(editBitmap, left, top, rw, rh)
             val pixelated = pixelateBitmap(region, blockSize)
             region.recycle()
@@ -750,7 +599,7 @@ internal object PartialScreenshotOverlay {
         }
 
         private fun pixelateBitmap(src: Bitmap, blockSize: Int): Bitmap {
-            val smallW = (src.width / blockSize).coerceAtLeast(1)
+            val smallW = (src.width  / blockSize).coerceAtLeast(1)
             val smallH = (src.height / blockSize).coerceAtLeast(1)
             val small = Bitmap.createScaledBitmap(src, smallW, smallH, false)
             val result = Bitmap.createScaledBitmap(small, src.width, src.height, false)
@@ -759,15 +608,44 @@ internal object PartialScreenshotOverlay {
         }
 
         override fun onDraw(canvas: Canvas) {
+            // 1. Annotated bitmap
             canvas.drawBitmap(editBitmap, displayMatrix, bitmapPaint)
-            val path = currentPath ?: return
-            // Draw in-progress brush stroke (transform bitmap-space path to view space)
-            val previewPath = Path(path).also { it.transform(displayMatrix) }
-            val previewPaint = Paint(brushPaint).apply {
-                color = brushColor
-                strokeWidth = brushStrokeWidthBitmap * displayScale
+
+            // 2. In-progress brush stroke preview
+            val path = currentPath
+            if (path != null && mode == Mode.BRUSH) {
+                val previewPath = Path(path).also { it.transform(displayMatrix) }
+                canvas.drawPath(previewPath, Paint(brushPaint).apply {
+                    color = brushColor
+                    strokeWidth = brushStrokeWidthBitmap * displayScale
+                })
             }
-            canvas.drawPath(previewPath, previewPaint)
+
+            // 3. SELECT mode: dim overlay + selection rect/handles
+            if (mode == Mode.SELECT) {
+                if (!hasSelection) {
+                    canvas.drawColor(Color.argb(155, 0, 0, 0))
+                } else {
+                    selRect.set(normalizedRect())
+                    val vw = width.toFloat(); val vh = height.toFloat()
+                    val l = selRect.left; val t = selRect.top
+                    val r = selRect.right; val b = selRect.bottom
+                    dimRect.set(0f, 0f, vw, t);  canvas.drawRect(dimRect, darkPaint)
+                    dimRect.set(0f, b, vw, vh);  canvas.drawRect(dimRect, darkPaint)
+                    dimRect.set(0f, t, l, b);    canvas.drawRect(dimRect, darkPaint)
+                    dimRect.set(r, t, vw, b);    canvas.drawRect(dimRect, darkPaint)
+                    canvas.drawRect(selRect, borderPaint)
+                    val hs = 18f
+                    canvas.drawRect(l - 2f, t - 2f, l + hs, t + 2f, handlePaint)
+                    canvas.drawRect(l - 2f, t - 2f, l + 2f, t + hs, handlePaint)
+                    canvas.drawRect(r - hs, t - 2f, r + 2f, t + 2f, handlePaint)
+                    canvas.drawRect(r - 2f, t - 2f, r + 2f, t + hs, handlePaint)
+                    canvas.drawRect(l - 2f, b - 2f, l + hs, b + 2f, handlePaint)
+                    canvas.drawRect(l - 2f, b - hs, l + 2f, b + 2f, handlePaint)
+                    canvas.drawRect(r - hs, b - 2f, r + 2f, b + 2f, handlePaint)
+                    canvas.drawRect(r - 2f, b - hs, r + 2f, b + 2f, handlePaint)
+                }
+            }
         }
     }
 }

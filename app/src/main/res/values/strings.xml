@@ -109,6 +109,7 @@
     <string name="partial_screenshot_saved">Screenshot saved</string>
     <string name="partial_screenshot_failed">Screenshot failed</string>
     <string name="partial_screenshot_save">Save</string>
+    <string name="partial_screenshot_tool_select">Select</string>
     <string name="partial_screenshot_tool_brush">Brush</string>
     <string name="partial_screenshot_tool_mosaic">Mosaic</string>
     <string name="partial_screenshot_undo">Undo</string>
