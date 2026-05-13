@@ -26,8 +26,6 @@ internal object PartialScreenshotOverlay {
     private var wmRef: WeakReference<WindowManager>? = null
     private val handler = Handler(Looper.getMainLooper())
 
-    // Capture first, then show a single unified overlay.
-    // No dismiss-before-capture needed because the overlay isn't shown yet.
     fun show(context: Context) {
         if (overlayRef?.get() != null) return
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -68,7 +66,7 @@ internal object PartialScreenshotOverlay {
         wmRef = null
     }
 
-    // ---- Single unified overlay (select + annotate in one place) ----
+    // ---- Unified overlay ----
 
     private fun buildRoot(context: Context, bitmap: Bitmap, wm: WindowManager): FrameLayout {
         val dp = context.resources.displayMetrics.density
@@ -76,10 +74,10 @@ internal object PartialScreenshotOverlay {
 
         val brushColors = listOf(Color.RED, Color.parseColor("#FF9800"), Color.BLUE, Color.BLACK, Color.WHITE)
         var currentMode = CombinedView.Mode.SELECT
+        var hasSelection = false
         combinedView.setBrushColor(brushColors[0])
         combinedView.setMode(CombinedView.Mode.SELECT)
 
-        // Tool buttons
         fun makeToolBtn(label: String) = TextView(context).apply {
             text = label
             textSize = 13f
@@ -89,11 +87,11 @@ internal object PartialScreenshotOverlay {
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { setMargins(0, 0, (4 * dp).toInt(), 0) }
         }
+
         val selectBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_select))
         val brushBtn  = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
         val mosaicBtn = makeToolBtn(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
 
-        // Color circles (always visible; dimmed when not in BRUSH mode)
         val colorViews = brushColors.mapIndexed { i, color ->
             View(context).apply {
                 background = GradientDrawable().apply {
@@ -112,15 +110,48 @@ internal object PartialScreenshotOverlay {
         }
 
         fun updateHighlight() {
-            selectBtn.background = if (currentMode == CombinedView.Mode.SELECT) activeBg() else null
-            brushBtn.background  = if (currentMode == CombinedView.Mode.BRUSH)  activeBg() else null
-            mosaicBtn.background = if (currentMode == CombinedView.Mode.MOSAIC) activeBg() else null
-            colorViews.forEach { it.alpha = if (currentMode == CombinedView.Mode.BRUSH) 1f else 0.4f }
+            selectBtn.background  = if (currentMode == CombinedView.Mode.SELECT)  activeBg() else null
+            brushBtn.background   = if (currentMode == CombinedView.Mode.BRUSH && hasSelection) activeBg() else null
+            mosaicBtn.background  = if (currentMode == CombinedView.Mode.MOSAIC && hasSelection) activeBg() else null
+            // Brush/mosaic and colors are greyed until a region is selected
+            val annotAlpha = if (hasSelection) 1f else 0.35f
+            brushBtn.alpha  = annotAlpha
+            mosaicBtn.alpha = annotAlpha
+            colorViews.forEach { it.alpha = if (hasSelection && currentMode == CombinedView.Mode.BRUSH) 1f else annotAlpha }
         }
         updateHighlight()
 
+        combinedView.onSelectionChanged = { sel ->
+            hasSelection = sel
+            // Clear selection → return to SELECT mode
+            if (!sel && currentMode != CombinedView.Mode.SELECT) {
+                currentMode = CombinedView.Mode.SELECT
+                combinedView.setMode(CombinedView.Mode.SELECT)
+            }
+            updateHighlight()
+        }
+
+        selectBtn.setOnClickListener {
+            currentMode = CombinedView.Mode.SELECT
+            combinedView.setMode(CombinedView.Mode.SELECT)
+            updateHighlight()
+        }
+        brushBtn.setOnClickListener {
+            if (!hasSelection) return@setOnClickListener
+            currentMode = CombinedView.Mode.BRUSH
+            combinedView.setMode(CombinedView.Mode.BRUSH)
+            updateHighlight()
+        }
+        mosaicBtn.setOnClickListener {
+            if (!hasSelection) return@setOnClickListener
+            currentMode = CombinedView.Mode.MOSAIC
+            combinedView.setMode(CombinedView.Mode.MOSAIC)
+            updateHighlight()
+        }
+
         colorViews.forEachIndexed { i, v ->
             v.setOnClickListener {
+                if (!hasSelection) return@setOnClickListener
                 combinedView.setBrushColor(brushColors[i])
                 if (currentMode != CombinedView.Mode.BRUSH) {
                     currentMode = CombinedView.Mode.BRUSH
@@ -136,29 +167,11 @@ internal object PartialScreenshotOverlay {
             }
         }
 
-        selectBtn.setOnClickListener {
-            currentMode = CombinedView.Mode.SELECT
-            combinedView.setMode(CombinedView.Mode.SELECT)
-            updateHighlight()
-        }
-        brushBtn.setOnClickListener {
-            currentMode = CombinedView.Mode.BRUSH
-            combinedView.setMode(CombinedView.Mode.BRUSH)
-            updateHighlight()
-        }
-        mosaicBtn.setOnClickListener {
-            currentMode = CombinedView.Mode.MOSAIC
-            combinedView.setMode(CombinedView.Mode.MOSAIC)
-            updateHighlight()
-        }
-
-        // Single bottom bar: [Select][Brush][Mosaic][|][colors][spacer][Undo][Cancel][Save]
-        val bottomBar = LinearLayout(context).apply {
+        // Row 1: [Select][Brush][Mosaic] | [colors]
+        val toolRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.argb(210, 20, 20, 20))
-            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
             gravity = Gravity.CENTER_VERTICAL
-
+            setPadding((8 * dp).toInt(), (10 * dp).toInt(), (8 * dp).toInt(), (6 * dp).toInt())
             addView(selectBtn)
             addView(brushBtn)
             addView(mosaicBtn)
@@ -169,7 +182,13 @@ internal object PartialScreenshotOverlay {
                 }
             })
             colorViews.forEach { addView(it) }
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+        }
+
+        // Row 2: [Undo] ——— [Cancel] [Save]
+        val actionRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding((8 * dp).toInt(), (6 * dp).toInt(), (8 * dp).toInt(), (10 * dp).toInt())
 
             val undoBtn   = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_undo), false)
             val cancelBtn = buildTextButton(context, dp, ModuleRes.getString(R.string.partial_screenshot_cancel), false)
@@ -191,14 +210,24 @@ internal object PartialScreenshotOverlay {
             }
 
             addView(undoBtn)
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
             addView(cancelBtn)
             addView(saveBtn)
+        }
+
+        val panel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.argb(210, 20, 20, 20))
+            addView(toolRow,   LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(View(context).apply { setBackgroundColor(Color.argb(40, 255, 255, 255)) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+            addView(actionRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
 
         return object : FrameLayout(context) {
             init {
                 addView(combinedView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                addView(bottomBar, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                addView(panel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
                     gravity = Gravity.BOTTOM
                 })
             }
@@ -227,18 +256,13 @@ internal object PartialScreenshotOverlay {
 
     // ---- Screen capture ----
 
-    // Android 16+: ScreenCapture.capture(ScreenCaptureParams(displayId), Executor, OutcomeReceiver)
-    // Android 12–15: ScreenCapture.captureDisplay(DisplayCaptureArgs(IBinder token))
     private fun captureDisplayBitmap(context: Context): Bitmap? {
         val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val bounds = wm.currentWindowMetrics.bounds
-        val w = bounds.width()
-        val h = bounds.height()
+        val w = bounds.width(); val h = bounds.height()
 
-        val scClass = runCatching { Class.forName("android.window.ScreenCapture") }.getOrNull()
-            ?: return null
+        val scClass = runCatching { Class.forName("android.window.ScreenCapture") }.getOrNull() ?: return null
 
-        // Android 16+: ScreenCaptureParams.Builder(int displayId)
         runCatching {
             val paramsClass = scClass.declaredClasses.firstOrNull { "ScreenCaptureParams" in it.simpleName }
                 ?: Class.forName("android.window.ScreenCaptureParams")
@@ -246,7 +270,6 @@ internal object PartialScreenshotOverlay {
             val builder = builderClass.getConstructor(Int::class.javaPrimitiveType)
                 .newInstance(android.view.Display.DEFAULT_DISPLAY)
             val params = XposedHelpers.callMethod(builder, "build")
-
             val latch = java.util.concurrent.CountDownLatch(1)
             var captureResultObj: Any? = null
             val receiver = java.lang.reflect.Proxy.newProxyInstance(
@@ -261,13 +284,11 @@ internal object PartialScreenshotOverlay {
             XposedHelpers.callStaticMethod(scClass, "capture", params,
                 java.util.concurrent.Executors.newSingleThreadExecutor(), receiver)
             if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                XposedBridge.log("$TAG capture timed out")
-                return null
+                XposedBridge.log("$TAG capture timed out"); return null
             }
             return captureResultObj?.let { hwBufToBitmap(it) }
         }.onFailure { XposedBridge.log("$TAG Android16 capture failed: ${it.message}") }
 
-        // Android 12–15: DisplayCaptureArgs(IBinder token)
         val token = resolveDisplayToken(context) ?: return null
         runCatching {
             val bc = Class.forName("android.window.ScreenCapture\$DisplayCaptureArgs\$Builder")
@@ -277,7 +298,6 @@ internal object PartialScreenshotOverlay {
             return hwBufToBitmap(XposedHelpers.callStaticMethod(scClass, "captureDisplay", args) ?: return null)
         }.onFailure { XposedBridge.log("$TAG captureDisplay(IBinder) failed: ${it.message}") }
 
-        // android.view.SurfaceControl fallback (Android 12–13)
         runCatching {
             val sc2 = Class.forName("android.view.SurfaceControl")
             val bc = Class.forName("android.view.SurfaceControl\$DisplayCaptureArgs\$Builder")
@@ -291,17 +311,14 @@ internal object PartialScreenshotOverlay {
     }
 
     private fun hwBufToBitmap(screenshotHwBuf: Any): Bitmap? {
-        val hwBuf = XposedHelpers.callMethod(screenshotHwBuf, "getHardwareBuffer") as? HardwareBuffer
-            ?: return null
+        val hwBuf = XposedHelpers.callMethod(screenshotHwBuf, "getHardwareBuffer") as? HardwareBuffer ?: return null
         val colorSpace = runCatching {
             XposedHelpers.callMethod(screenshotHwBuf, "getColorSpace") as? ColorSpace
         }.getOrNull()
         val hw = Bitmap.wrapHardwareBuffer(hwBuf, colorSpace)
-        hwBuf.close()
-        hw ?: return null
+        hwBuf.close(); hw ?: return null
         val soft = hw.copy(Bitmap.Config.ARGB_8888, false)
-        hw.recycle()
-        return soft
+        hw.recycle(); return soft
     }
 
     private fun resolveDisplayToken(context: Context): android.os.IBinder? {
@@ -309,16 +326,14 @@ internal object PartialScreenshotOverlay {
             val dmg = Class.forName("android.hardware.display.DisplayManagerGlobal")
             val instance = XposedHelpers.callStaticMethod(dmg, "getInstance")
             val info = XposedHelpers.callMethod(instance, "getDisplayInfo", android.view.Display.DEFAULT_DISPLAY)
-            if (info != null) {
+            if (info != null)
                 (XposedHelpers.getObjectField(info, "displayToken") as? android.os.IBinder)?.let { return it }
-            }
         }
         runCatching {
             val sc = Class.forName("android.view.SurfaceControl")
             val ids = XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayIds") as? LongArray
-            if (ids != null && ids.isNotEmpty()) {
+            if (ids != null && ids.isNotEmpty())
                 return XposedHelpers.callStaticMethod(sc, "getPhysicalDisplayToken", ids[0]) as? android.os.IBinder
-            }
         }
         runCatching {
             return XposedHelpers.callStaticMethod(
@@ -336,9 +351,8 @@ internal object PartialScreenshotOverlay {
 
     private fun saveToGallery(context: Context, bitmap: Bitmap) {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val filename = "Screenshot_$timestamp.png"
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.DISPLAY_NAME, "Screenshot_$timestamp.png")
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Screenshots")
             put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
@@ -347,9 +361,7 @@ internal object PartialScreenshotOverlay {
         try {
             val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
             if (uri != null) {
-                context.contentResolver.openOutputStream(uri)?.use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                }
+                context.contentResolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 showToast(context, ModuleRes.getString(R.string.partial_screenshot_saved))
             } else {
                 showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
@@ -366,7 +378,7 @@ internal object PartialScreenshotOverlay {
         }
     }
 
-    // ---- Combined view: SELECT / BRUSH / MOSAIC in one view ----
+    // ---- Combined view ----
 
     private class CombinedView(context: Context, sourceBitmap: Bitmap) : View(context) {
 
@@ -375,44 +387,44 @@ internal object PartialScreenshotOverlay {
         private var mode = Mode.SELECT
         private var brushColor = Color.RED
 
-        // Mutable bitmap for annotations
+        var onSelectionChanged: ((Boolean) -> Unit)? = null
+
         private val editBitmap: Bitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
         private val editCanvas = Canvas(editBitmap)
 
-        // Fit-center display transform
         private val displayMatrix = Matrix()
         private val inverseMatrix = Matrix()
         private var displayScale = 1f
 
-        // Undo (up to 5 snapshots)
         private val undoStack = ArrayDeque<Bitmap>()
         private val MAX_UNDO = 5
 
-        // --- SELECT state ---
+        // SELECT state
         private enum class TouchMode { NONE, DRAW, MOVE }
         private var touchMode = TouchMode.NONE
         private var startX = 0f; private var startY = 0f
         private var endX   = 0f; private var endY   = 0f
         private var hasSelection = false
-        private var dragAnchorX = 0f;   private var dragAnchorY = 0f
+            set(value) {
+                if (field != value) { field = value; onSelectionChanged?.invoke(value) }
+            }
+        private var dragAnchorX = 0f;    private var dragAnchorY = 0f
         private var moveBaseStartX = 0f; private var moveBaseStartY = 0f
         private var moveBaseEndX   = 0f; private var moveBaseEndY   = 0f
 
-        // --- BRUSH state ---
+        // BRUSH state
         private var currentPath: Path? = null
         private var lastBitmapX = 0f; private var lastBitmapY = 0f
 
-        // Stroke width: 8dp apparent on screen, converted to bitmap pixels
         private val brushStrokeWidthBitmap get() = (8f * resources.displayMetrics.density) / displayScale
 
-        // Paints
-        private val bitmapPaint  = Paint(Paint.FILTER_BITMAP_FLAG)
-        private val darkPaint    = Paint().apply { color = Color.argb(155, 0, 0, 0); style = Paint.Style.FILL }
-        private val borderPaint  = Paint().apply {
+        private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+        private val darkPaint   = Paint().apply { color = Color.argb(155, 0, 0, 0); style = Paint.Style.FILL }
+        private val borderPaint = Paint().apply {
             color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = true
         }
-        private val handlePaint  = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true }
-        private val brushPaint   = Paint().apply {
+        private val handlePaint = Paint().apply { color = Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true }
+        private val brushPaint  = Paint().apply {
             isAntiAlias = true; style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
         }
@@ -450,20 +462,13 @@ internal object PartialScreenshotOverlay {
             undoStack.clear()
         }
 
-        // Returns cropped bitmap if there's a selection, else full annotated bitmap.
+        // Crop to selection if present, else return full annotated bitmap.
         fun getFinalBitmap(): Bitmap {
             commitBrushPath()
-            if (!hasSelection) return editBitmap.copy(Bitmap.Config.ARGB_8888, false)
-            val sel = normalizedRect()
-            val pts = floatArrayOf(sel.left, sel.top, sel.right, sel.bottom)
-            inverseMatrix.mapPoints(pts)
-            val left   = pts[0].toInt().coerceIn(0, editBitmap.width)
-            val top    = pts[1].toInt().coerceIn(0, editBitmap.height)
-            val right  = pts[2].toInt().coerceIn(0, editBitmap.width)
-            val bottom = pts[3].toInt().coerceIn(0, editBitmap.height)
-            val w = (right - left).coerceAtLeast(1)
-            val h = (bottom - top).coerceAtLeast(1)
-            return Bitmap.createBitmap(editBitmap, left, top, w, h)
+            val sel = selectionBitmapRect() ?: return editBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            val w = (sel.width().toInt()).coerceAtLeast(1)
+            val h = (sel.height().toInt()).coerceAtLeast(1)
+            return Bitmap.createBitmap(editBitmap, sel.left.toInt(), sel.top.toInt(), w, h)
         }
 
         private fun pushUndo() {
@@ -471,16 +476,30 @@ internal object PartialScreenshotOverlay {
             undoStack.addLast(editBitmap.copy(Bitmap.Config.ARGB_8888, false))
         }
 
+        private fun normalizedRect() = RectF(
+            minOf(startX, endX), minOf(startY, endY),
+            maxOf(startX, endX), maxOf(startY, endY)
+        )
+
+        // Selection rect mapped into bitmap pixel coordinates
+        private fun selectionBitmapRect(): RectF? {
+            if (!hasSelection) return null
+            val vr = normalizedRect()
+            val pts = floatArrayOf(vr.left, vr.top, vr.right, vr.bottom)
+            inverseMatrix.mapPoints(pts)
+            return RectF(
+                pts[0].coerceIn(0f, editBitmap.width.toFloat()),
+                pts[1].coerceIn(0f, editBitmap.height.toFloat()),
+                pts[2].coerceIn(0f, editBitmap.width.toFloat()),
+                pts[3].coerceIn(0f, editBitmap.height.toFloat())
+            )
+        }
+
         private fun viewToBitmap(vx: Float, vy: Float): FloatArray {
             val pts = floatArrayOf(vx, vy)
             inverseMatrix.mapPoints(pts)
             return pts
         }
-
-        private fun normalizedRect() = RectF(
-            minOf(startX, endX), minOf(startY, endY),
-            maxOf(startX, endX), maxOf(startY, endY)
-        )
 
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (mode) {
@@ -496,9 +515,9 @@ internal object PartialScreenshotOverlay {
                 MotionEvent.ACTION_DOWN -> {
                     if (hasSelection && normalizedRect().contains(event.x, event.y)) {
                         touchMode = TouchMode.MOVE
-                        dragAnchorX = event.x; dragAnchorY = event.y
-                        moveBaseStartX = startX; moveBaseStartY = startY
-                        moveBaseEndX   = endX;   moveBaseEndY   = endY
+                        dragAnchorX    = event.x; dragAnchorY    = event.y
+                        moveBaseStartX = startX;  moveBaseStartY = startY
+                        moveBaseEndX   = endX;    moveBaseEndY   = endY
                     } else {
                         touchMode = TouchMode.DRAW
                         startX = event.x; startY = event.y
@@ -565,9 +584,13 @@ internal object PartialScreenshotOverlay {
 
         private fun commitBrushPath() {
             val path = currentPath ?: return
+            val sel = selectionBitmapRect()
             brushPaint.color = brushColor
             brushPaint.strokeWidth = brushStrokeWidthBitmap
+            editCanvas.save()
+            if (sel != null) editCanvas.clipRect(sel)
             editCanvas.drawPath(path, brushPaint)
+            editCanvas.restore()
             currentPath = null
         }
 
@@ -580,14 +603,16 @@ internal object PartialScreenshotOverlay {
         }
 
         private fun applyMosaic(vx: Float, vy: Float) {
+            val sel = selectionBitmapRect() ?: return
             val pts = viewToBitmap(vx, vy)
             val bx = pts[0].toInt(); val by = pts[1].toInt()
             val blockSize = (20f / displayScale).toInt().coerceAtLeast(4)
             val halfBrush = (30f / displayScale).toInt().coerceAtLeast(4)
-            val left   = (bx - halfBrush).coerceIn(0, editBitmap.width)
-            val top    = (by - halfBrush).coerceIn(0, editBitmap.height)
-            val right  = (bx + halfBrush).coerceIn(0, editBitmap.width)
-            val bottom = (by + halfBrush).coerceIn(0, editBitmap.height)
+            // Intersect mosaic region with selection rect
+            val left   = (bx - halfBrush).toFloat().coerceAtLeast(sel.left).toInt().coerceIn(0, editBitmap.width)
+            val top    = (by - halfBrush).toFloat().coerceAtLeast(sel.top).toInt().coerceIn(0, editBitmap.height)
+            val right  = (bx + halfBrush).toFloat().coerceAtMost(sel.right).toInt().coerceIn(0, editBitmap.width)
+            val bottom = (by + halfBrush).toFloat().coerceAtMost(sel.bottom).toInt().coerceIn(0, editBitmap.height)
             val rw = right - left; val rh = bottom - top
             if (rw <= 0 || rh <= 0) return
             val region = Bitmap.createBitmap(editBitmap, left, top, rw, rh)
@@ -603,25 +628,27 @@ internal object PartialScreenshotOverlay {
             val smallH = (src.height / blockSize).coerceAtLeast(1)
             val small = Bitmap.createScaledBitmap(src, smallW, smallH, false)
             val result = Bitmap.createScaledBitmap(small, src.width, src.height, false)
-            small.recycle()
-            return result
+            small.recycle(); return result
         }
 
         override fun onDraw(canvas: Canvas) {
-            // 1. Annotated bitmap
+            // Annotated bitmap
             canvas.drawBitmap(editBitmap, displayMatrix, bitmapPaint)
 
-            // 2. In-progress brush stroke preview
+            // In-progress brush stroke preview, clipped to selection (view space)
             val path = currentPath
             if (path != null && mode == Mode.BRUSH) {
                 val previewPath = Path(path).also { it.transform(displayMatrix) }
+                canvas.save()
+                if (hasSelection) canvas.clipRect(normalizedRect())
                 canvas.drawPath(previewPath, Paint(brushPaint).apply {
                     color = brushColor
                     strokeWidth = brushStrokeWidthBitmap * displayScale
                 })
+                canvas.restore()
             }
 
-            // 3. SELECT mode: dim overlay + selection rect/handles
+            // SELECT mode dim + rect + handles
             if (mode == Mode.SELECT) {
                 if (!hasSelection) {
                     canvas.drawColor(Color.argb(155, 0, 0, 0))
@@ -632,8 +659,8 @@ internal object PartialScreenshotOverlay {
                     val r = selRect.right; val b = selRect.bottom
                     dimRect.set(0f, 0f, vw, t);  canvas.drawRect(dimRect, darkPaint)
                     dimRect.set(0f, b, vw, vh);  canvas.drawRect(dimRect, darkPaint)
-                    dimRect.set(0f, t, l, b);    canvas.drawRect(dimRect, darkPaint)
-                    dimRect.set(r, t, vw, b);    canvas.drawRect(dimRect, darkPaint)
+                    dimRect.set(0f, t, l,  b);   canvas.drawRect(dimRect, darkPaint)
+                    dimRect.set(r, t, vw,  b);   canvas.drawRect(dimRect, darkPaint)
                     canvas.drawRect(selRect, borderPaint)
                     val hs = 18f
                     canvas.drawRect(l - 2f, t - 2f, l + hs, t + 2f, handlePaint)
