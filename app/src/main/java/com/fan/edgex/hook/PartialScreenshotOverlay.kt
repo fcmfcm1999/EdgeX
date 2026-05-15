@@ -24,6 +24,7 @@ import java.util.*
 internal object PartialScreenshotOverlay {
 
     private const val TAG = "EdgeX:PartialSS"
+    private enum class PanelPos { BOTTOM, TOP }
 
     private var overlayRef: WeakReference<View>? = null
     private var wmRef: WeakReference<WindowManager>? = null
@@ -69,254 +70,47 @@ internal object PartialScreenshotOverlay {
         wmRef = null
     }
 
-    // ---- Unified overlay ----
+    // ---- Overlay ----
 
     private fun buildRoot(context: Context, bitmap: Bitmap, wm: WindowManager): FrameLayout {
-        val dp = context.resources.displayMetrics.density
+        val dp  = context.resources.displayMetrics.density
+        val mp  = ViewGroup.LayoutParams.MATCH_PARENT
+        val wc  = ViewGroup.LayoutParams.WRAP_CONTENT
         val accentColor = readAccentColor(context)
         val combinedView = CombinedView(context, bitmap)
 
+        // ── Shared state ──────────────────────────────────────────────────
         val brushColors = listOf(
-            Color.BLACK,
-            Color.RED,
-            Color.YELLOW,
-            Color.GREEN,
-            Color.BLUE,
-            Color.parseColor("#E040FB"),
-            Color.WHITE
+            Color.BLACK, Color.RED, Color.YELLOW, Color.GREEN,
+            Color.BLUE, Color.parseColor("#E040FB"), Color.WHITE
         )
         var currentMode = CombinedView.Mode.SELECT
         var hasSelection = false
-        var colorsVisible = true
         combinedView.setBrushColor(brushColors[1])
         combinedView.setMode(CombinedView.Mode.SELECT)
 
-        // ── Color circles ──────────────────────────────────────────────────
-        val colorCircles = brushColors.mapIndexed { i, color ->
-            View(context).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(color)
-                    val strokeColor = if (color == Color.WHITE || color == Color.BLACK)
-                        Color.argb(100, 200, 200, 200)
-                    else Color.argb(40, 255, 255, 255)
-                    setStroke((2 * dp).toInt(), if (i == 1) Color.WHITE else strokeColor)
-                }
-                layoutParams = LinearLayout.LayoutParams((28 * dp).toInt(), (28 * dp).toInt()).apply {
-                    setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0)
-                }
-            }
-        }
+        val circleSize = (52 * dp).toInt()
 
-        // ── Color pill ────────────────────────────────────────────────────
-        val brushPenIcon = TextView(context).apply {
-            text = "✏"
-            textSize = 20f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, (8 * dp).toInt(), 0) }
-        }
-
-        val colorCirclesLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            colorCircles.forEach { addView(it) }
-        }
-
-        val collapseBtn = TextView(context).apply {
-            text = "<"
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setTextColor(Color.argb(180, 255, 255, 255))
-            setPadding((10 * dp).toInt(), 0, 0, 0)
-        }
-
-        val colorPill = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        // ── View factories (views can't be shared between two parents) ────
+        fun makeCancel() = FrameLayout(context).apply {
             background = GradientDrawable().apply {
-                setColor(Color.argb(220, 28, 28, 34))
-                cornerRadius = 40 * dp
+                shape = GradientDrawable.OVAL; setColor(Color.argb(220, 40, 40, 46))
             }
-            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
-            addView(brushPenIcon)
-            addView(colorCirclesLayout)
-            addView(collapseBtn)
-        }
-
-        val colorPillWrapper = FrameLayout(context).apply {
-            setPadding(0, (6 * dp).toInt(), 0, (6 * dp).toInt())
-            addView(colorPill, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.CENTER_HORIZONTAL })
-            visibility = View.GONE
-        }
-
-        collapseBtn.setOnClickListener {
-            colorsVisible = !colorsVisible
-            colorCirclesLayout.visibility = if (colorsVisible) View.VISIBLE else View.GONE
-            collapseBtn.text = if (colorsVisible) "<" else ">"
-        }
-
-        // ── Tool tabs ──────────────────────────────────────────────────────
-        fun makeTab(label: String) = TextView(context).apply {
-            text = label
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setTextColor(Color.argb(140, 255, 255, 255))
-            setPadding((20 * dp).toInt(), (12 * dp).toInt(), (20 * dp).toInt(), (12 * dp).toInt())
-        }
-
-        val selectTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_select))
-        val brushTab  = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
-        val mosaicTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
-
-        var centerRow: LinearLayout? = null
-
-        fun updateStyles() {
-            selectTab.setTextColor(
-                if (currentMode == CombinedView.Mode.SELECT) Color.WHITE
-                else Color.argb(180, 255, 255, 255)
-            )
-            brushTab.setTextColor(when {
-                currentMode == CombinedView.Mode.BRUSH -> Color.WHITE
-                hasSelection -> Color.argb(180, 255, 255, 255)
-                else -> Color.argb(70, 255, 255, 255)
-            })
-            mosaicTab.setTextColor(when {
-                currentMode == CombinedView.Mode.MOSAIC -> Color.WHITE
-                hasSelection -> Color.argb(180, 255, 255, 255)
-                else -> Color.argb(70, 255, 255, 255)
-            })
-            colorPillWrapper.visibility =
-                if (hasSelection && currentMode == CombinedView.Mode.BRUSH) View.VISIBLE else View.GONE
-            val annotating = currentMode == CombinedView.Mode.BRUSH || currentMode == CombinedView.Mode.MOSAIC
-            centerRow?.visibility = if (annotating) View.VISIBLE else View.INVISIBLE
-        }
-        updateStyles()
-
-        combinedView.onSelectionChanged = { sel ->
-            hasSelection = sel
-            if (!sel && currentMode != CombinedView.Mode.SELECT) {
-                currentMode = CombinedView.Mode.SELECT
-                combinedView.setMode(CombinedView.Mode.SELECT)
-            }
-            updateStyles()
-        }
-
-        selectTab.setOnClickListener {
-            currentMode = CombinedView.Mode.SELECT
-            combinedView.setMode(CombinedView.Mode.SELECT)
-            updateStyles()
-        }
-        brushTab.setOnClickListener {
-            if (!hasSelection) return@setOnClickListener
-            currentMode = CombinedView.Mode.BRUSH
-            combinedView.setMode(CombinedView.Mode.BRUSH)
-            updateStyles()
-        }
-        mosaicTab.setOnClickListener {
-            if (!hasSelection) return@setOnClickListener
-            currentMode = CombinedView.Mode.MOSAIC
-            combinedView.setMode(CombinedView.Mode.MOSAIC)
-            updateStyles()
-        }
-
-        colorCircles.forEachIndexed { i, v ->
-            v.setOnClickListener {
-                if (!hasSelection) return@setOnClickListener
-                combinedView.setBrushColor(brushColors[i])
-                colorCircles.forEachIndexed { j, cv ->
-                    val color = brushColors[j]
-                    val strokeColor = when {
-                        j == i -> Color.WHITE
-                        color == Color.WHITE || color == Color.BLACK -> Color.argb(100, 200, 200, 200)
-                        else -> Color.argb(40, 255, 255, 255)
-                    }
-                    (cv.background as? GradientDrawable)?.setStroke((2 * dp).toInt(), strokeColor)
-                }
-                if (currentMode != CombinedView.Mode.BRUSH) {
-                    currentMode = CombinedView.Mode.BRUSH
-                    combinedView.setMode(CombinedView.Mode.BRUSH)
-                    updateStyles()
-                }
-            }
-        }
-
-        val toolTabRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, (10 * dp).toInt(), 0, (2 * dp).toInt())
-            addView(selectTab)
-            addView(brushTab)
-            addView(mosaicTab)
-        }
-
-        // ── Action row: [X circle] | [↩ Reset ↪] | [✓ circle] ──────────
-        val cancelSize = (52 * dp).toInt()
-        val saveSize   = cancelSize
-
-        val cancelCircle = FrameLayout(context).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.argb(220, 40, 40, 46))
-            }
-            layoutParams = LinearLayout.LayoutParams(cancelSize, cancelSize)
             addView(TextView(context).apply {
-                text = "✕"
-                textSize = 19f
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                layoutParams = FrameLayout.LayoutParams(cancelSize, cancelSize)
+                text = "✕"; textSize = 19f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                layoutParams = FrameLayout.LayoutParams(circleSize, circleSize)
             })
+            setOnClickListener { combinedView.release(); dismiss() }
         }
 
-        val undoBtn = TextView(context).apply {
-            text = "↩"
-            textSize = 23f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
-        }
-        val resetLabel = TextView(context).apply {
-            text = "Reset"
-            textSize = 17f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setPadding((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
-        }
-        val redoBtn = TextView(context).apply {
-            text = "↪"
-            textSize = 23f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
-        }
-        centerRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            visibility = View.INVISIBLE
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            addView(undoBtn)
-            addView(resetLabel)
-            addView(redoBtn)
-        }
-
-        val saveCircle = FrameLayout(context).apply {
+        fun makeSave() = FrameLayout(context).apply {
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(accentColor)
+                shape = GradientDrawable.OVAL; setColor(accentColor)
             }
-            layoutParams = LinearLayout.LayoutParams(saveSize, saveSize)
             addView(object : View(context) {
                 private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.WHITE
-                    style = Paint.Style.STROKE
-                    strokeWidth = 2.5f * dp
-                    strokeCap = Paint.Cap.ROUND
-                    strokeJoin = Paint.Join.ROUND
+                    color = Color.WHITE; style = Paint.Style.STROKE
+                    strokeWidth = 2.5f * dp; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
                 }
                 override fun onDraw(canvas: Canvas) {
                     val w = width.toFloat(); val h = height.toFloat()
@@ -326,60 +120,238 @@ internal object PartialScreenshotOverlay {
                     path.lineTo(w * 0.72f, h * 0.36f)
                     canvas.drawPath(path, p)
                 }
-            }.apply {
-                layoutParams = FrameLayout.LayoutParams(saveSize, saveSize)
-            })
-        }
-
-        cancelCircle.setOnClickListener { combinedView.release(); dismiss() }
-        undoBtn.setOnClickListener { combinedView.undo() }
-        resetLabel.setOnClickListener { combinedView.resetAnnotations() }
-        redoBtn.setOnClickListener { combinedView.redo() }
-        saveCircle.setOnClickListener {
-            val finalBitmap = combinedView.getFinalBitmap()
-            combinedView.release()
-            dismiss()
-            Thread {
-                try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
-                catch (t: Throwable) {
-                    XposedBridge.log("$TAG save failed: ${t.message}")
-                    showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
-                }
-            }.start()
-        }
-
-        val actionRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding((24 * dp).toInt(), (8 * dp).toInt(), (24 * dp).toInt(), (24 * dp).toInt())
-            addView(cancelCircle)
-            addView(centerRow!!)
-            addView(saveCircle)
-        }
-
-        val panel = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(Color.argb(230, 18, 18, 20))
-                cornerRadii = floatArrayOf(20 * dp, 20 * dp, 20 * dp, 20 * dp, 0f, 0f, 0f, 0f)
+            }.apply { layoutParams = FrameLayout.LayoutParams(circleSize, circleSize) })
+            setOnClickListener {
+                val finalBitmap = combinedView.getFinalBitmap()
+                combinedView.release(); dismiss()
+                Thread {
+                    try { saveToGallery(context, finalBitmap); finalBitmap.recycle() }
+                    catch (t: Throwable) {
+                        XposedBridge.log("$TAG save failed: ${t.message}")
+                        showToast(context, ModuleRes.getString(R.string.partial_screenshot_failed))
+                    }
+                }.start()
             }
-            val mp = ViewGroup.LayoutParams.MATCH_PARENT
-            val wc = ViewGroup.LayoutParams.WRAP_CONTENT
+        }
+
+        // ── Color circles (h-panel only) ──────────────────────────────────
+        val colorCircles = brushColors.mapIndexed { i, color ->
+            View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL; setColor(color)
+                    val sc = if (color == Color.WHITE || color == Color.BLACK)
+                        Color.argb(100, 200, 200, 200) else Color.argb(40, 255, 255, 255)
+                    setStroke((2 * dp).toInt(), if (i == 1) Color.WHITE else sc)
+                }
+                layoutParams = LinearLayout.LayoutParams((28 * dp).toInt(), (28 * dp).toInt()).apply {
+                    setMargins((4 * dp).toInt(), 0, (4 * dp).toInt(), 0)
+                }
+            }
+        }
+
+        // ── Color pill ────────────────────────────────────────────────────
+        val colorCirclesLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            colorCircles.forEach { addView(it) }
+        }
+        val colorPill = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.argb(220, 28, 28, 34)); cornerRadius = 40 * dp
+            }
+            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+            addView(TextView(context).apply {
+                text = "✏"; textSize = 20f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                layoutParams = LinearLayout.LayoutParams(wc, wc).apply { setMargins(0, 0, (8 * dp).toInt(), 0) }
+            })
+            addView(colorCirclesLayout)
+        }
+        val colorPillWrapper = FrameLayout(context).apply {
+            setPadding(0, (6 * dp).toInt(), 0, (6 * dp).toInt())
+            addView(colorPill, FrameLayout.LayoutParams(wc, wc).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            visibility = View.GONE
+        }
+        colorCircles.forEachIndexed { i, v ->
+            v.setOnClickListener {
+                if (!hasSelection) return@setOnClickListener
+                combinedView.setBrushColor(brushColors[i])
+                colorCircles.forEachIndexed { j, cv ->
+                    val c = brushColors[j]
+                    val sc = when {
+                        j == i -> Color.WHITE
+                        c == Color.WHITE || c == Color.BLACK -> Color.argb(100, 200, 200, 200)
+                        else -> Color.argb(40, 255, 255, 255)
+                    }
+                    (cv.background as? GradientDrawable)?.setStroke((2 * dp).toInt(), sc)
+                }
+                if (currentMode != CombinedView.Mode.BRUSH) {
+                    currentMode = CombinedView.Mode.BRUSH
+                    combinedView.setMode(CombinedView.Mode.BRUSH)
+                }
+            }
+        }
+
+        // ── Tab factory ───────────────────────────────────────────────────
+        fun makeTab(label: String, size: Float, padH: Int, padV: Int) = TextView(context).apply {
+            text = label; textSize = size; gravity = Gravity.CENTER
+            setTextColor(Color.argb(140, 255, 255, 255))
+            setPadding(padH, padV, padH, padV)
+        }
+
+        // ── h-panel tabs ──────────────────────────────────────────────────
+        val hSelTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_select), 15f, (20*dp).toInt(), (12*dp).toInt())
+        val hBrushTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_brush), 15f, (20*dp).toInt(), (12*dp).toInt())
+        val hMosaicTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic), 15f, (20*dp).toInt(), (12*dp).toInt())
+
+        // ── Center-row var (assigned after panel construction) ───────────
+        var hCenterRow: LinearLayout? = null
+
+        // ── Shared style updater ──────────────────────────────────────────
+        fun tabColor(isActive: Boolean, avail: Boolean) = when {
+            isActive -> Color.WHITE
+            avail    -> Color.argb(180, 255, 255, 255)
+            else     -> Color.argb(70, 255, 255, 255)
+        }
+        fun updateStyles() {
+            val isBrush  = currentMode == CombinedView.Mode.BRUSH
+            val isMosaic = currentMode == CombinedView.Mode.MOSAIC
+            val isSel    = currentMode == CombinedView.Mode.SELECT
+            hSelTab.setTextColor(tabColor(isSel, true))
+            hBrushTab.setTextColor(tabColor(isBrush, hasSelection))
+            hMosaicTab.setTextColor(tabColor(isMosaic, hasSelection))
+            colorPillWrapper.visibility =
+                if (hasSelection && isBrush) View.VISIBLE else View.GONE
+            hCenterRow?.visibility = if (isBrush || isMosaic) View.VISIBLE else View.INVISIBLE
+        }
+        updateStyles()
+
+        // ── Mode switch ───────────────────────────────────────────────────
+        fun switchMode(m: CombinedView.Mode) {
+            if (m != CombinedView.Mode.SELECT && !hasSelection) return
+            currentMode = m; combinedView.setMode(m); updateStyles()
+        }
+        hSelTab.setOnClickListener   { switchMode(CombinedView.Mode.SELECT) }
+        hBrushTab.setOnClickListener { switchMode(CombinedView.Mode.BRUSH)  }
+        hMosaicTab.setOnClickListener{ switchMode(CombinedView.Mode.MOSAIC) }
+
+        combinedView.onSelectionChanged = { sel ->
+            hasSelection = sel
+            if (!sel && currentMode != CombinedView.Mode.SELECT) switchMode(CombinedView.Mode.SELECT)
+            else updateStyles()
+        }
+
+        // ── h-panel center row ────────────────────────────────────────────
+        val undoBtn = TextView(context).apply {
+            text = "↩"; textSize = 33f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            setPadding((12*dp).toInt(), (10*dp).toInt(), (12*dp).toInt(), (10*dp).toInt())
+            setOnClickListener { combinedView.undo() }
+        }
+        val redoBtn = TextView(context).apply {
+            text = "↪"; textSize = 33f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            setPadding((12*dp).toInt(), (10*dp).toInt(), (12*dp).toInt(), (10*dp).toInt())
+            setOnClickListener { combinedView.redo() }
+        }
+
+        fun updateUndoRedoState() {
+            val canUndo = combinedView.canUndo()
+            val canRedo = combinedView.canRedo()
+            undoBtn.alpha = if (canUndo) 1f else 0.35f
+            undoBtn.isClickable = canUndo
+            redoBtn.alpha = if (canRedo) 1f else 0.35f
+            redoBtn.isClickable = canRedo
+        }
+        updateUndoRedoState()
+        combinedView.onStackChanged = { updateUndoRedoState() }
+
+        hCenterRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            visibility = View.INVISIBLE
+            addView(undoBtn)
+            addView(TextView(context).apply {
+                text = "Reset"; textSize = 17f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                setPadding((6*dp).toInt(), 0, (6*dp).toInt(), 0)
+                setOnClickListener { combinedView.resetAnnotations() }
+            })
+            addView(redoBtn)
+        }
+
+        // ── Horizontal panel ──────────────────────────────────────────────
+        val hPanelBg = GradientDrawable().apply {
+            setColor(Color.argb(230, 18, 18, 20))
+            cornerRadii = floatArrayOf(20*dp, 20*dp, 20*dp, 20*dp, 0f, 0f, 0f, 0f)
+        }
+        val hPanel = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL; background = hPanelBg
             addView(colorPillWrapper, LinearLayout.LayoutParams(mp, wc))
-            addView(toolTabRow,       LinearLayout.LayoutParams(mp, wc))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+                setPadding(0, (10*dp).toInt(), 0, (2*dp).toInt())
+                addView(hSelTab); addView(hBrushTab); addView(hMosaicTab)
+            }, LinearLayout.LayoutParams(mp, wc))
             addView(View(context).apply { setBackgroundColor(Color.argb(35, 255, 255, 255)) },
                 LinearLayout.LayoutParams(mp, 1))
-            addView(actionRow,        LinearLayout.LayoutParams(mp, wc))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding((24*dp).toInt(), (8*dp).toInt(), (24*dp).toInt(), (24*dp).toInt())
+                addView(makeCancel().apply { layoutParams = LinearLayout.LayoutParams(circleSize, circleSize) })
+                addView(hCenterRow!!, LinearLayout.LayoutParams(0, wc, 1f))
+                addView(makeSave().apply { layoutParams = LinearLayout.LayoutParams(circleSize, circleSize) })
+            }, LinearLayout.LayoutParams(mp, wc))
         }
 
-        return object : FrameLayout(context) {
+        // ── Root ──────────────────────────────────────────────────────────
+        val hPanelLp = FrameLayout.LayoutParams(mp, wc, Gravity.BOTTOM)
+        val root = object : FrameLayout(context) {
             init {
-                addView(combinedView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-                addView(panel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                    gravity = Gravity.BOTTOM
-                })
+                addView(combinedView, LayoutParams(mp, mp))
+                addView(hPanel, hPanelLp)
             }
         }
+
+        // ── Panel repositioning ───────────────────────────────────────────
+        var currentPos = PanelPos.BOTTOM
+        val topInset = wm.currentWindowMetrics.windowInsets
+            .getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.statusBars() or
+                android.view.WindowInsets.Type.displayCutout()
+            ).top
+
+        fun applyPos(pos: PanelPos) {
+            if (pos == currentPos) return
+            currentPos = pos
+            when (pos) {
+                PanelPos.BOTTOM -> {
+                    root.updateViewLayout(hPanel, hPanelLp.also { it.gravity = Gravity.BOTTOM })
+                    hPanelBg.cornerRadii = floatArrayOf(20*dp, 20*dp, 20*dp, 20*dp, 0f, 0f, 0f, 0f)
+                    hPanel.setPadding(0, 0, 0, 0)
+                    // color pill above tool row
+                    hPanel.removeView(colorPillWrapper)
+                    hPanel.addView(colorPillWrapper, 0)
+                }
+                PanelPos.TOP -> {
+                    root.updateViewLayout(hPanel, hPanelLp.also { it.gravity = Gravity.TOP })
+                    hPanelBg.cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, 20*dp, 20*dp, 20*dp, 20*dp)
+                    hPanel.setPadding(0, topInset, 0, 0)
+                    // color pill below tool row (expands downward, away from screen edge)
+                    hPanel.removeView(colorPillWrapper)
+                    hPanel.addView(colorPillWrapper, 1)
+                }
+            }
+        }
+
+        fun reposition(selRect: RectF?) {
+            if (!hasSelection || selRect == null) { applyPos(PanelPos.BOTTOM); return }
+            val screenH = root.height.toFloat().takeIf { it > 0 }
+                ?: wm.currentWindowMetrics.bounds.height().toFloat()
+            val panelH  = hPanel.height.toFloat().takeIf { it > 0 } ?: (130 * dp)
+            val margin  = 32 * dp
+            val pos = if (selRect.bottom < screenH - panelH - margin) PanelPos.BOTTOM else PanelPos.TOP
+            applyPos(pos)
+        }
+
+        combinedView.onSelectionUpdated = { rect -> reposition(rect) }
+
+        return root
     }
 
     // ---- Theme ----
@@ -533,6 +505,11 @@ internal object PartialScreenshotOverlay {
         private var brushColor = Color.RED
 
         var onSelectionChanged: ((Boolean) -> Unit)? = null
+        var onSelectionUpdated: ((RectF?) -> Unit)? = null
+        var onStackChanged: (() -> Unit)? = null
+
+        fun canUndo() = undoStack.isNotEmpty()
+        fun canRedo() = redoStack.isNotEmpty()
 
         private val originalBitmap: Bitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, false)
         private val editBitmap: Bitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
@@ -546,7 +523,6 @@ internal object PartialScreenshotOverlay {
         private val redoStack = ArrayDeque<Bitmap>()
         private val MAX_UNDO = 5
 
-        // SELECT state
         private enum class TouchMode { NONE, DRAW, MOVE }
         private var touchMode = TouchMode.NONE
         private var startX = 0f; private var startY = 0f
@@ -559,7 +535,6 @@ internal object PartialScreenshotOverlay {
         private var moveBaseStartX = 0f; private var moveBaseStartY = 0f
         private var moveBaseEndX   = 0f; private var moveBaseEndY   = 0f
 
-        // BRUSH state
         private var currentPath: Path? = null
         private var lastBitmapX = 0f; private var lastBitmapY = 0f
 
@@ -604,10 +579,7 @@ internal object PartialScreenshotOverlay {
             redoStack.clear()
         }
 
-        private fun pushUndo() {
-            pushToUndo()
-            clearRedo()
-        }
+        private fun pushUndo() { pushToUndo(); clearRedo(); onStackChanged?.invoke() }
 
         fun undo() {
             if (undoStack.isEmpty()) return
@@ -618,6 +590,7 @@ internal object PartialScreenshotOverlay {
                 Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) })
             if (!prev.isRecycled) prev.recycle()
             invalidate()
+            onStackChanged?.invoke()
         }
 
         fun redo() {
@@ -628,6 +601,7 @@ internal object PartialScreenshotOverlay {
                 Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) })
             if (!next.isRecycled) next.recycle()
             invalidate()
+            onStackChanged?.invoke()
         }
 
         fun resetAnnotations() {
@@ -637,22 +611,21 @@ internal object PartialScreenshotOverlay {
             editCanvas.drawBitmap(originalBitmap, 0f, 0f,
                 Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC) })
             invalidate()
+            onStackChanged?.invoke()
         }
 
         fun release() {
             if (!editBitmap.isRecycled) editBitmap.recycle()
             if (!originalBitmap.isRecycled) originalBitmap.recycle()
             undoStack.forEach { if (!it.isRecycled) it.recycle() }
-            undoStack.clear()
-            clearRedo()
+            undoStack.clear(); clearRedo()
         }
 
-        // Crop to selection if present, else return full annotated bitmap.
         fun getFinalBitmap(): Bitmap {
             commitBrushPath()
             val sel = selectionBitmapRect() ?: return editBitmap.copy(Bitmap.Config.ARGB_8888, false)
-            val w = (sel.width().toInt()).coerceAtLeast(1)
-            val h = (sel.height().toInt()).coerceAtLeast(1)
+            val w = sel.width().toInt().coerceAtLeast(1)
+            val h = sel.height().toInt().coerceAtLeast(1)
             return Bitmap.createBitmap(editBitmap, sel.left.toInt(), sel.top.toInt(), w, h)
         }
 
@@ -661,7 +634,6 @@ internal object PartialScreenshotOverlay {
             maxOf(startX, endX), maxOf(startY, endY)
         )
 
-        // Selection rect mapped into bitmap pixel coordinates
         private fun selectionBitmapRect(): RectF? {
             if (!hasSelection) return null
             val vr = normalizedRect()
@@ -733,6 +705,7 @@ internal object PartialScreenshotOverlay {
                     }
                     touchMode = TouchMode.NONE
                     invalidate()
+                    onSelectionUpdated?.invoke(if (hasSelection) RectF(normalizedRect()) else null)
                 }
             }
         }
@@ -819,8 +792,7 @@ internal object PartialScreenshotOverlay {
                 canvas.save()
                 if (hasSelection) canvas.clipRect(normalizedRect())
                 canvas.drawPath(previewPath, Paint(brushPaint).apply {
-                    color = brushColor
-                    strokeWidth = brushStrokeWidthBitmap * displayScale
+                    color = brushColor; strokeWidth = brushStrokeWidthBitmap * displayScale
                 })
                 canvas.restore()
             }
