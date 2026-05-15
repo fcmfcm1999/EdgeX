@@ -11,7 +11,10 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.view.*
 import android.widget.*
+import androidx.core.graphics.toColorInt
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import java.lang.ref.WeakReference
@@ -70,6 +73,7 @@ internal object PartialScreenshotOverlay {
 
     private fun buildRoot(context: Context, bitmap: Bitmap, wm: WindowManager): FrameLayout {
         val dp = context.resources.displayMetrics.density
+        val accentColor = readAccentColor(context)
         val combinedView = CombinedView(context, bitmap)
 
         val brushColors = listOf(
@@ -169,6 +173,8 @@ internal object PartialScreenshotOverlay {
         val brushTab  = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_brush))
         val mosaicTab = makeTab(ModuleRes.getString(R.string.partial_screenshot_tool_mosaic))
 
+        var centerRow: LinearLayout? = null
+
         fun updateStyles() {
             selectTab.setTextColor(
                 if (currentMode == CombinedView.Mode.SELECT) Color.WHITE
@@ -186,6 +192,8 @@ internal object PartialScreenshotOverlay {
             })
             colorPillWrapper.visibility =
                 if (hasSelection && currentMode == CombinedView.Mode.BRUSH) View.VISIBLE else View.GONE
+            val annotating = currentMode == CombinedView.Mode.BRUSH || currentMode == CombinedView.Mode.MOSAIC
+            centerRow?.visibility = if (annotating) View.VISIBLE else View.INVISIBLE
         }
         updateStyles()
 
@@ -246,9 +254,9 @@ internal object PartialScreenshotOverlay {
             addView(mosaicTab)
         }
 
-        // ── Action row: [X circle] | [↩ Reset ↪] | [✓ cyan circle] ──────
+        // ── Action row: [X circle] | [↩ Reset ↪] | [✓ circle] ──────────
         val cancelSize = (52 * dp).toInt()
-        val saveSize   = (60 * dp).toInt()
+        val saveSize   = cancelSize
 
         val cancelCircle = FrameLayout(context).apply {
             background = GradientDrawable().apply {
@@ -267,28 +275,29 @@ internal object PartialScreenshotOverlay {
 
         val undoBtn = TextView(context).apply {
             text = "↩"
-            textSize = 20f
+            textSize = 23f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            setPadding((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt())
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
         }
         val resetLabel = TextView(context).apply {
             text = "Reset"
-            textSize = 14f
+            textSize = 17f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             setPadding((6 * dp).toInt(), 0, (6 * dp).toInt(), 0)
         }
         val redoBtn = TextView(context).apply {
             text = "↪"
-            textSize = 20f
+            textSize = 23f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            setPadding((10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt(), (10 * dp).toInt())
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
         }
-        val centerRow = LinearLayout(context).apply {
+        centerRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            visibility = View.INVISIBLE
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             addView(undoBtn)
             addView(resetLabel)
@@ -298,14 +307,26 @@ internal object PartialScreenshotOverlay {
         val saveCircle = FrameLayout(context).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#80DEEA"))
+                setColor(accentColor)
             }
             layoutParams = LinearLayout.LayoutParams(saveSize, saveSize)
-            addView(TextView(context).apply {
-                text = "✓"
-                textSize = 24f
-                gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
+            addView(object : View(context) {
+                private val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    style = Paint.Style.STROKE
+                    strokeWidth = 2.5f * dp
+                    strokeCap = Paint.Cap.ROUND
+                    strokeJoin = Paint.Join.ROUND
+                }
+                override fun onDraw(canvas: Canvas) {
+                    val w = width.toFloat(); val h = height.toFloat()
+                    val path = Path()
+                    path.moveTo(w * 0.28f, h * 0.52f)
+                    path.lineTo(w * 0.44f, h * 0.67f)
+                    path.lineTo(w * 0.72f, h * 0.36f)
+                    canvas.drawPath(path, p)
+                }
+            }.apply {
                 layoutParams = FrameLayout.LayoutParams(saveSize, saveSize)
             })
         }
@@ -332,7 +353,7 @@ internal object PartialScreenshotOverlay {
             gravity = Gravity.CENTER_VERTICAL
             setPadding((24 * dp).toInt(), (8 * dp).toInt(), (24 * dp).toInt(), (24 * dp).toInt())
             addView(cancelCircle)
-            addView(centerRow)
+            addView(centerRow!!)
             addView(saveCircle)
         }
 
@@ -344,8 +365,8 @@ internal object PartialScreenshotOverlay {
             }
             val mp = ViewGroup.LayoutParams.MATCH_PARENT
             val wc = ViewGroup.LayoutParams.WRAP_CONTENT
-            addView(toolTabRow,       LinearLayout.LayoutParams(mp, wc))
             addView(colorPillWrapper, LinearLayout.LayoutParams(mp, wc))
+            addView(toolTabRow,       LinearLayout.LayoutParams(mp, wc))
             addView(View(context).apply { setBackgroundColor(Color.argb(35, 255, 255, 255)) },
                 LinearLayout.LayoutParams(mp, 1))
             addView(actionRow,        LinearLayout.LayoutParams(mp, wc))
@@ -358,6 +379,23 @@ internal object PartialScreenshotOverlay {
                     gravity = Gravity.BOTTOM
                 })
             }
+        }
+    }
+
+    // ---- Theme ----
+
+    private fun readAccentColor(context: Context): Int {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        val presetId = snapshot[AppConfig.THEME_PRESET] ?: ""
+        return when (presetId) {
+            "custom" -> runCatching {
+                (snapshot[AppConfig.THEME_CUSTOM_COLOR] ?: "").toColorInt()
+            }.getOrElse { "#326D32".toColorInt() }
+            "classic" -> "#00796B".toColorInt()
+            "cedar"   -> "#496B3D".toColorInt()
+            "ocean"   -> "#2F6F8F".toColorInt()
+            "ember"   -> "#C56B2A".toColorInt()
+            else      -> "#326D32".toColorInt()
         }
     }
 
