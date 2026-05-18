@@ -21,6 +21,7 @@ object PremiumActivator {
     private const val KEY_INSTALLED = "installed"
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
     private const val KEY_INSTALL_BOOT_COUNT = "install_boot_count"
+    private const val KEY_INSTALLED_DEX_HASH = "installed_dex_hash"
     private const val KEY_DEACTIVATED = "deactivated"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
@@ -37,6 +38,7 @@ object PremiumActivator {
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
             .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
+            .putString(KEY_INSTALLED_DEX_HASH, activation.dexHash)
             .putBoolean(KEY_DEACTIVATED, false)
             .apply()
     }
@@ -78,18 +80,19 @@ object PremiumActivator {
         if (code.isEmpty()) return@runCatching UpdateResult.SkippedMissingActivationCode
 
         val activation = requestActivation(context, code)
-        val installedHash = installedDexHash()
+        // Use the hash saved in prefs — reading the META file from /data/system/ is
+        // blocked by SELinux for normal app processes and always returns null.
+        val installedHash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)
         if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
             return@runCatching UpdateResult.UpToDate
         }
 
         downloadAndInstall(context, activation)
-        // Do NOT update KEY_INSTALL_BOOT_COUNT here: the old DEX is still loaded in
-        // system_server and premium is working. Resetting boot count to the current
-        // value would flip status() back to RebootRequired for the rest of this session.
         prefs.edit()
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
+            .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
+            .putString(KEY_INSTALLED_DEX_HASH, activation.dexHash)
             .apply()
         UpdateResult.Updated
     }
