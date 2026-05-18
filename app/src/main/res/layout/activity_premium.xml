@@ -115,19 +115,15 @@
                     android:text="@string/premium_activate"
                     android:textSize="15sp" />
 
-                <!-- Unbind text action (subtle, only when activated) -->
-                <TextView
+                <!-- Unbind button (full-width, red, only when activated) -->
+                <Button
                     android:id="@+id/btn_deactivate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:padding="8dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="24dp"
+                    android:backgroundTint="#F44336"
                     android:text="@string/premium_deactivate"
-                    android:textColor="@color/ui_text_secondary"
-                    android:textSize="13sp"
+                    android:textSize="15sp"
                     android:visibility="gone" />
 
             </LinearLayout>

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
@@ -93,8 +94,8 @@ class PremiumActivity : AppCompatActivity() {
         }
 
         val activated = status != PremiumActivator.Status.NotActivated
-        val btnActivate = findViewById<View>(R.id.btn_activate)
-        val btnDeactivate = findViewById<View>(R.id.btn_deactivate)
+        val btnActivate = findViewById<Button>(R.id.btn_activate)
+        val btnDeactivate = findViewById<Button>(R.id.btn_deactivate)
 
         btnActivate.visibility = if (activated) View.GONE else View.VISIBLE
         btnDeactivate.visibility = if (activated) View.VISIBLE else View.GONE
@@ -117,9 +118,9 @@ class PremiumActivity : AppCompatActivity() {
     }
 
     private fun performDeactivate() {
-        val btnDeactivate = findViewById<View>(R.id.btn_deactivate)
+        val btnDeactivate = findViewById<Button>(R.id.btn_deactivate)
         btnDeactivate.isEnabled = false
-        (btnDeactivate as TextView).text = getString(R.string.premium_deactivating)
+        btnDeactivate.text = getString(R.string.premium_deactivating)
 
         thread(name = "EdgeXPremiumDeactivate") {
             val result = PremiumActivator.deactivate(applicationContext)

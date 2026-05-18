@@ -50,7 +50,7 @@
     <string name="premium_deactivate_confirm_title">Unbind Premium?</string>
     <string name="premium_deactivate_confirm_message">Your activation will be removed from this device. You can re-activate later with the same code.</string>
     <string name="premium_deactivate_success">Premium deactivated</string>
-    <string name="premium_deactivating">Unbinding…</string>
+    <string name="premium_deactivating">Deactivating…</string>
     <string name="premium_activation_title">Activate Premium</string>
     <string name="premium_activation_message">Enter the activation code from your donation email.</string>
     <string name="premium_activation_hint">Activation code</string>
