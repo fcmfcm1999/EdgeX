@@ -65,7 +65,7 @@ object PremiumActivator {
             .putBoolean(KEY_DEACTIVATED, true)
             .apply()
 
-        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}").exec()
+        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}").exec()
     }
 
     fun getActivationCode(context: Context): String? =
@@ -203,14 +203,16 @@ object PremiumActivator {
             mkdir -p ${PremiumInstall.DIR_PATH}
             cp ${shellQuote(tempDex.absolutePath)} ${PremiumInstall.DEX_PATH}.tmp
             cp ${shellQuote(tempMeta.absolutePath)} ${PremiumInstall.META_PATH}.tmp
+            printf '%s' ${shellQuote(deviceId)} > ${PremiumInstall.DEVICE_ID_PATH}.tmp
             chown system:system ${PremiumInstall.DIR_PATH}
-            chown system:system ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp
+            chown system:system ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}.tmp
             chmod 0755 ${PremiumInstall.DIR_PATH}
-            chmod 0444 ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp
+            chmod 0444 ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}.tmp
             mv -f ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.DEX_PATH}
             mv -f ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.META_PATH}
-            chown system:system ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
-            chmod 0444 ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
+            mv -f ${PremiumInstall.DEVICE_ID_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}
+            chown system:system ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}
+            chmod 0444 ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}
         """.trimIndent()
         val result = Shell.cmd("sh -c ${shellQuote(installScript)}").exec()
 

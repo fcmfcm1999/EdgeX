@@ -1,7 +1,6 @@
 package com.fan.edgex.hook
 
 import android.content.Context
-import android.provider.Settings
 import android.util.Base64
 import com.fan.edgex.premium.IPremiumPlugin
 import com.fan.edgex.premium.PremiumInstall
@@ -58,6 +57,7 @@ object PremiumPluginLoader {
      * Stage 2: verify device binding via Ed25519 signature. Called once a Context is available
      * (InputManagerService.start()). Promotes pendingPlugin to plugin on success.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun verifyDeviceBinding(context: Context) {
         val pending = pendingPlugin ?: return
 
@@ -74,9 +74,10 @@ object PremiumPluginLoader {
                 ?: error("missing device_sig in meta — re-activate to apply device binding")
             val sigBytes = Base64.decode(sigBase64, Base64.NO_WRAP)
 
-            val currentDeviceId = Settings.Secure.getString(
-                context.contentResolver, Settings.Secure.ANDROID_ID,
-            ) ?: ""
+            val currentDeviceId = File(PremiumInstall.DEVICE_ID_PATH)
+                .takeIf { it.isFile && it.canRead() }
+                ?.readText()?.trim()
+                ?: error("device_id file missing — re-activate to register this device")
             require(metaDeviceId == currentDeviceId) { "device_id mismatch" }
 
             require(pending.verifyInstallation(dex.absolutePath, metaDeviceId, sigBytes)) {
