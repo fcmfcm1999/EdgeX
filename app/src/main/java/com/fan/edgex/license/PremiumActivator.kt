@@ -65,7 +65,7 @@ object PremiumActivator {
             .putBoolean(KEY_DEACTIVATED, true)
             .apply()
 
-        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}").submit()
+        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}").exec()
     }
 
     fun getActivationCode(context: Context): String? =
