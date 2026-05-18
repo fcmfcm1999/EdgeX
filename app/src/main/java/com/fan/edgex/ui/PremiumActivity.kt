@@ -99,6 +99,8 @@ class PremiumActivity : AppCompatActivity() {
 
         btnActivate.visibility = if (activated) View.GONE else View.VISIBLE
         btnDeactivate.visibility = if (activated) View.VISIBLE else View.GONE
+        btnDeactivate.setText(R.string.premium_deactivate)
+        btnDeactivate.isEnabled = true
 
         btnActivate.setOnClickListener {
             ActivationDialog.show(this) { refreshStatus() }
