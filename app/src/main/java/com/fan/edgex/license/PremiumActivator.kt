@@ -20,6 +20,7 @@ object PremiumActivator {
     private const val KEY_ACTIVATION_CODE = "activation_code"
     private const val KEY_INSTALLED = "installed"
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
+    private const val KEY_INSTALL_BOOT_COUNT = "install_boot_count"
     private const val KEY_DEACTIVATED = "deactivated"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
@@ -35,6 +36,7 @@ object PremiumActivator {
             .putString(KEY_ACTIVATION_CODE, normalizedCode)
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
+            .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
             .putBoolean(KEY_DEACTIVATED, false)
             .apply()
     }
@@ -85,6 +87,7 @@ object PremiumActivator {
         prefs.edit()
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
+            .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
             .apply()
         UpdateResult.Updated
     }
@@ -104,12 +107,15 @@ object PremiumActivator {
         val installedAtMs = prefs.getLong(KEY_INSTALLED_AT_MS, 0L)
         if (installedAtMs <= 0L) return Status.Installed
 
-        val bootWallClockMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
-        return if (installedAtMs > bootWallClockMs) {
-            Status.RebootRequired
-        } else {
-            Status.Installed
+        // Primary: boot count is reliable and unaffected by NTP/clock sync issues.
+        val savedBootCount = prefs.getInt(KEY_INSTALL_BOOT_COUNT, -1)
+        if (savedBootCount >= 0) {
+            return if (bootCount(context) > savedBootCount) Status.Installed else Status.RebootRequired
         }
+
+        // Fallback for installs that predate boot-count tracking.
+        val bootWallClockMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
+        return if (installedAtMs > bootWallClockMs) Status.RebootRequired else Status.Installed
     }
 
     enum class Status {
@@ -211,6 +217,9 @@ object PremiumActivator {
                 ?.takeIf { it.isNotEmpty() }
         }.getOrNull()
     }
+
+    private fun bootCount(context: Context): Int =
+        Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, 0)
 
     private fun deviceId(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
