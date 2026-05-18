@@ -42,7 +42,10 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
-            "android" -> hookInputManager(lpparam)
+            "android" -> {
+                PremiumPluginLoader.tryLoad()
+                hookInputManager(lpparam)
+            }
         }
     }
 

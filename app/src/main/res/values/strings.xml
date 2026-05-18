@@ -31,6 +31,17 @@
     <string name="haptic_feedback_type_heavy_click">Heavy click</string>
     <string name="haptic_feedback_type_double_click">Double click</string>
     <string name="menu_restart_sysui">Restart SystemUI</string>
+    <string name="menu_premium">Premium</string>
+    <string name="menu_premium_not_activated">Not activated</string>
+    <string name="menu_premium_reboot_required">Installed - reboot to take effect</string>
+    <string name="menu_premium_installed">Installed</string>
+    <string name="premium_activation_title">Activate Premium</string>
+    <string name="premium_activation_message">Enter the activation code from your donation email.</string>
+    <string name="premium_activation_hint">Activation code</string>
+    <string name="premium_activate">Activate</string>
+    <string name="premium_activation_in_progress">Activating…</string>
+    <string name="premium_activation_success">Premium installed. Reboot your phone to enable it.</string>
+    <string name="premium_activation_failed">Activation failed: %s</string>
     <string name="menu_about">About</string>
     <string name="label_author">Author</string>
     <string name="label_project_url">Project URL</string>

@@ -29,6 +29,17 @@
     <string name="haptic_feedback_type_heavy_click">重按</string>
     <string name="haptic_feedback_type_double_click">双击</string>
     <string name="menu_restart_sysui">重启 SystemUI</string>
+    <string name="menu_premium">Premium 功能</string>
+    <string name="menu_premium_not_activated">未激活</string>
+    <string name="menu_premium_reboot_required">已安装，重启后生效</string>
+    <string name="menu_premium_installed">已安装</string>
+    <string name="premium_activation_title">激活 Premium</string>
+    <string name="premium_activation_message">请输入捐赠邮件中的激活码。</string>
+    <string name="premium_activation_hint">激活码</string>
+    <string name="premium_activate">激活</string>
+    <string name="premium_activation_in_progress">正在激活…</string>
+    <string name="premium_activation_success">Premium 已安装，重启手机后生效。</string>
+    <string name="premium_activation_failed">激活失败：%s</string>
     <string name="menu_about">关于</string>
     <string name="label_author">作者</string>
     <string name="label_project_url">项目地址</string>

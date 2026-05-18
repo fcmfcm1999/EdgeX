@@ -26,3 +26,7 @@ todo.md
 AGENTS.md
 scripts
 .claude
+/cloudflare-worker/
+/premium-api/
+/premium/
+/tools/*

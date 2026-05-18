@@ -366,6 +366,55 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
+            <!-- Item: Premium -->
+            <LinearLayout
+                android:id="@+id/item_premium"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="16dp">
+
+                <FrameLayout
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:tag="theme_icon_bg"
+                    android:background="@drawable/circle_background_teal">
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_donate"
+                        app:tint="@color/ui_icon_tint" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/menu_premium"
+                        android:textColor="@color/ui_text_primary"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/text_premium_desc"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/menu_premium_not_activated"
+                        android:textColor="@color/ui_text_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- Item 3: Advanced Options (Collapsible) -->
             <LinearLayout
                 android:id="@+id/item_advanced"

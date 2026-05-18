@@ -14,6 +14,7 @@ import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.utils.UpdateChecker
 
 class MainActivity : AppCompatActivity() {
@@ -74,6 +75,13 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.item_multi_actions).setOnClickListener {
             startActivity(android.content.Intent(this, MultiActionsListActivity::class.java))
         }
+
+        findViewById<View>(R.id.item_premium).setOnClickListener {
+            com.fan.edgex.utils.ActivationDialog.show(this) {
+                refreshPremiumStatus()
+            }
+        }
+        refreshPremiumStatus()
 
         findViewById<View>(R.id.item_custom_panel).setOnClickListener {
             startActivity(android.content.Intent(this, PanelConfigActivity::class.java)
@@ -182,6 +190,16 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         ThemeManager.applyToActivity(this)
         refreshHapticFeedbackType()
+        refreshPremiumStatus()
+    }
+
+    private fun refreshPremiumStatus() {
+        val statusRes = when (PremiumActivator.status(this)) {
+            PremiumActivator.Status.NotActivated -> R.string.menu_premium_not_activated
+            PremiumActivator.Status.RebootRequired -> R.string.menu_premium_reboot_required
+            PremiumActivator.Status.Installed -> R.string.menu_premium_installed
+        }
+        findViewById<TextView>(R.id.text_premium_desc).text = getString(statusRes)
     }
 
     private fun showHapticFeedbackTypeDialog() {

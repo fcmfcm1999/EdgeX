@@ -28,6 +28,11 @@ android {
         targetSdk = Configs.targetSdk
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: Configs.versionCode
         versionName = System.getenv("VERSION_NAME") ?: Configs.versionName
+        buildConfigField(
+            "String",
+            "PREMIUM_WORKER_URL",
+            "\"${localProperties.getProperty("PREMIUM_WORKER_URL") ?: System.getenv("PREMIUM_WORKER_URL") ?: ""}\""
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
