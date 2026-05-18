@@ -39,7 +39,19 @@ object PremiumActivator {
             .apply()
     }
 
-    fun deactivate(context: Context) {
+    fun deactivate(context: Context): Result<Unit> = runCatching {
+        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
+        val code = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_ACTIVATION_CODE, null)
+
+        if (workerUrl.isNotEmpty() && !code.isNullOrEmpty()) {
+            val body = JSONObject()
+                .put("code", code)
+                .put("device_id", deviceId(context))
+                .toString()
+            postJson("$workerUrl/deactivate", body)
+        }
+
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_ACTIVATION_CODE)
@@ -47,6 +59,7 @@ object PremiumActivator {
             .remove(KEY_INSTALLED_AT_MS)
             .putBoolean(KEY_DEACTIVATED, true)
             .apply()
+
         Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}").submit()
     }
 

@@ -41,11 +41,16 @@
     <string name="menu_premium_installed">Installed</string>
     <string name="header_premium">Premium</string>
     <string name="premium_section_features">Premium Features</string>
+    <string name="premium_status_active">Premium Active</string>
+    <string name="premium_status_reboot">Reboot Required</string>
+    <string name="premium_desc_not_activated">Support the project to get an activation code</string>
+    <string name="premium_desc_reboot">Reboot your device to enable Premium</string>
     <string name="premium_code_label">Code: %s</string>
     <string name="premium_deactivate">Unbind</string>
     <string name="premium_deactivate_confirm_title">Unbind Premium?</string>
     <string name="premium_deactivate_confirm_message">Your activation will be removed from this device. You can re-activate later with the same code.</string>
     <string name="premium_deactivate_success">Premium deactivated</string>
+    <string name="premium_deactivating">Unbinding…</string>
     <string name="premium_activation_title">Activate Premium</string>
     <string name="premium_activation_message">Enter the activation code from your donation email.</string>
     <string name="premium_activation_hint">Activation code</string>

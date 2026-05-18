@@ -1,9 +1,11 @@
 package com.fan.edgex.ui
 
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -11,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.utils.ActivationDialog
+import kotlin.concurrent.thread
 
 class PremiumActivity : AppCompatActivity() {
 
@@ -36,39 +39,69 @@ class PremiumActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val status = PremiumActivator.status(this)
-        val activated = status != PremiumActivator.Status.NotActivated
 
-        val statusRes = when (status) {
-            PremiumActivator.Status.NotActivated -> R.string.menu_premium_not_activated
-            PremiumActivator.Status.RebootRequired -> R.string.menu_premium_reboot_required
-            PremiumActivator.Status.Installed -> R.string.menu_premium_installed
+        data class StateVisuals(
+            val iconRes: Int,
+            val iconColorArgb: Int,
+            val titleRes: Int,
+            val descText: String?,
+        )
+
+        val visuals = when (status) {
+            PremiumActivator.Status.NotActivated -> StateVisuals(
+                iconRes = R.drawable.ic_info,
+                iconColorArgb = 0xFFBDBDBD.toInt(),
+                titleRes = R.string.menu_premium_not_activated,
+                descText = getString(R.string.premium_desc_not_activated),
+            )
+            PremiumActivator.Status.RebootRequired -> StateVisuals(
+                iconRes = R.drawable.ic_restart_alt,
+                iconColorArgb = 0xFFFF9800.toInt(),
+                titleRes = R.string.premium_status_reboot,
+                descText = buildString {
+                    append(getString(R.string.premium_desc_reboot))
+                    PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
+                        append("\n")
+                        append(getString(R.string.premium_code_label, maskCode(it)))
+                    }
+                },
+            )
+            PremiumActivator.Status.Installed -> StateVisuals(
+                iconRes = R.drawable.ic_donate,
+                iconColorArgb = getColor(R.color.ui_icon_bg),
+                titleRes = R.string.premium_status_active,
+                descText = PremiumActivator.getActivationCode(this)?.let {
+                    getString(R.string.premium_code_label, maskCode(it))
+                },
+            )
         }
-        findViewById<TextView>(R.id.text_status).text = getString(statusRes)
+
+        val iconBg = findViewById<FrameLayout>(R.id.icon_status_bg)
+        iconBg.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(visuals.iconColorArgb)
+        }
+        findViewById<ImageView>(R.id.icon_status).setImageResource(visuals.iconRes)
+        findViewById<TextView>(R.id.text_status).setText(visuals.titleRes)
 
         val codeView = findViewById<TextView>(R.id.text_activation_code)
-        val code = PremiumActivator.getActivationCode(this)
-        if (activated && code != null) {
+        if (!visuals.descText.isNullOrEmpty()) {
             codeView.visibility = View.VISIBLE
-            codeView.text = getString(R.string.premium_code_label, maskCode(code))
+            codeView.text = visuals.descText
         } else {
             codeView.visibility = View.GONE
         }
 
-        val btnActivate = findViewById<Button>(R.id.btn_activate)
-        val btnDeactivate = findViewById<Button>(R.id.btn_deactivate)
+        val activated = status != PremiumActivator.Status.NotActivated
+        val btnActivate = findViewById<View>(R.id.btn_activate)
+        val btnDeactivate = findViewById<View>(R.id.btn_deactivate)
 
-        if (activated) {
-            btnActivate.visibility = View.GONE
-            btnDeactivate.visibility = View.VISIBLE
-        } else {
-            btnActivate.visibility = View.VISIBLE
-            btnDeactivate.visibility = View.GONE
-        }
+        btnActivate.visibility = if (activated) View.GONE else View.VISIBLE
+        btnDeactivate.visibility = if (activated) View.VISIBLE else View.GONE
 
         btnActivate.setOnClickListener {
             ActivationDialog.show(this) { refreshStatus() }
         }
-
         btnDeactivate.setOnClickListener {
             showDeactivateConfirmDialog()
         }
@@ -78,13 +111,32 @@ class PremiumActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.premium_deactivate_confirm_title)
             .setMessage(R.string.premium_deactivate_confirm_message)
-            .setPositiveButton(R.string.premium_deactivate) { _, _ ->
-                PremiumActivator.deactivate(this)
-                Toast.makeText(this, R.string.premium_deactivate_success, Toast.LENGTH_SHORT).show()
-                refreshStatus()
-            }
+            .setPositiveButton(R.string.premium_deactivate) { _, _ -> performDeactivate() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun performDeactivate() {
+        val btnDeactivate = findViewById<View>(R.id.btn_deactivate)
+        btnDeactivate.isEnabled = false
+        (btnDeactivate as TextView).text = getString(R.string.premium_deactivating)
+
+        thread(name = "EdgeXPremiumDeactivate") {
+            val result = PremiumActivator.deactivate(applicationContext)
+            runOnUiThread {
+                btnDeactivate.isEnabled = true
+                result.onSuccess {
+                    Toast.makeText(this, R.string.premium_deactivate_success, Toast.LENGTH_SHORT).show()
+                }.onFailure {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.premium_activation_failed, it.message ?: it.javaClass.simpleName),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                refreshStatus()
+            }
+        }
     }
 
     private fun maskCode(code: String): String {

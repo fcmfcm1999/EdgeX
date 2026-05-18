@@ -71,10 +71,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, PieSettingsActivity::class.java))
         }
 
-        findViewById<View>(R.id.item_edge_lighting).setOnClickListener {
-            startActivity(android.content.Intent(this, EdgeLightingSettingsActivity::class.java))
-        }
-
         findViewById<View>(R.id.item_theme).setOnClickListener {
             startActivity(android.content.Intent(this, ThemeActivity::class.java))
         }

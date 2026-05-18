@@ -6,6 +6,7 @@
     android:background="@color/ui_background"
     android:orientation="vertical">
 
+    <!-- Header -->
     <LinearLayout
         android:id="@+id/header_container"
         android:layout_width="match_parent"
@@ -39,6 +40,7 @@
             android:textSize="20sp" />
     </LinearLayout>
 
+    <!-- Scrollable content -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -49,25 +51,121 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="16dp"
-            android:paddingBottom="24dp">
+            android:paddingTop="24dp"
+            android:paddingBottom="32dp">
 
-            <!-- Activation Status Card -->
+            <!-- Status Hero Card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
                 android:background="@drawable/bg_card"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingTop="32dp"
+                android:paddingBottom="24dp">
 
-                <!-- Status Row -->
+                <!-- State Icon -->
+                <FrameLayout
+                    android:id="@+id/icon_status_bg"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp">
+
+                    <ImageView
+                        android:id="@+id/icon_status"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_info"
+                        app:tint="@color/ui_icon_tint" />
+                </FrameLayout>
+
+                <!-- Status Title -->
+                <TextView
+                    android:id="@+id/text_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="@string/menu_premium_not_activated"
+                    android:textColor="@color/ui_text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <!-- Description / Code -->
+                <TextView
+                    android:id="@+id/text_activation_code"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <!-- Activate Button (full-width, primary) -->
+                <Button
+                    android:id="@+id/btn_activate"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="24dp"
+                    android:text="@string/premium_activate"
+                    android:textSize="15sp" />
+
+                <!-- Unbind text action (subtle, only when activated) -->
+                <TextView
+                    android:id="@+id/btn_deactivate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="8dp"
+                    android:text="@string/premium_deactivate"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- Section Label: Premium Features -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="6dp"
+                android:letterSpacing="0.08"
+                android:text="@string/premium_section_features"
+                android:textAllCaps="true"
+                android:textColor="@color/ui_text_secondary"
+                android:textSize="11sp" />
+
+            <!-- Feature list card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical">
+
+                <!-- Feature: Edge Lighting -->
                 <LinearLayout
+                    android:id="@+id/item_edge_lighting"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:background="?android:attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:padding="16dp">
 
                     <FrameLayout
                         android:layout_width="40dp"
@@ -79,7 +177,7 @@
                             android:layout_width="24dp"
                             android:layout_height="24dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_donate"
+                            android:src="@drawable/ic_notifications"
                             app:tint="@color/ui_icon_tint" />
                     </FrameLayout>
 
@@ -91,119 +189,31 @@
                         android:orientation="vertical">
 
                         <TextView
-                            android:id="@+id/text_status"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/menu_premium_not_activated"
+                            android:text="@string/menu_edge_lighting"
                             android:textColor="@color/ui_text_primary"
                             android:textSize="16sp" />
 
                         <TextView
-                            android:id="@+id/text_activation_code"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:text="@string/menu_edge_lighting_desc"
                             android:textColor="@color/ui_text_secondary"
-                            android:textSize="12sp"
-                            android:visibility="gone" />
+                            android:textSize="12sp" />
                     </LinearLayout>
-                </LinearLayout>
-
-                <!-- Action Buttons -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="end"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_activate"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/premium_activate"
-                        style="?android:attr/borderlessButtonStyle"
-                        android:textColor="@color/ui_checkbox_tint" />
-
-                    <Button
-                        android:id="@+id/btn_deactivate"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/premium_deactivate"
-                        style="?android:attr/borderlessButtonStyle"
-                        android:textColor="@color/ui_text_secondary"
-                        android:visibility="gone" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Section Header: Premium Features -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="24dp"
-                android:layout_marginBottom="4dp"
-                android:text="@string/premium_section_features"
-                android:textColor="@color/ui_text_secondary"
-                android:textSize="12sp"
-                android:textAllCaps="true" />
-
-            <!-- Feature: Edge Lighting -->
-            <LinearLayout
-                android:id="@+id/item_edge_lighting"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="?android:attr/selectableItemBackground"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="16dp">
-
-                <FrameLayout
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:tag="theme_icon_bg"
-                    android:background="@drawable/circle_background_teal">
 
                     <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_notifications"
-                        app:tint="@color/ui_icon_tint" />
-                </FrameLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/menu_edge_lighting"
-                        android:textColor="@color/ui_text_primary"
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/menu_edge_lighting_desc"
-                        android:textColor="@color/ui_text_secondary"
-                        android:textSize="12sp" />
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:rotation="-90"
+                        android:src="@drawable/ic_expand_more"
+                        app:tint="@color/ui_text_secondary" />
                 </LinearLayout>
 
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@drawable/ic_expand_more"
-                    android:rotation="-90"
-                    app:tint="@color/ui_text_secondary" />
             </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
+
 </LinearLayout>
