@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -22,6 +23,7 @@ import androidx.core.graphics.toColorInt
 import androidx.core.widget.addTextChangedListener
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
@@ -79,6 +81,7 @@ class EdgeLightingSettingsActivity : AppCompatActivity() {
         setupNotificationAccessRow()
         setupAppFilterEntry()
         syncPreviewFromConfig()
+        applyPremiumGating()
     }
 
     override fun onResume() {
@@ -87,6 +90,7 @@ class EdgeLightingSettingsActivity : AppCompatActivity() {
         refreshNotificationAccessStatus()
         refreshAppFilterSummary()
         startPreviewAnimation()
+        applyPremiumGating()
     }
 
     override fun onPause() {
@@ -422,6 +426,22 @@ class EdgeLightingSettingsActivity : AppCompatActivity() {
             }
         }.getOrElse {
             value.split(",").mapNotNullTo(mutableSetOf()) { it.trim().takeIf(String::isNotEmpty) }
+        }
+    }
+
+    // --- Premium gating ---
+
+    private fun applyPremiumGating() {
+        val notActivated = PremiumActivator.status(this) == PremiumActivator.Status.NotActivated
+        val card = findViewById<LinearLayout>(R.id.card_general)
+        card.alpha = if (notActivated) DISABLED_ALPHA else 1f
+        setGroupEnabled(card, !notActivated)
+    }
+
+    private fun setGroupEnabled(view: View, enabled: Boolean) {
+        view.isEnabled = enabled
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) setGroupEnabled(view.getChildAt(i), enabled)
         }
     }
 
