@@ -84,9 +84,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.item_premium).setOnClickListener {
-            com.fan.edgex.utils.ActivationDialog.show(this) {
-                refreshPremiumStatus()
-            }
+            startActivity(android.content.Intent(this, PremiumActivity::class.java))
         }
         refreshPremiumStatus()
         checkPremiumUpdateOnLaunch()

@@ -20,6 +20,7 @@ object PremiumActivator {
     private const val KEY_ACTIVATION_CODE = "activation_code"
     private const val KEY_INSTALLED = "installed"
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
+    private const val KEY_DEACTIVATED = "deactivated"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
 
@@ -34,8 +35,24 @@ object PremiumActivator {
             .putString(KEY_ACTIVATION_CODE, normalizedCode)
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
+            .putBoolean(KEY_DEACTIVATED, false)
             .apply()
     }
+
+    fun deactivate(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_ACTIVATION_CODE)
+            .putBoolean(KEY_INSTALLED, false)
+            .remove(KEY_INSTALLED_AT_MS)
+            .putBoolean(KEY_DEACTIVATED, true)
+            .apply()
+        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}").submit()
+    }
+
+    fun getActivationCode(context: Context): String? =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_ACTIVATION_CODE, null)
 
     fun updateInstalledDexIfNeeded(context: Context): Result<UpdateResult> = runCatching {
         if (!isInstalled(context)) return@runCatching UpdateResult.NotInstalled
@@ -58,12 +75,15 @@ object PremiumActivator {
         UpdateResult.Updated
     }
 
-    fun isInstalled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getBoolean(KEY_INSTALLED, false) || File(PremiumInstall.META_PATH).isFile
+    fun isInstalled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_DEACTIVATED, false)) return false
+        return prefs.getBoolean(KEY_INSTALLED, false) || File(PremiumInstall.META_PATH).isFile
+    }
 
     fun status(context: Context): Status {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(KEY_DEACTIVATED, false)) return Status.NotActivated
         val installed = prefs.getBoolean(KEY_INSTALLED, false) || File(PremiumInstall.META_PATH).isFile
         if (!installed) return Status.NotActivated
 

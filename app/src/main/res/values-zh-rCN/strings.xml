@@ -37,6 +37,13 @@
     <string name="menu_premium_not_activated">未激活</string>
     <string name="menu_premium_reboot_required">已安装，重启后生效</string>
     <string name="menu_premium_installed">已安装</string>
+    <string name="header_premium">Premium 功能</string>
+    <string name="premium_section_features">Premium 功能</string>
+    <string name="premium_code_label">激活码：%s</string>
+    <string name="premium_deactivate">解绑</string>
+    <string name="premium_deactivate_confirm_title">解绑 Premium？</string>
+    <string name="premium_deactivate_confirm_message">将从此设备移除激活信息，之后可以用同一激活码重新激活。</string>
+    <string name="premium_deactivate_success">Premium 已解绑</string>
     <string name="premium_activation_title">激活 Premium</string>
     <string name="premium_activation_message">请输入捐赠邮件中的激活码。</string>
     <string name="premium_activation_hint">激活码</string>
