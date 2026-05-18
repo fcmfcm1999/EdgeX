@@ -84,10 +84,12 @@ object PremiumActivator {
         }
 
         downloadAndInstall(context, activation)
+        // Do NOT update KEY_INSTALL_BOOT_COUNT here: the old DEX is still loaded in
+        // system_server and premium is working. Resetting boot count to the current
+        // value would flip status() back to RebootRequired for the rest of this session.
         prefs.edit()
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
-            .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
             .apply()
         UpdateResult.Updated
     }
