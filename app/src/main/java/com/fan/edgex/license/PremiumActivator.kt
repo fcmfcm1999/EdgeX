@@ -140,6 +140,7 @@ object PremiumActivator {
         val token: String,
         val dexHash: String,
         val dexVersion: Int,
+        val deviceSig: String,
     )
 
     private fun requestActivation(context: Context, code: String): ActivationResponse {
@@ -155,12 +156,13 @@ object PremiumActivator {
         val token = activateResponse.getString("token")
         val expectedHash = activateResponse.getString("dex_hash").lowercase()
         val dexVersion = activateResponse.optInt("dex_version", PremiumInstall.SUPPORTED_API_VERSION)
+        val deviceSig = activateResponse.getString("device_sig")
 
         require(dexVersion == PremiumInstall.SUPPORTED_API_VERSION) {
             "Unsupported premium version: $dexVersion"
         }
 
-        return ActivationResponse(token, expectedHash, dexVersion)
+        return ActivationResponse(token, expectedHash, dexVersion, deviceSig)
     }
 
     private fun downloadAndInstall(context: Context, activation: ActivationResponse) {
@@ -171,10 +173,17 @@ object PremiumActivator {
         val actualHash = sha256Hex(dexBytes)
         require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
 
-        installDex(context, dexBytes, actualHash, activation.dexVersion)
+        installDex(context, dexBytes, actualHash, activation.dexVersion, deviceId(context), activation.deviceSig)
     }
 
-    private fun installDex(context: Context, dexBytes: ByteArray, sha256: String, version: Int) {
+    private fun installDex(
+        context: Context,
+        dexBytes: ByteArray,
+        sha256: String,
+        version: Int,
+        deviceId: String,
+        deviceSig: String,
+    ) {
         val tempDex = File(context.cacheDir, "premium.dex.tmp")
         val tempMeta = File(context.cacheDir, "premium.meta.tmp")
         tempDex.writeBytes(dexBytes)
@@ -184,6 +193,8 @@ object PremiumActivator {
                 appendLine("sha256=$sha256")
                 appendLine("size=${dexBytes.size}")
                 appendLine("installed_at=${Instant.now()}")
+                appendLine("device_id=$deviceId")
+                appendLine("device_sig=$deviceSig")
             },
         )
 

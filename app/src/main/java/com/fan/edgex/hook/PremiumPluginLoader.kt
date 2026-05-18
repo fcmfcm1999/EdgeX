@@ -1,5 +1,8 @@
 package com.fan.edgex.hook
 
+import android.content.Context
+import android.provider.Settings
+import android.util.Base64
 import com.fan.edgex.premium.IPremiumPlugin
 import com.fan.edgex.premium.PremiumInstall
 import dalvik.system.DexClassLoader
@@ -14,12 +17,17 @@ object PremiumPluginLoader {
     private val SHA256_PATTERN = Regex("^[0-9a-fA-F]{64}$")
 
     @Volatile private var disabledForProcess = false
+    @Volatile private var pendingPlugin: IPremiumPlugin? = null
 
     @Volatile var plugin: IPremiumPlugin? = null
         private set
 
+    /**
+     * Stage 1: load and hash-verify the DEX. Called from handleLoadPackage (no Context yet).
+     * Sets pendingPlugin on success; plugin remains null until verifyDeviceBinding() passes.
+     */
     fun tryLoad() {
-        if (disabledForProcess || plugin != null) return
+        if (disabledForProcess || plugin != null || pendingPlugin != null) return
 
         val dex = File(PremiumInstall.DEX_PATH)
         val meta = File(PremiumInstall.META_PATH)
@@ -36,18 +44,59 @@ object PremiumPluginLoader {
             require(instance.apiVersion == PremiumInstall.SUPPORTED_API_VERSION) {
                 "unsupported apiVersion=${instance.apiVersion}"
             }
-            plugin = instance
-            XposedBridge.log("EdgeX: premium plugin loaded")
+            pendingPlugin = instance
+            XposedBridge.log("EdgeX: premium plugin loaded, pending device binding")
+        }.onFailure {
+            pendingPlugin = null
+            disabledForProcess = true
+            markBad(dex, meta)
+            XposedBridge.log("EdgeX: premium plugin load failed: ${it.message}")
+        }
+    }
+
+    /**
+     * Stage 2: verify device binding via Ed25519 signature. Called once a Context is available
+     * (InputManagerService.start()). Promotes pendingPlugin to plugin on success.
+     */
+    fun verifyDeviceBinding(context: Context) {
+        val pending = pendingPlugin ?: return
+
+        val dex = File(PremiumInstall.DEX_PATH)
+        val meta = File(PremiumInstall.META_PATH)
+
+        runCatching {
+            val properties = Properties()
+            FileInputStream(meta).use(properties::load)
+
+            val metaDeviceId = properties.getProperty("device_id")?.trim()
+                ?: error("missing device_id in meta — re-activate to apply device binding")
+            val sigBase64 = properties.getProperty("device_sig")?.trim()
+                ?: error("missing device_sig in meta — re-activate to apply device binding")
+            val sigBytes = Base64.decode(sigBase64, Base64.NO_WRAP)
+
+            val currentDeviceId = Settings.Secure.getString(
+                context.contentResolver, Settings.Secure.ANDROID_ID,
+            ) ?: ""
+            require(metaDeviceId == currentDeviceId) { "device_id mismatch" }
+
+            require(pending.verifyInstallation(dex.absolutePath, metaDeviceId, sigBytes)) {
+                "installation signature invalid"
+            }
+
+            plugin = pending
+            XposedBridge.log("EdgeX: premium plugin activated")
         }.onFailure {
             plugin = null
             disabledForProcess = true
             markBad(dex, meta)
-            XposedBridge.log("EdgeX: premium plugin disabled: ${it.message}")
+            XposedBridge.log("EdgeX: premium device binding failed: ${it.message}")
         }
+        pendingPlugin = null
     }
 
     fun disableForCurrentProcess(cause: Throwable) {
         plugin = null
+        pendingPlugin = null
         disabledForProcess = true
         XposedBridge.log("EdgeX: premium plugin disabled for current process: ${cause.message}")
     }
