@@ -17,42 +17,45 @@ import java.util.UUID
 object PremiumActivator {
     private const val PREFS_NAME = "premium_activation"
     private const val KEY_DEVICE_ID = "device_id"
+    private const val KEY_ACTIVATION_CODE = "activation_code"
     private const val KEY_INSTALLED = "installed"
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
 
     fun activate(context: Context, code: String): Result<Unit> = runCatching {
-        val normalizedCode = code.trim()
+        val normalizedCode = normalizeCode(code)
         require(normalizedCode.isNotEmpty()) { "Activation code is empty" }
-        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
-        require(workerUrl.isNotEmpty()) { "Premium worker URL is not configured" }
 
-        val deviceId = deviceId(context)
-        val activateBody = JSONObject()
-            .put("code", normalizedCode)
-            .put("device_id", deviceId)
-            .toString()
-
-        val activateResponse = postJson("$workerUrl/activate", activateBody)
-        val token = activateResponse.getString("token")
-        val expectedHash = activateResponse.getString("dex_hash").lowercase()
-        val dexVersion = activateResponse.optInt("dex_version", PremiumInstall.SUPPORTED_API_VERSION)
-
-        require(dexVersion == PremiumInstall.SUPPORTED_API_VERSION) {
-            "Unsupported premium version: $dexVersion"
-        }
-
-        val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(token)}")
-        val actualHash = sha256Hex(dexBytes)
-        require(actualHash == expectedHash) { "Downloaded premium DEX hash mismatch" }
-
-        installDex(context, dexBytes, actualHash, dexVersion)
+        val activation = requestActivation(context, normalizedCode)
+        downloadAndInstall(context, activation)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
+            .putString(KEY_ACTIVATION_CODE, normalizedCode)
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
             .apply()
+    }
+
+    fun updateInstalledDexIfNeeded(context: Context): Result<UpdateResult> = runCatching {
+        if (!isInstalled(context)) return@runCatching UpdateResult.NotInstalled
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val code = prefs.getString(KEY_ACTIVATION_CODE, null)?.let(::normalizeCode).orEmpty()
+        if (code.isEmpty()) return@runCatching UpdateResult.SkippedMissingActivationCode
+
+        val activation = requestActivation(context, code)
+        val installedHash = installedDexHash()
+        if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
+            return@runCatching UpdateResult.UpToDate
+        }
+
+        downloadAndInstall(context, activation)
+        prefs.edit()
+            .putBoolean(KEY_INSTALLED, true)
+            .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
+            .apply()
+        UpdateResult.Updated
     }
 
     fun isInstalled(context: Context): Boolean =
@@ -79,6 +82,51 @@ object PremiumActivator {
         NotActivated,
         RebootRequired,
         Installed,
+    }
+
+    enum class UpdateResult {
+        NotInstalled,
+        SkippedMissingActivationCode,
+        UpToDate,
+        Updated,
+    }
+
+    private data class ActivationResponse(
+        val token: String,
+        val dexHash: String,
+        val dexVersion: Int,
+    )
+
+    private fun requestActivation(context: Context, code: String): ActivationResponse {
+        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
+        require(workerUrl.isNotEmpty()) { "Premium worker URL is not configured" }
+
+        val activateBody = JSONObject()
+            .put("code", code)
+            .put("device_id", deviceId(context))
+            .toString()
+
+        val activateResponse = postJson("$workerUrl/activate", activateBody)
+        val token = activateResponse.getString("token")
+        val expectedHash = activateResponse.getString("dex_hash").lowercase()
+        val dexVersion = activateResponse.optInt("dex_version", PremiumInstall.SUPPORTED_API_VERSION)
+
+        require(dexVersion == PremiumInstall.SUPPORTED_API_VERSION) {
+            "Unsupported premium version: $dexVersion"
+        }
+
+        return ActivationResponse(token, expectedHash, dexVersion)
+    }
+
+    private fun downloadAndInstall(context: Context, activation: ActivationResponse) {
+        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
+        require(workerUrl.isNotEmpty()) { "Premium worker URL is not configured" }
+
+        val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
+        val actualHash = sha256Hex(dexBytes)
+        require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
+
+        installDex(context, dexBytes, actualHash, activation.dexVersion)
     }
 
     private fun installDex(context: Context, dexBytes: ByteArray, sha256: String, version: Int) {
@@ -116,6 +164,18 @@ object PremiumActivator {
         check(result.isSuccess) {
             result.err.joinToString("\n").ifBlank { "Root install failed" }
         }
+    }
+
+    private fun installedDexHash(): String? {
+        val meta = File(PremiumInstall.META_PATH)
+        if (!meta.isFile || !meta.canRead()) return null
+        return runCatching {
+            meta.readLines()
+                .firstOrNull { it.startsWith("sha256=") }
+                ?.substringAfter("=")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        }.getOrNull()
     }
 
     private fun deviceId(context: Context): String {
@@ -176,6 +236,9 @@ object PremiumActivator {
 
     private fun shellQuote(value: String): String =
         "'" + value.replace("'", "'\"'\"'") + "'"
+
+    private fun normalizeCode(code: String): String =
+        code.trim().uppercase()
 
     private fun urlEncode(value: String): String =
         java.net.URLEncoder.encode(value, Charsets.UTF_8.name())

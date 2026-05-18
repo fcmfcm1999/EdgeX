@@ -8,6 +8,8 @@
     <string name="header_action_selection">Select Action</string>
     <string name="header_shortcut_selection">Select Shortcut</string>
     <string name="header_theme">Theme</string>
+    <string name="header_edge_lighting">Edge Lighting</string>
+    <string name="header_edge_lighting_app_filter">Edge Lighting Apps</string>
 
     <!-- Main Screen Menu Items -->
     <string name="menu_gestures">Gestures</string>
@@ -16,6 +18,8 @@
     <string name="menu_freezer_desc">Manage frozen apps</string>
     <string name="menu_theme">Theme</string>
     <string name="menu_theme_desc">Choose an accent color</string>
+    <string name="menu_edge_lighting">Edge Lighting</string>
+    <string name="menu_edge_lighting_desc">Premium notification glow</string>
     <string name="menu_advanced">Advanced Options</string>
     <string name="menu_debug_matrix">Debug Mode</string>
     <string name="menu_debug_matrix_desc">Show gesture trigger area</string>
@@ -42,6 +46,8 @@
     <string name="premium_activation_in_progress">Activating…</string>
     <string name="premium_activation_success">Premium installed. Reboot your phone to enable it.</string>
     <string name="premium_activation_failed">Activation failed: %s</string>
+    <string name="premium_update_success">Premium updated. Reboot your phone to enable it.</string>
+    <string name="premium_update_failed">Premium update failed: %s</string>
     <string name="menu_about">About</string>
     <string name="label_author">Author</string>
     <string name="label_project_url">Project URL</string>
@@ -334,6 +340,46 @@
     <string name="multi_action_step_count">%d step(s)</string>
     <string name="icon_picker_title">Choose Icon</string>
     <string name="icon_picker_from_gallery">Choose from Gallery</string>
+
+    <!-- Edge Lighting -->
+    <string name="edge_lighting_enabled">Enable Edge Lighting</string>
+    <string name="edge_lighting_auto_color">Use notification color automatically</string>
+    <string name="edge_lighting_notification_access_required">Grant notification access</string>
+    <string name="edge_lighting_notification_access_granted">Notification access granted</string>
+    <string name="edge_lighting_effect">Effect</string>
+    <string name="edge_lighting_effect_basic">Basic glow</string>
+    <string name="edge_lighting_effect_breathing">Breathing</string>
+    <string name="edge_lighting_effect_flow">Flow</string>
+    <string name="edge_lighting_effect_multicolor">Multicolor</string>
+    <string name="edge_lighting_effect_spotlight">Spotlight</string>
+    <string name="edge_lighting_effect_eclipse">Eclipse</string>
+    <string name="edge_lighting_effect_echo">Echo</string>
+    <string name="edge_lighting_effect_comet">Comet</string>
+    <string name="edge_lighting_effect_ripple">Ripple</string>
+    <string name="edge_lighting_color">Fallback color</string>
+    <string name="edge_lighting_color_saved">Edge lighting color saved</string>
+    <string name="edge_lighting_width_value">Width: %d dp</string>
+    <string name="edge_lighting_duration_value">Duration: %d ms</string>
+    <string name="edge_lighting_alpha_value">Opacity: %d%%</string>
+    <string name="edge_lighting_app_filter_all">Apps: all notifications</string>
+    <string name="edge_lighting_app_filter_selected">Apps: %d selected</string>
+    <string name="edge_lighting_app_filter">Apps</string>
+    <string name="edge_lighting_clear_app_filter">Clear app filter</string>
+    <string name="edge_lighting_notification_service">EdgeX Edge Lighting</string>
+    <string name="edge_lighting_section_general">General</string>
+    <string name="edge_lighting_section_color">Color</string>
+    <string name="edge_lighting_section_appearance">Appearance</string>
+    <string name="edge_lighting_section_timing">Timing</string>
+    <string name="edge_lighting_section_apps">Apps</string>
+    <string name="edge_lighting_label_width">Width</string>
+    <string name="edge_lighting_label_opacity">Opacity</string>
+    <string name="edge_lighting_label_duration">Duration</string>
+    <string name="edge_lighting_notification_access_title">Notification Access</string>
+    <string name="edge_lighting_notif_status_granted">Granted</string>
+    <string name="edge_lighting_notif_status_required">Tap to grant</string>
+    <string name="edge_lighting_width_dp">%d dp</string>
+    <string name="edge_lighting_duration_ms">%d ms</string>
+    <string name="edge_lighting_alpha_pct">%d%%</string>
 
     <!-- Keys Feature -->
     <string name="menu_keys">Keys</string>

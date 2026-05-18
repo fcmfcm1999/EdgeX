@@ -174,6 +174,7 @@ object GestureManager {
                         mainHandler().post {
                             PieManager.dismiss()
                             PanelOverlayManager.dismiss()
+                            PremiumRuntime.onScreenOff()
                         }
                     }
                     Intent.ACTION_USER_UNLOCKED -> {
@@ -226,6 +227,30 @@ object GestureManager {
                         log("Execute action request from UI: $action")
                         actionDispatcher.executeKeyAction(action, ctx)
                     }
+                    HookConfigSnapshot.ACTION_EDGE_LIGHTING -> {
+                        if (configRepository.get(AppConfig.EDGE_LIGHTING_ENABLED) != "true") return
+
+                        val sysCtx = systemContext ?: ctx
+                        val color = intent.getIntExtra(
+                            HookConfigSnapshot.EXTRA_EDGE_LIGHTING_COLOR,
+                            parseColor(configRepository.get(AppConfig.EDGE_LIGHTING_COLOR), 0xFF00FFFF.toInt()),
+                        )
+                        val durationMs = intent.getIntExtra(
+                            HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS,
+                            configRepository.get(AppConfig.EDGE_LIGHTING_DURATION_MS).toIntOrNull() ?: 3000,
+                        ).coerceIn(500, 10000)
+                        val widthDp = (configRepository.get(AppConfig.EDGE_LIGHTING_WIDTH_DP).toIntOrNull() ?: 5)
+                            .coerceIn(1, 20)
+                        val alpha = (configRepository.get(AppConfig.EDGE_LIGHTING_ALPHA).toFloatOrNull() ?: 1f)
+                            .coerceIn(0f, 1f)
+                        val effect = configRepository.get(
+                            AppConfig.EDGE_LIGHTING_EFFECT,
+                            AppConfig.EDGE_LIGHTING_EFFECT_BASIC,
+                        )
+                        mainHandler().post {
+                            PremiumRuntime.showEdgeLighting(sysCtx, effect, color, durationMs, widthDp, alpha)
+                        }
+                    }
                     GameModeManager.ACTION_DISABLE -> {
                         val sysCtx = systemContext ?: ctx
                         val h = mainHandler()
@@ -244,6 +269,7 @@ object GestureManager {
             val filter = IntentFilter().apply {
                 addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
                 addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+                addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING)
                 addAction(GameModeManager.ACTION_DISABLE)
                 addAction(FlashlightManager.ACTION_TURN_OFF)
             }
@@ -318,5 +344,12 @@ object GestureManager {
             log("Failed to add window anchor: ${t.message}")
         }
     }
+
+    private fun parseColor(value: String, fallback: Int): Int =
+        try {
+            android.graphics.Color.parseColor(value)
+        } catch (_: Exception) {
+            fallback
+        }
 
 }

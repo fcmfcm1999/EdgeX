@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "EdgeX"
 include(":app")
- 
+include(":premium-api")
+include(":premium")

@@ -3,6 +3,7 @@ package com.fan.edgex.ui
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
@@ -16,8 +17,10 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.utils.UpdateChecker
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
+    private var premiumUpdateCheckStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +71,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, PieSettingsActivity::class.java))
         }
 
+        findViewById<View>(R.id.item_edge_lighting).setOnClickListener {
+            startActivity(android.content.Intent(this, EdgeLightingSettingsActivity::class.java))
+        }
+
         findViewById<View>(R.id.item_theme).setOnClickListener {
             startActivity(android.content.Intent(this, ThemeActivity::class.java))
         }
@@ -82,6 +89,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         refreshPremiumStatus()
+        checkPremiumUpdateOnLaunch()
 
         findViewById<View>(R.id.item_custom_panel).setOnClickListener {
             startActivity(android.content.Intent(this, PanelConfigActivity::class.java)
@@ -200,6 +208,37 @@ class MainActivity : AppCompatActivity() {
             PremiumActivator.Status.Installed -> R.string.menu_premium_installed
         }
         findViewById<TextView>(R.id.text_premium_desc).text = getString(statusRes)
+    }
+
+    private fun checkPremiumUpdateOnLaunch() {
+        if (premiumUpdateCheckStarted || !PremiumActivator.isInstalled(this)) return
+        premiumUpdateCheckStarted = true
+
+        val appContext = applicationContext
+        thread(name = "EdgeXPremiumUpdate") {
+            val result = PremiumActivator.updateInstalledDexIfNeeded(appContext)
+            runOnUiThread {
+                result.onSuccess { updateResult ->
+                    if (updateResult == PremiumActivator.UpdateResult.Updated) {
+                        Toast.makeText(
+                            this,
+                            R.string.premium_update_success,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    refreshPremiumStatus()
+                }.onFailure {
+                    Toast.makeText(
+                        this,
+                        getString(
+                            R.string.premium_update_failed,
+                            it.message ?: it.javaClass.simpleName,
+                        ),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
     }
 
     private fun showHapticFeedbackTypeDialog() {
