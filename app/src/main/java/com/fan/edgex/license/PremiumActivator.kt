@@ -49,7 +49,8 @@ object PremiumActivator {
                 .put("code", code)
                 .put("device_id", deviceId(context))
                 .toString()
-            postJson("$workerUrl/deactivate", body)
+            // postOk is used instead of postJson: the /deactivate endpoint returns plain text "OK"
+            postOk("$workerUrl/deactivate", body)
         }
 
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -232,6 +233,20 @@ object PremiumActivator {
         }
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         return JSONObject(readResponse(connection))
+    }
+
+    private fun postOk(url: String, body: String) {
+        val connection = openConnection(url).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+        }
+        connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+        val code = connection.responseCode
+        if (code !in 200..299) {
+            val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            error("Request failed ($code): $message")
+        }
     }
 
     private fun getBytes(url: String): ByteArray {
