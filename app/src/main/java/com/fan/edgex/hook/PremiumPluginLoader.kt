@@ -36,7 +36,21 @@ object PremiumPluginLoader {
             verifyMeta(dex, meta)
             val parent = IPremiumPlugin::class.java.classLoader
                 ?: ClassLoader.getSystemClassLoader()
-            val loader = DexClassLoader(dex.absolutePath, null, null, parent)
+            // Child-first delegation: premium DEX classes are resolved from the plugin
+            // DEX before delegating to the module ClassLoader.  Both DEXes go through R8
+            // obfuscation independently and can produce identical short names (a.a, b.c …).
+            // Standard parent-first delegation would return the host-app class for those
+            // names, causing NoSuchFieldError when premium code accesses its own fields.
+            val loader = object : DexClassLoader(dex.absolutePath, null, null, parent) {
+                override fun loadClass(name: String, resolve: Boolean): Class<*> {
+                    findLoadedClass(name)?.let { return it }
+                    return try {
+                        findClass(name)
+                    } catch (_: ClassNotFoundException) {
+                        super.loadClass(name, resolve)
+                    }
+                }
+            }
             val instance = loader.loadClass(PLUGIN_CLASS)
                 .getDeclaredConstructor()
                 .newInstance() as IPremiumPlugin
