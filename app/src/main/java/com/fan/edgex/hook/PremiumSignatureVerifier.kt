@@ -25,6 +25,20 @@ object PremiumSignatureVerifier {
         expectedDexHash: String,
         devicePubkeyHex: String,
         sigBytes: ByteArray,
+    ): Boolean = verifyInstallationSignature(
+        dex = dex,
+        expectedDexHash = expectedDexHash,
+        devicePubkeyHex = devicePubkeyHex,
+        sigBytes = sigBytes,
+        publicKeyDerHex = RSA_PUBLIC_KEY_DER_HEX,
+    )
+
+    internal fun verifyInstallationSignature(
+        dex: File,
+        expectedDexHash: String,
+        devicePubkeyHex: String,
+        sigBytes: ByteArray,
+        publicKeyDerHex: String,
     ): Boolean = runCatching {
         val actualHash = sha256Hex(dex)
         require(actualHash.equals(expectedDexHash, ignoreCase = true)) {
@@ -34,7 +48,7 @@ object PremiumSignatureVerifier {
         val message = "${actualHash.lowercase()}|$devicePubkeyHex"
             .toByteArray(Charsets.UTF_8)
         Signature.getInstance("SHA256withRSA").run {
-            initVerify(rsaPublicKey())
+            initVerify(rsaPublicKey(publicKeyDerHex))
             update(message)
             verify(sigBytes)
         }
@@ -53,8 +67,8 @@ object PremiumSignatureVerifier {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun rsaPublicKey() = KeyFactory.getInstance("RSA").generatePublic(
-        X509EncodedKeySpec(RSA_PUBLIC_KEY_DER_HEX.hexToByteArray()),
+    private fun rsaPublicKey(publicKeyDerHex: String) = KeyFactory.getInstance("RSA").generatePublic(
+        X509EncodedKeySpec(publicKeyDerHex.hexToByteArray()),
     )
 
     private fun String.hexToByteArray(): ByteArray =
