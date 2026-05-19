@@ -72,6 +72,15 @@ object PremiumActivator {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_ACTIVATION_CODE, null)
 
+    data class DexInfo(val hashPrefix: String, val installedAtMs: Long)
+
+    fun getDexInfo(context: Context): DexInfo? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val hash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)?.take(8) ?: return null
+        val ts = prefs.getLong(KEY_INSTALLED_AT_MS, 0L).takeIf { it > 0 } ?: return null
+        return DexInfo(hash, ts)
+    }
+
     fun updateInstalledDexIfNeeded(context: Context): Result<UpdateResult> = runCatching {
         if (!isInstalled(context)) return@runCatching UpdateResult.NotInstalled
 

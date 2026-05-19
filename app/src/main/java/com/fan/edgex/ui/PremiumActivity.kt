@@ -14,6 +14,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.fan.edgex.R
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.utils.ActivationDialog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.concurrent.thread
 
 class PremiumActivity : AppCompatActivity() {
@@ -71,9 +74,17 @@ class PremiumActivity : AppCompatActivity() {
                 iconRes = R.drawable.ic_donate,
                 iconColorArgb = getColor(R.color.ui_icon_bg),
                 titleRes = R.string.premium_status_active,
-                descText = PremiumActivator.getActivationCode(this)?.let {
-                    getString(R.string.premium_code_label, maskCode(it))
-                },
+                descText = buildString {
+                    PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
+                        append(getString(R.string.premium_code_label, maskCode(it)))
+                    }
+                    PremiumActivator.getDexInfo(this@PremiumActivity)?.let { info ->
+                        if (isNotEmpty()) append("\n")
+                        val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+                            .format(Date(info.installedAtMs))
+                        append("DEX ${info.hashPrefix}  ·  $time")
+                    }
+                }.takeIf { it.isNotEmpty() },
             )
         }
 
