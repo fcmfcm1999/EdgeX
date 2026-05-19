@@ -41,12 +41,8 @@
     <string name="premium_section_features">Premium 功能</string>
     <string name="premium_status_active">Premium 已激活</string>
     <string name="premium_status_reboot">需要重启</string>
-    <string name="premium_status_runtime_pending">运行时验证中</string>
-    <string name="premium_status_runtime_failed">运行时验证失败</string>
     <string name="premium_desc_not_activated">支持项目以获取激活码</string>
     <string name="premium_desc_reboot">重启设备以启用 Premium</string>
-    <string name="premium_desc_runtime_pending">Premium 已安装，但 system_server 尚未完成验证。</string>
-    <string name="premium_desc_runtime_failed">Premium 已安装，但 system_server 拒绝加载。请重新激活或查看 Xposed 日志。</string>
     <string name="premium_code_label">激活码：%s</string>
     <string name="premium_deactivate">解绑</string>
     <string name="premium_deactivate_confirm_title">解绑 Premium？</string>

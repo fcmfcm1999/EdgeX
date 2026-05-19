@@ -43,7 +43,6 @@ class PremiumActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val status = PremiumActivator.status(this)
-        val runtimeInfo = PremiumActivator.runtimeInfo()
 
         data class StateVisuals(
             val iconRes: Int,
@@ -72,28 +71,20 @@ class PremiumActivity : AppCompatActivity() {
                 },
             )
             PremiumActivator.Status.Installed -> StateVisuals(
-                iconRes = when (runtimeInfo.state) {
-                    PremiumActivator.RuntimeState.Active -> R.drawable.ic_donate
-                    PremiumActivator.RuntimeState.Failed -> R.drawable.ic_info
-                    PremiumActivator.RuntimeState.Missing,
-                    PremiumActivator.RuntimeState.Installed,
-                    PremiumActivator.RuntimeState.PendingVerification -> R.drawable.ic_restart_alt
-                },
-                iconColorArgb = when (runtimeInfo.state) {
-                    PremiumActivator.RuntimeState.Active -> getColor(R.color.ui_icon_bg)
-                    PremiumActivator.RuntimeState.Failed -> 0xFFE53935.toInt()
-                    PremiumActivator.RuntimeState.Missing,
-                    PremiumActivator.RuntimeState.Installed,
-                    PremiumActivator.RuntimeState.PendingVerification -> 0xFFFF9800.toInt()
-                },
-                titleRes = when (runtimeInfo.state) {
-                    PremiumActivator.RuntimeState.Active -> R.string.premium_status_active
-                    PremiumActivator.RuntimeState.Failed -> R.string.premium_status_runtime_failed
-                    PremiumActivator.RuntimeState.Missing,
-                    PremiumActivator.RuntimeState.Installed,
-                    PremiumActivator.RuntimeState.PendingVerification -> R.string.premium_status_runtime_pending
-                },
-                descText = buildRuntimeDescription(runtimeInfo),
+                iconRes = R.drawable.ic_donate,
+                iconColorArgb = getColor(R.color.ui_icon_bg),
+                titleRes = R.string.premium_status_active,
+                descText = buildString {
+                    PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
+                        append(getString(R.string.premium_code_label, maskCode(it)))
+                    }
+                    PremiumActivator.getDexInfo(this@PremiumActivity)?.let { info ->
+                        if (isNotEmpty()) append("\n")
+                        val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+                            .format(Date(info.installedAtMs))
+                        append("DEX ${info.hashPrefix}  ·  $time")
+                    }
+                }.takeIf { it.isNotEmpty() },
             )
         }
 
@@ -166,34 +157,4 @@ class PremiumActivity : AppCompatActivity() {
         if (code.length <= 4) return "****"
         return code.take(4) + "*".repeat(code.length - 4)
     }
-
-    private fun buildRuntimeDescription(runtimeInfo: PremiumActivator.RuntimeInfo): String =
-        buildString {
-            when (runtimeInfo.state) {
-                PremiumActivator.RuntimeState.Active -> Unit
-                PremiumActivator.RuntimeState.Failed -> {
-                    append(getString(R.string.premium_desc_runtime_failed))
-                    runtimeInfo.message?.let {
-                        append("\n")
-                        append(it)
-                    }
-                }
-                PremiumActivator.RuntimeState.Missing,
-                PremiumActivator.RuntimeState.Installed,
-                PremiumActivator.RuntimeState.PendingVerification -> append(
-                    getString(R.string.premium_desc_runtime_pending),
-                )
-            }
-
-            PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
-                if (isNotEmpty()) append("\n")
-                append(getString(R.string.premium_code_label, maskCode(it)))
-            }
-            PremiumActivator.getDexInfo(this@PremiumActivity)?.let { info ->
-                if (isNotEmpty()) append("\n")
-                val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-                    .format(Date(info.installedAtMs))
-                append("DEX ${info.hashPrefix}  ·  $time")
-            }
-        }
 }
