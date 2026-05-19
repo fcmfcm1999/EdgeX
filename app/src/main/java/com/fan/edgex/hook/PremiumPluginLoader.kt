@@ -64,6 +64,19 @@ object PremiumPluginLoader {
         val dex = File(PremiumInstall.DEX_PATH)
         val meta = File(PremiumInstall.META_PATH)
 
+        // Diagnostic: log DEX hash and classloader chain so failures can be pinpointed.
+        runCatching {
+            val metaHash = meta.readLines()
+                .firstOrNull { it.startsWith("sha256=") }
+                ?.substringAfter("=")?.trim()?.take(8) ?: "?"
+            val cl = pending.javaClass.classLoader
+            XposedBridge.log("EdgeX: verifyDeviceBinding dex=$metaHash cl=${cl?.javaClass?.simpleName}")
+            val intrinsicsOk = runCatching {
+                cl?.loadClass("kotlin.jvm.internal.Intrinsics"); true
+            }.getOrDefault(false)
+            XposedBridge.log("EdgeX: Intrinsics via plugin CL: $intrinsicsOk")
+        }
+
         runCatching {
             val properties = Properties()
             FileInputStream(meta).use(properties::load)
@@ -90,7 +103,7 @@ object PremiumPluginLoader {
             plugin = null
             disabledForProcess = true
             markBad(dex, meta)
-            XposedBridge.log("EdgeX: premium device binding failed: ${it.message}")
+            XposedBridge.log("EdgeX: premium device binding failed (${it.javaClass.simpleName}): ${it.message}")
         }
         pendingPlugin = null
     }
