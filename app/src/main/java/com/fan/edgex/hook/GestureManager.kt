@@ -238,7 +238,7 @@ object GestureManager {
                         val durationMs = intent.getIntExtra(
                             HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS,
                             configRepository.get(AppConfig.EDGE_LIGHTING_DURATION_MS).toIntOrNull() ?: 3000,
-                        ).coerceIn(500, 10000)
+                        ).coerceIn(500, 60000)
                         val widthDp = (configRepository.get(AppConfig.EDGE_LIGHTING_WIDTH_DP).toIntOrNull() ?: 5)
                             .coerceIn(1, 20)
                         val alpha = (configRepository.get(AppConfig.EDGE_LIGHTING_ALPHA).toFloatOrNull() ?: 1f)
@@ -250,6 +250,9 @@ object GestureManager {
                         mainHandler().post {
                             PremiumRuntime.showEdgeLighting(sysCtx, effect, color, durationMs, widthDp, alpha)
                         }
+                    }
+                    HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS -> {
+                        mainHandler().post { PremiumRuntime.dismissEdgeLighting() }
                     }
                     GameModeManager.ACTION_DISABLE -> {
                         val sysCtx = systemContext ?: ctx
@@ -270,6 +273,7 @@ object GestureManager {
                 addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
                 addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
                 addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING)
+                addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS)
                 addAction(GameModeManager.ACTION_DISABLE)
                 addAction(FlashlightManager.ACTION_TURN_OFF)
             }

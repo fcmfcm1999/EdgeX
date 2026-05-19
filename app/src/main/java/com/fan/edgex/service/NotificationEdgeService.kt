@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -20,13 +22,82 @@ class NotificationEdgeService : NotificationListenerService() {
     // Cache extracted icon colors per package; null means no colorful color was found
     private val iconColorCache = HashMap<String, Int?>()
 
+    // Keys of notifications we've already shown Edge Lighting for.
+    // Cleared when the notification is dismissed, so re-posting after removal triggers again.
+    // Using key alone (not postTime) because apps like LSPosed re-post with a fresh postTime on
+    // rotation, which would defeat any (key, postTime) comparison.
+    private val seenNotificationKeys = HashSet<String>()
+
+    // Repeating pulse for incoming calls (CATEGORY_CALL).
+    // The system only calls onNotificationPosted once per call, so we drive repetition ourselves.
+    // Pulse fires every RINGING_PULSE_INTERVAL_MS, restarting the Edge Lighting animation.
+    // Stopped when the call notification is removed (answered / rejected / ended).
+    private val handler = Handler(Looper.getMainLooper())
+    private var ringingKey: String? = null
+    private var ringingColor: Int = 0
+    private val ringingPulse = object : Runnable {
+        override fun run() {
+            fireLighting(ringingColor, CALL_DURATION_MS.toInt())
+            handler.postDelayed(this, RINGING_PULSE_INTERVAL_MS)
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED)) return
         if (!isScreenInteractive()) return
         if (!isAllowedPackage(sbn.packageName)) return
 
+        val isCall = sbn.notification.category == Notification.CATEGORY_CALL
+
+        if (isCall) {
+            // Start (or restart with updated color) the ringing pulse loop.
+            // We use CALL_DURATION_MS per trigger so the animation runs continuously
+            // without restarting (and disrupting directional effects like comet) for
+            // the typical ringing period. The pulse loop is a fallback for unusually
+            // long-ringing calls only.
+            val color = resolveColor(sbn)
+            seenNotificationKeys.add(sbn.key)
+            ringingKey = sbn.key
+            ringingColor = color
+            handler.removeCallbacks(ringingPulse)
+            handler.post(ringingPulse)
+            return
+        }
+
+        // Non-call notification: fire once, deduplicate rotation re-posts.
+        if (sbn.key == ringingKey) stopRingingPulse()
+        if (!seenNotificationKeys.add(sbn.key)) return
+        fireLighting(resolveColor(sbn))
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        seenNotificationKeys.remove(sbn.key)
+        if (sbn.key == ringingKey) stopRingingPulse()
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        iconColorCache.clear()
+        seenNotificationKeys.clear()
+        stopRingingPulse()
+    }
+
+    private fun stopRingingPulse() {
+        handler.removeCallbacks(ringingPulse)
+        ringingKey = null
+        sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS))
+    }
+
+    private fun fireLighting(color: Int, durationMs: Int = getConfigString(AppConfig.EDGE_LIGHTING_DURATION_MS, "3000").toIntOrNull() ?: 3000) {
+        sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING).apply {
+            putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_COLOR, color)
+            putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS, durationMs)
+        })
+    }
+
+    private fun resolveColor(sbn: StatusBarNotification): Int {
         val fallbackColor = parseColor(getConfigString(AppConfig.EDGE_LIGHTING_COLOR, DEFAULT_COLOR))
-        val color = if (getConfigBool(AppConfig.EDGE_LIGHTING_AUTO_COLOR, true)) {
+        return if (getConfigBool(AppConfig.EDGE_LIGHTING_AUTO_COLOR, true)) {
             val rawColor = sbn.notification.color
             if (rawColor != Notification.COLOR_DEFAULT) {
                 // Force full alpha: some apps omit the alpha byte (0x07C160 instead of 0xFF07C160),
@@ -40,19 +111,6 @@ class NotificationEdgeService : NotificationListenerService() {
         } else {
             fallbackColor
         }
-
-        sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING).apply {
-            putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_COLOR, color)
-            putExtra(
-                HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS,
-                getConfigString(AppConfig.EDGE_LIGHTING_DURATION_MS, "3000").toIntOrNull() ?: 3000,
-            )
-        })
-    }
-
-    override fun onListenerDisconnected() {
-        super.onListenerDisconnected()
-        iconColorCache.clear()
     }
 
     /**
@@ -121,5 +179,10 @@ class NotificationEdgeService : NotificationListenerService() {
 
     private companion object {
         const val DEFAULT_COLOR = "#00FFFF"
+        // Each ringing pulse sends a 30-second animation so directional effects (comet, flow, etc.)
+        // run continuously without restarting. 29 s interval ensures a fresh pulse fires before
+        // the current animation fades out, acting as a fallback for calls that ring unusually long.
+        const val CALL_DURATION_MS = 30_000L
+        const val RINGING_PULSE_INTERVAL_MS = 29_000L
     }
 }

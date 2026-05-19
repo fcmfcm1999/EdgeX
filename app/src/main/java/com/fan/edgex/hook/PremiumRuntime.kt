@@ -28,4 +28,13 @@ object PremiumRuntime {
             PremiumPluginLoader.disableForCurrentProcess(it)
         }
     }
+
+    fun dismissEdgeLighting() {
+        val plugin = PremiumPluginLoader.plugin ?: return
+        runCatching {
+            plugin.onScreenOff()
+        }.onFailure {
+            PremiumPluginLoader.disableForCurrentProcess(it)
+        }
+    }
 }
