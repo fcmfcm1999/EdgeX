@@ -14,3 +14,9 @@
 # Keep line numbers for crash debugging
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Kotlin runtime support classes must survive R8 shrinking.
+# The premium DEX is loaded via DexClassLoader at runtime and resolves these
+# through the parent (module) ClassLoader — if R8 removes them from the host
+# DEX they become unresolvable, causing NoClassDefFoundError in system_server.
+-keep class kotlin.jvm.internal.** { *; }
