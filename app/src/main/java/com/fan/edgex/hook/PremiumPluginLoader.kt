@@ -1,25 +1,45 @@
 package com.fan.edgex.hook
 
+import android.content.ComponentName
 import android.content.Context
-import android.util.Base64
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import com.fan.edgex.IKeystoreVerifier
 import com.fan.edgex.premium.IPremiumPlugin
 import com.fan.edgex.premium.PremiumInstall
 import dalvik.system.DexClassLoader
 import de.robv.android.xposed.XposedBridge
 import java.io.File
 import java.io.FileInputStream
+import java.security.KeyFactory
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.util.Properties
 
 object PremiumPluginLoader {
     private const val PLUGIN_CLASS = "com.fan.edgex.premium.PremiumPluginImpl"
+    private const val VERIFIER_PKG = "com.fan.edgex"
+    private const val VERIFIER_SVC = "com.fan.edgex.license.KeystoreVerifierService"
     private val SHA256_PATTERN = Regex("^[0-9a-fA-F]{64}$")
+
+    private const val INITIAL_DELAY_MS = 15_000L
+    private const val RETRY_DELAY_MS = 10_000L
+    private const val MAX_ATTEMPTS = 8
 
     @Volatile private var disabledForProcess = false
     @Volatile private var pendingPlugin: IPremiumPlugin? = null
+    @Volatile private var storedPubKeyBytes: ByteArray? = null
+    @Volatile private var challengeAttempt = 0
 
     @Volatile var plugin: IPremiumPlugin? = null
         private set
+
+    private val handler by lazy { Handler(Looper.getMainLooper()) }
 
     /**
      * Stage 1: load and hash-verify the DEX. Called from handleLoadPackage (no Context yet).
@@ -36,11 +56,6 @@ object PremiumPluginLoader {
             verifyMeta(dex, meta)
             val parent = IPremiumPlugin::class.java.classLoader
                 ?: ClassLoader.getSystemClassLoader()
-            // Child-first delegation: premium DEX classes are resolved from the plugin
-            // DEX before delegating to the module ClassLoader.  Both DEXes go through R8
-            // obfuscation independently and can produce identical short names (a.a, b.c …).
-            // Standard parent-first delegation would return the host-app class for those
-            // names, causing NoSuchFieldError when premium code accesses its own fields.
             val loader = object : DexClassLoader(dex.absolutePath, null, null, parent) {
                 override fun loadClass(name: String, resolve: Boolean): Class<*> {
                     findLoadedClass(name)?.let { return it }
@@ -68,8 +83,9 @@ object PremiumPluginLoader {
     }
 
     /**
-     * Stage 2: verify device binding via Ed25519 signature. Called once a Context is available
-     * (InputManagerService.start()). Promotes pendingPlugin to plugin on success.
+     * Stage 2: verify the server RSA signature over sha256(dex)|device_pubkey_hex.
+     * Stores the pubkey bytes and schedules the Keystore challenge (Stage 3).
+     * Called once a Context is available (InputManagerService.start()).
      */
     @Suppress("UNUSED_PARAMETER")
     fun verifyDeviceBinding(context: Context) {
@@ -78,7 +94,6 @@ object PremiumPluginLoader {
         val dex = File(PremiumInstall.DEX_PATH)
         val meta = File(PremiumInstall.META_PATH)
 
-        // Diagnostic: log DEX hash and classloader chain so failures can be pinpointed.
         runCatching {
             val metaHash = meta.readLines()
                 .firstOrNull { it.startsWith("sha256=") }
@@ -95,31 +110,25 @@ object PremiumPluginLoader {
             val properties = Properties()
             FileInputStream(meta).use(properties::load)
 
-            val metaDeviceId = properties.getProperty("device_id")?.trim()
-                ?: error("missing device_id in meta — re-activate to apply device binding")
+            val metaPubkeyHex = properties.getProperty("device_pubkey")?.trim()
+                ?: error("missing device_pubkey in meta — re-activate to apply device binding")
             val sigBase64 = properties.getProperty("device_sig")?.trim()
                 ?: error("missing device_sig in meta — re-activate to apply device binding")
-            val sigBytes = Base64.decode(sigBase64, Base64.NO_WRAP)
+            val sigBytes = android.util.Base64.decode(sigBase64, android.util.Base64.NO_WRAP)
 
-            val currentDeviceId = File(PremiumInstall.DEVICE_ID_PATH)
-                .takeIf { it.isFile && it.canRead() }
-                ?.readText()?.trim()
-                ?: error("device_id file missing — re-activate to register this device")
-            require(metaDeviceId == currentDeviceId) { "device_id mismatch" }
-
-            require(pending.verifyInstallation(dex.absolutePath, metaDeviceId, sigBytes)) {
+            require(pending.verifyInstallation(dex.absolutePath, metaPubkeyHex, sigBytes)) {
                 "installation signature invalid"
             }
 
-            plugin = pending
-            XposedBridge.log("EdgeX: premium plugin activated")
+            storedPubKeyBytes = metaPubkeyHex.hexToByteArray()
+            XposedBridge.log("EdgeX: static binding verified, scheduling keystore challenge")
+            scheduleChallenge(context)
         }.onFailure {
-            plugin = null
+            pendingPlugin = null
             disabledForProcess = true
             markBad(dex, meta)
-            XposedBridge.log("EdgeX: premium device binding failed (${it.javaClass.simpleName}): ${it.message}")
+            XposedBridge.log("EdgeX: premium static binding failed (${it.javaClass.simpleName}): ${it.message}")
         }
-        pendingPlugin = null
     }
 
     fun disableForCurrentProcess(cause: Throwable) {
@@ -128,6 +137,84 @@ object PremiumPluginLoader {
         disabledForProcess = true
         XposedBridge.log("EdgeX: premium plugin disabled for current process: ${cause.message}")
     }
+
+    /**
+     * Stage 3: ECDSA challenge-response via AIDL to prove the device holds the Keystore
+     * private key corresponding to device_pubkey in the META file.
+     * Scheduled after static binding succeeds; retried up to MAX_ATTEMPTS times.
+     */
+    private fun scheduleChallenge(context: Context) {
+        challengeAttempt = 0
+        handler.postDelayed({ attemptChallenge(context) }, INITIAL_DELAY_MS)
+    }
+
+    private fun attemptChallenge(context: Context) {
+        if (pendingPlugin == null || disabledForProcess) return
+
+        val intent = Intent().apply {
+            component = ComponentName(VERIFIER_PKG, VERIFIER_SVC)
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+        }
+
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                val pubKeyBytes = storedPubKeyBytes
+                val success = if (pubKeyBytes == null) {
+                    XposedBridge.log("EdgeX: challenge aborted — no stored pubkey")
+                    false
+                } else {
+                    runCatching {
+                        val verifier = IKeystoreVerifier.Stub.asInterface(binder)
+                        val challenge = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                        val sig = verifier.sign(challenge) ?: error("null response from verifier")
+                        verifyEcSig(challenge, sig, pubKeyBytes)
+                    }.onFailure {
+                        XposedBridge.log("EdgeX: keystore challenge error: ${it.message}")
+                    }.getOrDefault(false)
+                }
+
+                runCatching { context.unbindService(this) }
+
+                if (success) {
+                    plugin = pendingPlugin
+                    pendingPlugin = null
+                    XposedBridge.log("EdgeX: keystore challenge passed — premium active")
+                } else {
+                    pendingPlugin = null
+                    disabledForProcess = true
+                    markBad(File(PremiumInstall.DEX_PATH), File(PremiumInstall.META_PATH))
+                    XposedBridge.log("EdgeX: keystore challenge failed — premium disabled")
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {}
+        }
+
+        val bound = runCatching {
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }.getOrDefault(false)
+
+        if (!bound) {
+            challengeAttempt++
+            if (challengeAttempt < MAX_ATTEMPTS) {
+                XposedBridge.log("EdgeX: KeystoreVerifierService bind failed (attempt $challengeAttempt/$MAX_ATTEMPTS), retrying")
+                handler.postDelayed({ attemptChallenge(context) }, RETRY_DELAY_MS)
+            } else {
+                XposedBridge.log("EdgeX: keystore challenge exhausted retries — premium remains inactive")
+            }
+        }
+    }
+
+    private fun verifyEcSig(challenge: ByteArray, sig: ByteArray, pubKeyBytes: ByteArray): Boolean =
+        runCatching {
+            val pubKey = KeyFactory.getInstance("EC")
+                .generatePublic(X509EncodedKeySpec(pubKeyBytes))
+            Signature.getInstance("SHA256withECDSA").run {
+                initVerify(pubKey)
+                update(challenge)
+                verify(sig)
+            }
+        }.getOrDefault(false)
 
     private fun verifyMeta(dex: File, meta: File) {
         val properties = Properties()
@@ -179,4 +266,7 @@ object PremiumPluginLoader {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
+
+    private fun String.hexToByteArray(): ByteArray =
+        chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 }

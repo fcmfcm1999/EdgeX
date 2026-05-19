@@ -12,11 +12,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.time.Instant
-import java.util.UUID
 
 object PremiumActivator {
     private const val PREFS_NAME = "premium_activation"
-    private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_ACTIVATION_CODE = "activation_code"
     private const val KEY_INSTALLED = "installed"
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
@@ -31,7 +29,13 @@ object PremiumActivator {
         require(normalizedCode.isNotEmpty()) { "Activation code is empty" }
 
         val activation = requestActivation(context, normalizedCode)
-        downloadAndInstall(context, activation)
+        downloadAndInstall(context, dexBytes = run {
+            val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
+            val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
+            val actualHash = sha256Hex(dexBytes)
+            require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
+            dexBytes
+        }, activation)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_ACTIVATION_CODE, normalizedCode)
@@ -51,9 +55,8 @@ object PremiumActivator {
         if (workerUrl.isNotEmpty() && !code.isNullOrEmpty()) {
             val body = JSONObject()
                 .put("code", code)
-                .put("device_id", deviceId(context))
+                .put("device_pubkey", devicePubkeyHex())
                 .toString()
-            // postOk is used instead of postJson: the /deactivate endpoint returns plain text "OK"
             postOk("$workerUrl/deactivate", body)
         }
 
@@ -65,7 +68,9 @@ object PremiumActivator {
             .putBoolean(KEY_DEACTIVATED, true)
             .apply()
 
-        Shell.cmd("rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}").exec()
+        Shell.cmd(
+            "rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.LEGACY_DEVICE_ID_PATH}"
+        ).exec()
     }
 
     fun getActivationCode(context: Context): String? =
@@ -89,14 +94,17 @@ object PremiumActivator {
         if (code.isEmpty()) return@runCatching UpdateResult.SkippedMissingActivationCode
 
         val activation = requestActivation(context, code)
-        // Use the hash saved in prefs — reading the META file from /data/system/ is
-        // blocked by SELinux for normal app processes and always returns null.
         val installedHash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)
         if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
             return@runCatching UpdateResult.UpToDate
         }
 
-        downloadAndInstall(context, activation)
+        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
+        val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
+        val actualHash = sha256Hex(dexBytes)
+        require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
+        downloadAndInstall(context, dexBytes, activation)
+
         prefs.edit()
             .putBoolean(KEY_INSTALLED, true)
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
@@ -121,29 +129,18 @@ object PremiumActivator {
         val installedAtMs = prefs.getLong(KEY_INSTALLED_AT_MS, 0L)
         if (installedAtMs <= 0L) return Status.Installed
 
-        // Primary: boot count is reliable and unaffected by NTP/clock sync issues.
         val savedBootCount = prefs.getInt(KEY_INSTALL_BOOT_COUNT, -1)
         if (savedBootCount >= 0) {
             return if (bootCount(context) > savedBootCount) Status.Installed else Status.RebootRequired
         }
 
-        // Fallback for installs that predate boot-count tracking.
         val bootWallClockMs = System.currentTimeMillis() - SystemClock.elapsedRealtime()
         return if (installedAtMs > bootWallClockMs) Status.RebootRequired else Status.Installed
     }
 
-    enum class Status {
-        NotActivated,
-        RebootRequired,
-        Installed,
-    }
+    enum class Status { NotActivated, RebootRequired, Installed }
 
-    enum class UpdateResult {
-        NotInstalled,
-        SkippedMissingActivationCode,
-        UpToDate,
-        Updated,
-    }
+    enum class UpdateResult { NotInstalled, SkippedMissingActivationCode, UpToDate, Updated }
 
     private data class ActivationResponse(
         val token: String,
@@ -158,7 +155,7 @@ object PremiumActivator {
 
         val activateBody = JSONObject()
             .put("code", code)
-            .put("device_id", deviceId(context))
+            .put("device_pubkey", devicePubkeyHex())
             .toString()
 
         val activateResponse = postJson("$workerUrl/activate", activateBody)
@@ -174,36 +171,20 @@ object PremiumActivator {
         return ActivationResponse(token, expectedHash, dexVersion, deviceSig)
     }
 
-    private fun downloadAndInstall(context: Context, activation: ActivationResponse) {
-        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
-        require(workerUrl.isNotEmpty()) { "Premium worker URL is not configured" }
-
-        val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
-        val actualHash = sha256Hex(dexBytes)
-        require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
-
-        installDex(context, dexBytes, actualHash, activation.dexVersion, deviceId(context), activation.deviceSig)
-    }
-
-    private fun installDex(
-        context: Context,
-        dexBytes: ByteArray,
-        sha256: String,
-        version: Int,
-        deviceId: String,
-        deviceSig: String,
-    ) {
+    private fun downloadAndInstall(context: Context, dexBytes: ByteArray, activation: ActivationResponse) {
         val tempDex = File(context.cacheDir, "premium.dex.tmp")
         val tempMeta = File(context.cacheDir, "premium.meta.tmp")
+        val pubkeyHex = devicePubkeyHex()
+
         tempDex.writeBytes(dexBytes)
         tempMeta.writeText(
             buildString {
-                appendLine("version=$version")
-                appendLine("sha256=$sha256")
+                appendLine("version=${activation.dexVersion}")
+                appendLine("sha256=${activation.dexHash}")
                 appendLine("size=${dexBytes.size}")
                 appendLine("installed_at=${Instant.now()}")
-                appendLine("device_id=$deviceId")
-                appendLine("device_sig=$deviceSig")
+                appendLine("device_pubkey=$pubkeyHex")
+                appendLine("device_sig=${activation.deviceSig}")
             },
         )
 
@@ -212,16 +193,15 @@ object PremiumActivator {
             mkdir -p ${PremiumInstall.DIR_PATH}
             cp ${shellQuote(tempDex.absolutePath)} ${PremiumInstall.DEX_PATH}.tmp
             cp ${shellQuote(tempMeta.absolutePath)} ${PremiumInstall.META_PATH}.tmp
-            printf '%s' ${shellQuote(deviceId)} > ${PremiumInstall.DEVICE_ID_PATH}.tmp
             chown system:system ${PremiumInstall.DIR_PATH}
-            chown system:system ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}.tmp
+            chown system:system ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp
             chmod 0755 ${PremiumInstall.DIR_PATH}
-            chmod 0444 ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}.tmp
+            chmod 0444 ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp
             mv -f ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.DEX_PATH}
             mv -f ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.META_PATH}
-            mv -f ${PremiumInstall.DEVICE_ID_PATH}.tmp ${PremiumInstall.DEVICE_ID_PATH}
-            chown system:system ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}
-            chmod 0444 ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.DEVICE_ID_PATH}
+            chown system:system ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
+            chmod 0444 ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
+            rm -f ${PremiumInstall.LEGACY_DEVICE_ID_PATH}
         """.trimIndent()
         val result = Shell.cmd("sh -c ${shellQuote(installScript)}").exec()
 
@@ -233,33 +213,12 @@ object PremiumActivator {
         }
     }
 
-    private fun installedDexHash(): String? {
-        val meta = File(PremiumInstall.META_PATH)
-        if (!meta.isFile || !meta.canRead()) return null
-        return runCatching {
-            meta.readLines()
-                .firstOrNull { it.startsWith("sha256=") }
-                ?.substringAfter("=")
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
-        }.getOrNull()
-    }
+    private fun devicePubkeyHex(): String =
+        DeviceKeystore.getOrCreatePublicKeyBytes()
+            .joinToString("") { "%02x".format(it) }
 
     private fun bootCount(context: Context): Int =
         Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, 0)
-
-    private fun deviceId(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
-
-        val androidId = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ANDROID_ID,
-        )
-        val value = androidId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
-        prefs.edit().putString(KEY_DEVICE_ID, value).apply()
-        return value
-    }
 
     private fun postJson(url: String, body: String): JSONObject {
         val connection = openConnection(url).apply {
@@ -286,9 +245,7 @@ object PremiumActivator {
     }
 
     private fun getBytes(url: String): ByteArray {
-        val connection = openConnection(url).apply {
-            requestMethod = "GET"
-        }
+        val connection = openConnection(url).apply { requestMethod = "GET" }
         val code = connection.responseCode
         if (code !in 200..299) {
             val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
@@ -301,9 +258,7 @@ object PremiumActivator {
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (code !in 200..299) {
-            error("Activation failed ($code): $body")
-        }
+        if (code !in 200..299) error("Activation failed ($code): $body")
         return body
     }
 
@@ -321,8 +276,7 @@ object PremiumActivator {
     private fun shellQuote(value: String): String =
         "'" + value.replace("'", "'\"'\"'") + "'"
 
-    private fun normalizeCode(code: String): String =
-        code.trim().uppercase()
+    private fun normalizeCode(code: String): String = code.trim().uppercase()
 
     private fun urlEncode(value: String): String =
         java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
