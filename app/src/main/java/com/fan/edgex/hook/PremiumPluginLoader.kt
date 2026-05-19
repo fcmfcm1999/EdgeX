@@ -85,11 +85,13 @@ object PremiumPluginLoader {
                 "unsupported apiVersion=${instance.apiVersion}"
             }
             pendingPlugin = instance
+            writeRuntimeStatus("pending_challenge")
             XposedBridge.log("EdgeX: premium plugin verified and loaded, pending device binding")
         }.onFailure {
             pendingPlugin = null
             storedPubKeyBytes = null
             disabledForProcess = true
+            writeRuntimeStatus("failed:load:${it.javaClass.simpleName}:${it.message.orEmpty()}")
             markBad(dex, meta)
             XposedBridge.log("EdgeX: premium plugin load failed: ${it.message}")
         }
@@ -129,6 +131,7 @@ object PremiumPluginLoader {
             pendingPlugin = null
             storedPubKeyBytes = null
             disabledForProcess = true
+            writeRuntimeStatus("failed:binding:${it.javaClass.simpleName}:${it.message.orEmpty()}")
             markBad(dex, meta)
             XposedBridge.log("EdgeX: premium device binding failed (${it.javaClass.simpleName}): ${it.message}")
         }
@@ -181,10 +184,12 @@ object PremiumPluginLoader {
                 if (success) {
                     plugin = pendingPlugin
                     pendingPlugin = null
+                    writeRuntimeStatus("active")
                     XposedBridge.log("EdgeX: keystore challenge passed — premium active")
                 } else {
                     pendingPlugin = null
                     disabledForProcess = true
+                    writeRuntimeStatus("failed:challenge")
                     markBad(File(PremiumInstall.DEX_PATH), File(PremiumInstall.META_PATH))
                     XposedBridge.log("EdgeX: keystore challenge failed — premium disabled")
                 }
@@ -203,6 +208,7 @@ object PremiumPluginLoader {
                 XposedBridge.log("EdgeX: KeystoreVerifierService bind failed (attempt $challengeAttempt/$MAX_ATTEMPTS), retrying")
                 handler.postDelayed({ attemptChallenge(context) }, RETRY_DELAY_MS)
             } else {
+                writeRuntimeStatus("failed:challenge_bind")
                 XposedBridge.log("EdgeX: keystore challenge exhausted retries — premium remains inactive")
             }
         }
@@ -278,6 +284,36 @@ object PremiumPluginLoader {
         val devicePubkeyHex: String,
         val deviceSigBytes: ByteArray,
     )
+
+    private fun writeRuntimeStatus(status: String) {
+        runCatching {
+            val safeStatus = status.replace('\n', ' ').replace('\r', ' ')
+            val target = File(PremiumInstall.RUNTIME_STATUS_PATH)
+            val dir = target.parentFile ?: error("missing runtime status parent")
+            val content = buildString {
+                appendLine("status=$safeStatus")
+                appendLine("updated_at=${System.currentTimeMillis()}")
+            }
+            val tmp = File(dir, "${target.name}.tmp.${android.os.Process.myPid()}.${System.nanoTime()}")
+            try {
+                tmp.writeText(content)
+                tmp.setReadable(true, false)
+                tmp.setWritable(true, true)
+                if (!tmp.renameTo(target)) {
+                    target.setWritable(true, true)
+                    target.writeText(content)
+                    target.setReadable(true, false)
+                    target.setWritable(true, true)
+                    tmp.delete()
+                }
+            } catch (throwable: Throwable) {
+                tmp.delete()
+                throw throwable
+            }
+        }.onFailure {
+            XposedBridge.log("EdgeX: failed to write premium runtime status: ${it.message}")
+        }
+    }
 
     private fun String.hexToByteArray(): ByteArray =
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()

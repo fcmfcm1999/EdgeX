@@ -199,7 +199,13 @@ class MainActivity : AppCompatActivity() {
         val statusRes = when (PremiumActivator.status(this)) {
             PremiumActivator.Status.NotActivated -> R.string.menu_premium_not_activated
             PremiumActivator.Status.RebootRequired -> R.string.menu_premium_reboot_required
-            PremiumActivator.Status.Installed -> R.string.menu_premium_installed
+            PremiumActivator.Status.Installed -> when (PremiumActivator.runtimeInfo().state) {
+                PremiumActivator.RuntimeState.Active -> R.string.menu_premium_installed
+                PremiumActivator.RuntimeState.Failed -> R.string.premium_status_runtime_failed
+                PremiumActivator.RuntimeState.Missing,
+                PremiumActivator.RuntimeState.Installed,
+                PremiumActivator.RuntimeState.PendingVerification -> R.string.premium_status_runtime_pending
+            }
         }
         findViewById<TextView>(R.id.text_premium_desc).text = getString(statusRes)
     }

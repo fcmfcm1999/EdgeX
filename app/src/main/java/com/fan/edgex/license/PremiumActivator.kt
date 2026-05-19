@@ -8,10 +8,12 @@ import com.fan.edgex.premium.PremiumInstall
 import com.topjohnwu.superuser.Shell
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.time.Instant
+import java.util.Properties
 
 object PremiumActivator {
     private const val PREFS_NAME = "premium_activation"
@@ -69,7 +71,7 @@ object PremiumActivator {
             .apply()
 
         Shell.cmd(
-            "rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.LEGACY_DEVICE_ID_PATH}"
+            "rm -f ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH} ${PremiumInstall.RUNTIME_STATUS_PATH} ${PremiumInstall.LEGACY_DEVICE_ID_PATH}"
         ).exec()
     }
 
@@ -142,6 +144,31 @@ object PremiumActivator {
 
     enum class UpdateResult { NotInstalled, SkippedMissingActivationCode, UpToDate, Updated }
 
+    enum class RuntimeState { Missing, Installed, PendingVerification, Active, Failed }
+
+    data class RuntimeInfo(val state: RuntimeState, val message: String?)
+
+    fun runtimeInfo(): RuntimeInfo {
+        val file = File(PremiumInstall.RUNTIME_STATUS_PATH)
+        if (!file.isFile) return RuntimeInfo(RuntimeState.Missing, null)
+
+        return runCatching {
+            val properties = Properties()
+            FileInputStream(file).use(properties::load)
+            val status = properties.getProperty("status")?.trim().orEmpty()
+            when {
+                status == "active" -> RuntimeInfo(RuntimeState.Active, null)
+                status == "installed" -> RuntimeInfo(RuntimeState.Installed, null)
+                status == "pending_challenge" -> RuntimeInfo(RuntimeState.PendingVerification, null)
+                status.startsWith("failed") -> RuntimeInfo(
+                    RuntimeState.Failed,
+                    status.substringAfter("failed:", missingDelimiterValue = "").takeIf { it.isNotBlank() },
+                )
+                else -> RuntimeInfo(RuntimeState.Missing, status.takeIf { it.isNotBlank() })
+            }
+        }.getOrDefault(RuntimeInfo(RuntimeState.Missing, null))
+    }
+
     private data class ActivationResponse(
         val token: String,
         val dexHash: String,
@@ -199,8 +226,11 @@ object PremiumActivator {
             chmod 0444 ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.META_PATH}.tmp
             mv -f ${PremiumInstall.DEX_PATH}.tmp ${PremiumInstall.DEX_PATH}
             mv -f ${PremiumInstall.META_PATH}.tmp ${PremiumInstall.META_PATH}
+            printf 'status=installed\nupdated_at=%s\n' "$(date +%s)" > ${PremiumInstall.RUNTIME_STATUS_PATH}
             chown system:system ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
+            chown system:system ${PremiumInstall.RUNTIME_STATUS_PATH}
             chmod 0444 ${PremiumInstall.DEX_PATH} ${PremiumInstall.META_PATH}
+            chmod 0644 ${PremiumInstall.RUNTIME_STATUS_PATH}
             rm -f ${PremiumInstall.LEGACY_DEVICE_ID_PATH}
         """.trimIndent()
         val result = Shell.cmd("sh -c ${shellQuote(installScript)}").exec()

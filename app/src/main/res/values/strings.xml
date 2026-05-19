@@ -43,8 +43,12 @@
     <string name="premium_section_features">Premium Features</string>
     <string name="premium_status_active">Premium Active</string>
     <string name="premium_status_reboot">Reboot Required</string>
+    <string name="premium_status_runtime_pending">Runtime verification pending</string>
+    <string name="premium_status_runtime_failed">Runtime verification failed</string>
     <string name="premium_desc_not_activated">Support the project to get an activation code</string>
     <string name="premium_desc_reboot">Reboot your device to enable Premium</string>
+    <string name="premium_desc_runtime_pending">Premium is installed, but system_server has not completed verification yet.</string>
+    <string name="premium_desc_runtime_failed">Premium is installed, but system_server rejected it. Re-activate or check the Xposed log.</string>
     <string name="premium_code_label">Code: %s</string>
     <string name="premium_deactivate">Unbind</string>
     <string name="premium_deactivate_confirm_title">Unbind Premium?</string>
