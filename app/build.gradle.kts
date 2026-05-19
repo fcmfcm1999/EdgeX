@@ -87,6 +87,7 @@ android {
 
 dependencies {
     compileOnly("de.robv.android.xposed:api:82")
+    implementation(project(":premium-api"))
     implementation("com.github.topjohnwu.libsu:core:6.0.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

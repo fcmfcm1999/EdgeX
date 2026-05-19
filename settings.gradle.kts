@@ -23,11 +23,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "EdgeX"
 include(":app")
+include(":premium-api")
 
-// Premium plugin modules are proprietary and not included in this repo.
-// When the directories are present locally, they are included automatically
+// Premium implementation modules are proprietary and not included in this repo.
+// When the directory is present locally, it is included automatically
 // so ./gradlew :premium:assembleRelease works without any manual changes.
 if (file("premium").exists()) {
-    include(":premium-api")
     include(":premium")
 }

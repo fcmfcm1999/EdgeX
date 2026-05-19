@@ -11,8 +11,8 @@ interface IPremiumPlugin {
      * Called from system_server after the DEX is loaded; returning false disables the plugin.
      *
      * @param dexPath absolute path to the installed DEX file (used to compute its hash)
-     * @param devicePubkeyHex hex-encoded EC public key that was bound at activation time
-     * @param sigBytes raw RSA-2048/SHA-256 signature over sha256hex(dex)+"|"+devicePubkeyHex
+     * @param devicePubkeyHex hex X.509 encoding of the device's Keystore EC public key
+     * @param sigBytes raw RSA/SHA-256 signature over sha256hex(dex)+"|"+devicePubkeyHex
      */
     fun verifyInstallation(dexPath: String, devicePubkeyHex: String, sigBytes: ByteArray): Boolean
 

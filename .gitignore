@@ -29,6 +29,4 @@ scripts
 /cloudflare-worker/
 # Premium plugin source and build tools — not distributed in this repo
 /premium/
-/premium-api/
 /tools/
-
