@@ -391,4 +391,6 @@
     <string name="edge_lighting_width_dp">%d dp</string>
     <string name="edge_lighting_duration_ms">%d ms</string>
     <string name="edge_lighting_alpha_pct">%d%%</string>
+    <string name="edge_lighting_preview_notification_title">新通知</string>
+    <string name="edge_lighting_preview_notification_body">Edge Lighting 已触发</string>
 </resources>

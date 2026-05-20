@@ -57,20 +57,81 @@
             <!-- Live Preview -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
-                android:background="@drawable/bg_preview_dark"
+                android:layout_height="360dp"
                 android:clipToOutline="true">
 
-                <com.fan.edgex.overlay.EdgeLightingView
-                    android:id="@+id/preview_lighting_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                <FrameLayout
+                    android:id="@+id/preview_phone_frame"
+                    android:layout_width="176dp"
+                    android:layout_height="320dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_edge_lighting_phone_preview"
+                    android:clipToOutline="true">
+
+                    <com.fan.edgex.overlay.EdgeLightingView
+                        android:id="@+id/preview_lighting_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+
+                    <View
+                        android:layout_width="24dp"
+                        android:layout_height="3dp"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="11dp"
+                        android:background="@drawable/bg_edge_lighting_phone_speaker" />
+
+                    <LinearLayout
+                        android:layout_width="144dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="top|center_horizontal"
+                        android:layout_marginTop="30dp"
+                        android:background="@drawable/bg_edge_lighting_notification_preview"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp">
+
+                        <View
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:background="@drawable/bg_edge_lighting_notification_dot" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:singleLine="true"
+                                android:text="@string/edge_lighting_preview_notification_title"
+                                android:textColor="#E6000000"
+                                android:textSize="10sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:singleLine="true"
+                                android:text="@string/edge_lighting_preview_notification_body"
+                                android:textColor="#99000000"
+                                android:textSize="8sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </FrameLayout>
 
                 <TextView
                     android:id="@+id/preview_effect_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="14dp"
+                    android:layout_marginBottom="12dp"
                     android:textColor="#AAFFFFFF"
                     android:textSize="13sp" />
             </FrameLayout>
