@@ -12,6 +12,7 @@ import android.graphics.Shader
 import androidx.core.graphics.ColorUtils
 import android.view.View
 import com.fan.edgex.config.AppConfig
+import kotlin.math.roundToInt
 
 class EdgeLightingView @JvmOverloads constructor(
     context: Context,
@@ -217,10 +218,12 @@ class EdgeLightingView @JvmOverloads constructor(
             LinearGradient(0f, 0f, 0f, gradientLength, colors, positions, Shader.TileMode.MIRROR)
         }
         shaderMatrix.reset()
+        val periodCount = (1f / widthFactor.coerceIn(0.1f, 1f)).roundToInt().coerceAtLeast(1)
+        val offset = gradientLength * 2f * periodCount * flowProgress
         if (horizontal) {
-            shaderMatrix.setTranslate(length * flowProgress * 2f, 0f)
+            shaderMatrix.setTranslate(offset, 0f)
         } else {
-            shaderMatrix.setTranslate(0f, length * flowProgress * 2f)
+            shaderMatrix.setTranslate(0f, offset)
         }
         shader.setLocalMatrix(shaderMatrix)
         return shader
@@ -317,12 +320,13 @@ class EdgeLightingView @JvmOverloads constructor(
         } else {
             LinearGradient(0f, 0f, 0f, gradientLength, colors, null, Shader.TileMode.REPEAT)
         }
-        val normalizedPhase = phase - phase.toInt()
+        val normalizedPhase = ((phase % 1f) + 1f) % 1f
         shaderMatrix.reset()
+        val offset = gradientLength * 3f * normalizedPhase
         if (horizontal) {
-            shaderMatrix.setTranslate(length * normalizedPhase * 1.8f, 0f)
+            shaderMatrix.setTranslate(offset, 0f)
         } else {
-            shaderMatrix.setTranslate(0f, length * normalizedPhase * 1.8f)
+            shaderMatrix.setTranslate(0f, offset)
         }
         shader.setLocalMatrix(shaderMatrix)
         return shader
