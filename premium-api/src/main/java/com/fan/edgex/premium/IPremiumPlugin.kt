@@ -25,5 +25,21 @@ interface IPremiumPlugin {
         alpha: Float,
     ): Boolean
 
+    fun onFluidGestureDown(
+        context: Context,
+        edge: String,
+        touchX: Float,
+        touchY: Float,
+        screenWidth: Float,
+        screenHeight: Float,
+        color: Int,
+        sizeProgress: Int,
+        alpha: Float,
+    ): Boolean
+
+    fun onFluidGestureMove(touchX: Float, touchY: Float): Boolean
+
+    fun onFluidGestureUp(onComplete: Runnable?): Boolean
+
     fun onScreenOff()
 }

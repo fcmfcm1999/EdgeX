@@ -84,6 +84,15 @@ object PremiumPluginLoader {
             require(instance.apiVersion == PremiumInstall.SUPPORTED_API_VERSION) {
                 "unsupported apiVersion=${instance.apiVersion}"
             }
+            require(
+                instance.verifyInstallation(
+                    dexPath = dex.absolutePath,
+                    devicePubkeyHex = installMeta.devicePubkeyHex,
+                    sigBytes = installMeta.deviceSigBytes,
+                ),
+            ) {
+                "plugin installation verification failed"
+            }
             pendingPlugin = instance
             XposedBridge.log("EdgeX: premium plugin verified and loaded, pending device binding")
         }.onFailure {

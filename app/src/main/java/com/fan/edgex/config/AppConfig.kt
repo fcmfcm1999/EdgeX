@@ -31,6 +31,15 @@ object AppConfig {
     const val EDGE_LIGHTING_EFFECT_ECHO = "echo"
     const val EDGE_LIGHTING_EFFECT_COMET = "comet"
     const val EDGE_LIGHTING_EFFECT_RIPPLE = "ripple"
+    const val FLUID_GESTURE_ENABLED = "fluid_gesture_enabled"
+    const val FLUID_GESTURE_COLOR = "fluid_gesture_color"
+    const val FLUID_GESTURE_COLOR_LEFT = "fluid_gesture_color_left"
+    const val FLUID_GESTURE_COLOR_RIGHT = "fluid_gesture_color_right"
+    const val FLUID_GESTURE_COLOR_TOP = "fluid_gesture_color_top"
+    const val FLUID_GESTURE_COLOR_BOTTOM = "fluid_gesture_color_bottom"
+    const val FLUID_GESTURE_SIZE = "fluid_gesture_size"
+    const val FLUID_GESTURE_ALPHA = "fluid_gesture_alpha"
+    const val FLUID_GESTURE_SIZE_DEFAULT = 63
 
     const val HAPTIC_FEEDBACK_TYPE_CLICK = "click"
     const val HAPTIC_FEEDBACK_TYPE_TICK = "tick"

@@ -30,8 +30,22 @@ object GestureManager {
     private var screenStateReceiverRegistered = false
     private var systemConfigReceiverRegistered = false
     private var keyManagerInitialized = false
+    private var fluidPremiumInactiveLogged = false
+    private val fluidActionLock = Any()
+    private var fluidGestureSequence = 0L
+    private var activeFluidGestureId = 0L
+    private var fluidGestureActive = false
+    private val pendingFluidActions = mutableListOf<PendingFluidAction>()
+    private var fluidMovePosted = false
+    private var pendingFluidMoveX = 0f
+    private var pendingFluidMoveY = 0f
 
     private var mHandler: Handler? = null
+
+    private data class PendingFluidAction(
+        val gestureId: Long,
+        val action: Runnable,
+    )
 
     private val nativeTouchHandoff = NativeTouchHandoff { message ->
         log(message)
@@ -78,7 +92,12 @@ object GestureManager {
                     touchX: Float,
                     touchY: Float,
                 ) {
-                    actionDispatcher.triggerGestureAction(zone, gestureType, context, touchX, touchY)
+                    val action = Runnable {
+                        actionDispatcher.triggerGestureAction(zone, gestureType, context, touchX, touchY)
+                    }
+                    if (!enqueueUntilFluidComplete(action)) {
+                        action.run()
+                    }
                 }
 
                 override fun performContinuousAdjustment(action: String, context: Context, up: Boolean) {
@@ -112,6 +131,86 @@ object GestureManager {
                 override fun cancelPie() {
                     mainHandler().post { PieManager.dismiss() }
                 }
+
+                override fun onFluidGestureDown(
+                    zone: String,
+                    touchX: Float,
+                    touchY: Float,
+                    screenW: Float,
+                    screenH: Float,
+                ) {
+                    if (configRepository.get(AppConfig.FLUID_GESTURE_ENABLED, "true") != "true") return
+                    if (!PremiumRuntime.isActive()) {
+                        if (!fluidPremiumInactiveLogged) {
+                            fluidPremiumInactiveLogged = true
+                            log("Fluid Gesture skipped: Supporter Extras premium DEX is not active")
+                        }
+                        return
+                    }
+
+                    val edge = zone.substringBefore("_")
+                    val edgeColorKey = when (edge) {
+                        "left" -> AppConfig.FLUID_GESTURE_COLOR_LEFT
+                        "right" -> AppConfig.FLUID_GESTURE_COLOR_RIGHT
+                        "top" -> AppConfig.FLUID_GESTURE_COLOR_TOP
+                        "bottom" -> AppConfig.FLUID_GESTURE_COLOR_BOTTOM
+                        else -> null
+                    }
+                    val colorValue = edgeColorKey
+                        ?.let { configRepository.get(it).takeIf(String::isNotEmpty) }
+                        ?: configRepository.get(AppConfig.FLUID_GESTURE_COLOR, DEFAULT_FLUID_COLOR)
+                    val color = parseFluidColor(colorValue)
+                    val sizeProgress = configRepository
+                        .get(AppConfig.FLUID_GESTURE_SIZE, AppConfig.FLUID_GESTURE_SIZE_DEFAULT.toString())
+                        .toIntOrNull()
+                        ?.coerceIn(0, 100)
+                        ?: AppConfig.FLUID_GESTURE_SIZE_DEFAULT
+                    val alpha = configRepository
+                        .get(AppConfig.FLUID_GESTURE_ALPHA, "0.8")
+                        .toFloatOrNull()
+                        ?.coerceIn(0f, 1f)
+                        ?: 0.8f
+
+                    val sysCtx = systemContext ?: return
+                    val gestureId = beginFluidGestureGate()
+                    mainHandler().post {
+                        val shown = PremiumRuntime.onFluidGestureDown(
+                            sysCtx,
+                            edge,
+                            touchX,
+                            touchY,
+                            screenW,
+                            screenH,
+                            color,
+                            sizeProgress,
+                            alpha,
+                        )
+                        if (!shown) {
+                            log("Fluid Gesture skipped: premium runtime returned false")
+                            completeFluidGestureGate(gestureId)
+                        }
+                    }
+                }
+
+                override fun onFluidGestureMove(touchX: Float, touchY: Float) {
+                    postFluidGestureMove(touchX, touchY)
+                }
+
+                override fun onFluidGestureUp() {
+                    val gestureId = currentFluidGestureId()
+                    mainHandler().post {
+                        if (gestureId == 0L) {
+                            PremiumRuntime.onFluidGestureUp()
+                            return@post
+                        }
+                        val accepted = PremiumRuntime.onFluidGestureUp(
+                            Runnable { completeFluidGestureGate(gestureId) },
+                        )
+                        if (!accepted) {
+                            completeFluidGestureGate(gestureId)
+                        }
+                    }
+                }
             },
         )
     }
@@ -125,6 +224,67 @@ object GestureManager {
 
     private fun gestureLog(message: String) {
         XposedBridge.log("$TAG: [Gesture] $message")
+    }
+
+    private fun beginFluidGestureGate(): Long =
+        synchronized(fluidActionLock) {
+            fluidGestureSequence += 1
+            activeFluidGestureId = fluidGestureSequence
+            fluidGestureActive = true
+            activeFluidGestureId
+        }
+
+    private fun currentFluidGestureId(): Long =
+        synchronized(fluidActionLock) {
+            if (fluidGestureActive) activeFluidGestureId else 0L
+        }
+
+    private fun enqueueUntilFluidComplete(action: Runnable): Boolean =
+        synchronized(fluidActionLock) {
+            if (!fluidGestureActive) return false
+            pendingFluidActions += PendingFluidAction(activeFluidGestureId, action)
+            true
+        }
+
+    private fun postFluidGestureMove(touchX: Float, touchY: Float) {
+        synchronized(fluidActionLock) {
+            if (!fluidGestureActive) return
+            pendingFluidMoveX = touchX
+            pendingFluidMoveY = touchY
+            if (fluidMovePosted) return
+            fluidMovePosted = true
+        }
+        mainHandler().post {
+            val move = synchronized(fluidActionLock) {
+                fluidMovePosted = false
+                if (!fluidGestureActive) return@post
+                pendingFluidMoveX to pendingFluidMoveY
+            }
+            PremiumRuntime.onFluidGestureMove(move.first, move.second)
+        }
+    }
+
+    private fun completeFluidGestureGate(gestureId: Long) {
+        val actions = synchronized(fluidActionLock) {
+            if (activeFluidGestureId == gestureId) {
+                fluidGestureActive = false
+            }
+            fluidMovePosted = false
+            val ready = pendingFluidActions.filter { it.gestureId == gestureId }
+            pendingFluidActions.removeAll { it.gestureId == gestureId }
+            ready
+        }
+        actions.forEach { pending ->
+            mainHandler().post(pending.action)
+        }
+    }
+
+    private fun cancelFluidGestureGate() {
+        synchronized(fluidActionLock) {
+            fluidGestureActive = false
+            fluidMovePosted = false
+            pendingFluidActions.clear()
+        }
     }
 
     private fun ensureSystemServerInitialized(context: Context, initializeKeys: Boolean) {
@@ -169,6 +329,7 @@ object GestureManager {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
+                        cancelFluidGestureGate()
                         gestureDetector.reset()
                         KeyManager.reset()
                         mainHandler().post {
@@ -355,5 +516,18 @@ object GestureManager {
         } catch (_: Exception) {
             fallback
         }
+
+    private fun parseFluidColor(value: String): Int {
+        val normalized = value.removePrefix("#")
+        return runCatching {
+            when (normalized.length) {
+                6 -> (0xFF000000.toInt() or normalized.toInt(16))
+                8 -> java.lang.Long.parseLong(normalized, 16).toInt()
+                else -> java.lang.Long.parseLong(DEFAULT_FLUID_COLOR, 16).toInt()
+            }
+        }.getOrDefault(0xCCFFFFFF.toInt())
+    }
+
+    private const val DEFAULT_FLUID_COLOR = "CCFFFFFF"
 
 }
