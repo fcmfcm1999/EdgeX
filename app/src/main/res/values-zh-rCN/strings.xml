@@ -41,7 +41,7 @@
     <string name="premium_section_features">Supporter Extras</string>
     <string name="premium_status_active">Supporter Extras 已激活</string>
     <string name="premium_status_reboot">需要重启</string>
-    <string name="premium_desc_not_activated">支持项目以获取激活码</string>
+    <string name="premium_desc_not_activated">捐赠 30 元后，请将捐赠截图发送至 fcmfantasy1999@gmail.com，我会回复激活码。\n\n如果你在 2026 年 5 月 21 日前捐赠过任意金额，也请附上捐赠截图。</string>
     <string name="premium_desc_reboot">重启设备以启用 Supporter Extras</string>
     <string name="premium_code_label">激活码：%s</string>
     <string name="premium_deactivate">解绑</string>
