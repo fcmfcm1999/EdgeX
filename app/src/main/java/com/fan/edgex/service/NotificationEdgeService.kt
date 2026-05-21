@@ -1,6 +1,7 @@
 package com.fan.edgex.service
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -46,6 +47,7 @@ class NotificationEdgeService : NotificationListenerService() {
         if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED)) return
         if (!isScreenInteractive()) return
         if (!isAllowedPackage(sbn.packageName)) return
+        if (isSilentNotification(sbn)) return
 
         val isCall = sbn.notification.category == Notification.CATEGORY_CALL
 
@@ -93,6 +95,14 @@ class NotificationEdgeService : NotificationListenerService() {
             putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_COLOR, color)
             putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS, durationMs)
         })
+    }
+
+    private fun isSilentNotification(sbn: StatusBarNotification): Boolean {
+        val ranking = Ranking()
+        return runCatching {
+            currentRanking.getRanking(sbn.key, ranking) &&
+                ranking.importance in NotificationManager.IMPORTANCE_NONE until NotificationManager.IMPORTANCE_DEFAULT
+        }.getOrDefault(false)
     }
 
     private fun resolveColor(sbn: StatusBarNotification): Int {
