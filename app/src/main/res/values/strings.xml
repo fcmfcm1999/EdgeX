@@ -58,6 +58,15 @@
     <string name="premium_activation_in_progress">Activating…</string>
     <string name="premium_activation_success">Supporter Extras installed. Reboot your phone to enable it.</string>
     <string name="premium_activation_failed">Activation failed: %s</string>
+    <string name="premium_activation_error_empty_code">Enter your activation code first.</string>
+    <string name="premium_activation_error_invalid_code">This activation code is invalid. Check the code and try again.</string>
+    <string name="premium_activation_error_not_configured">Activation is not configured in this build.</string>
+    <string name="premium_activation_error_package_verify">The downloaded package could not be verified. Try again later.</string>
+    <string name="premium_activation_error_unsupported_version">This activation package is not compatible with the current app version.</string>
+    <string name="premium_activation_error_download">Could not download Supporter Extras. Check your network and try again.</string>
+    <string name="premium_activation_error_root">Could not install Supporter Extras. Check root authorization and try again.</string>
+    <string name="premium_activation_error_network">Could not reach the activation server. Check your network and try again.</string>
+    <string name="premium_activation_error_server">The activation server returned an error. Try again later.</string>
     <string name="premium_update_success">Supporter Extras updated. Reboot your phone to enable it.</string>
     <string name="premium_update_failed">Supporter Extras update failed: %s</string>
     <string name="premium_update_download">Download update</string>

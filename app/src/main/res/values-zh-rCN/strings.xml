@@ -56,6 +56,15 @@
     <string name="premium_activation_in_progress">正在激活…</string>
     <string name="premium_activation_success">Supporter Extras 已安装，重启手机后生效。</string>
     <string name="premium_activation_failed">激活失败：%s</string>
+    <string name="premium_activation_error_empty_code">请先输入激活码。</string>
+    <string name="premium_activation_error_invalid_code">激活码无效，请检查后重试。</string>
+    <string name="premium_activation_error_not_configured">当前构建未配置激活服务。</string>
+    <string name="premium_activation_error_package_verify">下载的安装包校验失败，请稍后重试。</string>
+    <string name="premium_activation_error_unsupported_version">激活包与当前应用版本不兼容。</string>
+    <string name="premium_activation_error_download">无法下载 Supporter Extras，请检查网络后重试。</string>
+    <string name="premium_activation_error_root">无法安装 Supporter Extras，请检查 Root 授权后重试。</string>
+    <string name="premium_activation_error_network">无法连接激活服务器，请检查网络后重试。</string>
+    <string name="premium_activation_error_server">激活服务器返回异常，请稍后重试。</string>
     <string name="premium_update_success">Supporter Extras 已更新，重启手机后生效。</string>
     <string name="premium_update_failed">Supporter Extras 更新失败：%s</string>
     <string name="premium_update_download">下载更新</string>

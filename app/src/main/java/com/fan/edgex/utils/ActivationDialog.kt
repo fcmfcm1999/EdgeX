@@ -51,7 +51,7 @@ object ActivationDialog {
                             dialog.setMessage(
                                 context.getString(
                                     R.string.premium_activation_failed,
-                                    it.message ?: it.javaClass.simpleName,
+                                    activationFailureMessage(context, it),
                                 ),
                             )
                         }
@@ -66,6 +66,35 @@ object ActivationDialog {
         }
 
         dialog.show()
+    }
+
+    private fun activationFailureMessage(context: Context, throwable: Throwable): String {
+        val rawMessage = throwable.message.orEmpty()
+        val message = rawMessage.lowercase()
+        return when {
+            message.contains("activation code is empty") ->
+                context.getString(R.string.premium_activation_error_empty_code)
+            message.contains("invalid code") || message.contains("activation failed (404)") ->
+                context.getString(R.string.premium_activation_error_invalid_code)
+            message.contains("worker url is not configured") ->
+                context.getString(R.string.premium_activation_error_not_configured)
+            message.contains("downloaded premium dex hash mismatch") ->
+                context.getString(R.string.premium_activation_error_package_verify)
+            message.contains("unsupported premium version") ->
+                context.getString(R.string.premium_activation_error_unsupported_version)
+            message.contains("download failed") ->
+                context.getString(R.string.premium_activation_error_download)
+            message.contains("root install failed") || message.contains("permission denied") ->
+                context.getString(R.string.premium_activation_error_root)
+            message.contains("timeout") ||
+                message.contains("failed to connect") ||
+                message.contains("unable to resolve host") ||
+                throwable.javaClass.name.startsWith("java.net.") ->
+                context.getString(R.string.premium_activation_error_network)
+            message.contains("activation failed (") || message.contains("request failed (") ->
+                context.getString(R.string.premium_activation_error_server)
+            else -> rawMessage.ifBlank { throwable.javaClass.simpleName }
+        }
     }
 
     private fun hideKeyboard(context: Context, input: EditText) {
