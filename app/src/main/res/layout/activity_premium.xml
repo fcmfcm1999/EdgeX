@@ -13,6 +13,7 @@
         android:layout_height="wrap_content"
         android:minHeight="?attr/actionBarSize"
         android:background="@color/ui_header_background"
+        android:fitsSystemWindows="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="4dp"

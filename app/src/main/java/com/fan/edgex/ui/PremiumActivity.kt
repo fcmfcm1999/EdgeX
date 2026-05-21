@@ -30,6 +30,15 @@ class PremiumActivity : AppCompatActivity() {
         setContentView(R.layout.activity_premium)
         ThemeManager.applyToActivity(this)
 
+        findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
+            view.setPadding(
+                view.paddingLeft,
+                insets.getInsets(android.view.WindowInsets.Type.statusBars()).top,
+                view.paddingRight,
+                view.paddingBottom,
+            )
+            insets
+        }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
         findViewById<View>(R.id.item_edge_lighting).setOnClickListener {
