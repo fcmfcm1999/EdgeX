@@ -43,7 +43,7 @@
     <string name="premium_section_features">Supporter Extras</string>
     <string name="premium_status_active">Supporter Extras Active</string>
     <string name="premium_status_reboot">Reboot Required</string>
-    <string name="premium_desc_not_activated">Donate $5, then email your donation screenshot to fcmfantasy1999@gmail.com. I will reply with an activation code.\n\nIf you donated any amount before May 21, 2026, send that screenshot too.</string>
+    <string name="premium_desc_not_activated">Supporter Extras includes a few small features for donors, plus some of my less serious ideas that may still be useful.\n\nDonate $3 or more, then email your donation screenshot to fcmfantasy1999@gmail.com. I will reply with an activation code.\n\nIf you donated any amount before May 21, 2026, send that screenshot too.</string>
     <string name="premium_desc_reboot">Reboot your device to enable Supporter Extras</string>
     <string name="premium_code_label">Code: %s</string>
     <string name="premium_deactivate">Unbind</string>
