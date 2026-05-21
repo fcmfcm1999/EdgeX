@@ -387,7 +387,7 @@
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:layout_gravity="center"
-                        android:src="@drawable/ic_donate"
+                        android:src="@drawable/ic_supporter_extra"
                         app:tint="@color/ui_icon_tint" />
                 </FrameLayout>
 

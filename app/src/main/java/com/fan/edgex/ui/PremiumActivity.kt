@@ -78,7 +78,7 @@ class PremiumActivity : AppCompatActivity() {
                 },
             )
             PremiumActivator.Status.Installed -> StateVisuals(
-                iconRes = R.drawable.ic_donate,
+                iconRes = R.drawable.ic_supporter_extra,
                 iconColorArgb = getColor(R.color.ui_icon_bg),
                 titleRes = R.string.premium_status_active,
                 descText = buildString {
