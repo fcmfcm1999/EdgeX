@@ -366,7 +366,7 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
-            <!-- Item: Premium -->
+            <!-- Item: Supporter Extras -->
             <LinearLayout
                 android:id="@+id/item_premium"
                 android:layout_width="match_parent"
