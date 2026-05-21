@@ -44,12 +44,12 @@ class EdgeLightingSettingsActivity : AppCompatActivity() {
     private val effects = listOf(
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_BASIC, R.string.edge_lighting_effect_basic),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_BREATHING, R.string.edge_lighting_effect_breathing),
+        EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_COMET, R.string.edge_lighting_effect_comet),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_FLOW, R.string.edge_lighting_effect_flow),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_MULTICOLOR, R.string.edge_lighting_effect_multicolor),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_SPOTLIGHT, R.string.edge_lighting_effect_spotlight),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_ECLIPSE, R.string.edge_lighting_effect_eclipse),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_ECHO, R.string.edge_lighting_effect_echo),
-        EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_COMET, R.string.edge_lighting_effect_comet),
         EffectOption(AppConfig.EDGE_LIGHTING_EFFECT_RIPPLE, R.string.edge_lighting_effect_ripple),
     )
     private var selectedEffect = AppConfig.EDGE_LIGHTING_EFFECT_BASIC
