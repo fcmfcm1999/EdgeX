@@ -20,6 +20,7 @@ object PremiumActivator {
     private const val KEY_INSTALLED_AT_MS = "installed_at_ms"
     private const val KEY_INSTALL_BOOT_COUNT = "install_boot_count"
     private const val KEY_INSTALLED_DEX_HASH = "installed_dex_hash"
+    private const val KEY_INSTALLED_DEX_VERSION = "installed_dex_version"
     private const val KEY_DEACTIVATED = "deactivated"
     private const val CONNECT_TIMEOUT_MS = 10_000
     private const val READ_TIMEOUT_MS = 30_000
@@ -43,6 +44,7 @@ object PremiumActivator {
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
             .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
             .putString(KEY_INSTALLED_DEX_HASH, activation.dexHash)
+            .putInt(KEY_INSTALLED_DEX_VERSION, activation.dexVersion)
             .putBoolean(KEY_DEACTIVATED, false)
             .apply()
     }
@@ -77,13 +79,44 @@ object PremiumActivator {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_ACTIVATION_CODE, null)
 
-    data class DexInfo(val hashPrefix: String, val installedAtMs: Long)
+    data class DexInfo(val apiVersion: Int, val hashPrefix: String, val installedAtMs: Long)
 
     fun getDexInfo(context: Context): DexInfo? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val hash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)?.take(8) ?: return null
+        val apiVersion = prefs.getInt(KEY_INSTALLED_DEX_VERSION, PremiumInstall.SUPPORTED_API_VERSION)
         val ts = prefs.getLong(KEY_INSTALLED_AT_MS, 0L).takeIf { it > 0 } ?: return null
-        return DexInfo(hash, ts)
+        return DexInfo(apiVersion, hash, ts)
+    }
+
+    data class DexUpdateInfo(val apiVersion: Int, val hashPrefix: String)
+
+    sealed class DexUpdateStatus {
+        data object NotInstalled : DexUpdateStatus()
+        data object MissingActivationCode : DexUpdateStatus()
+        data object UpToDate : DexUpdateStatus()
+        data class Available(val info: DexUpdateInfo) : DexUpdateStatus()
+    }
+
+    fun checkInstalledDexUpdate(context: Context): Result<DexUpdateStatus> = runCatching {
+        if (!isInstalled(context)) return@runCatching DexUpdateStatus.NotInstalled
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val code = prefs.getString(KEY_ACTIVATION_CODE, null)?.let(::normalizeCode).orEmpty()
+        if (code.isEmpty()) return@runCatching DexUpdateStatus.MissingActivationCode
+
+        val activation = requestActivation(context, code)
+        val installedHash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)
+        if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
+            DexUpdateStatus.UpToDate
+        } else {
+            DexUpdateStatus.Available(
+                DexUpdateInfo(
+                    apiVersion = activation.dexVersion,
+                    hashPrefix = activation.dexHash.take(8),
+                ),
+            )
+        }
     }
 
     fun updateInstalledDexIfNeeded(context: Context): Result<UpdateResult> = runCatching {
@@ -110,6 +143,7 @@ object PremiumActivator {
             .putLong(KEY_INSTALLED_AT_MS, System.currentTimeMillis())
             .putInt(KEY_INSTALL_BOOT_COUNT, bootCount(context))
             .putString(KEY_INSTALLED_DEX_HASH, activation.dexHash)
+            .putInt(KEY_INSTALLED_DEX_VERSION, activation.dexVersion)
             .apply()
         UpdateResult.Updated
     }

@@ -60,6 +60,12 @@
     <string name="premium_activation_failed">Activation failed: %s</string>
     <string name="premium_update_success">Supporter Extras updated. Reboot your phone to enable it.</string>
     <string name="premium_update_failed">Supporter Extras update failed: %s</string>
+    <string name="premium_update_download">Download update</string>
+    <string name="premium_update_downloading">Downloading…</string>
+    <string name="premium_dex_info">DEX API v%1$d · build %2$s · %3$s</string>
+    <string name="premium_dex_update_checking">Checking for DEX updates…</string>
+    <string name="premium_dex_update_available">DEX update available: build %s</string>
+    <string name="premium_dex_update_up_to_date">DEX is up to date</string>
     <string name="menu_about">About</string>
     <string name="label_author">Author</string>
     <string name="label_project_url">Project URL</string>

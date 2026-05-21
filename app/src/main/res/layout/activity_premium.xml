@@ -106,6 +106,16 @@
                     android:textSize="14sp"
                     android:visibility="gone" />
 
+                <TextView
+                    android:id="@+id/text_dex_info"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
                 <!-- Activate Button (full-width, primary) -->
                 <Button
                     android:id="@+id/btn_activate"
@@ -115,12 +125,21 @@
                     android:text="@string/premium_activate"
                     android:textSize="15sp" />
 
+                <Button
+                    android:id="@+id/btn_update"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="24dp"
+                    android:text="@string/premium_update_download"
+                    android:textSize="15sp"
+                    android:visibility="gone" />
+
                 <!-- Unbind button (full-width, red, only when activated) -->
                 <Button
                     android:id="@+id/btn_deactivate"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="24dp"
+                    android:layout_marginTop="12dp"
                     android:backgroundTint="#F44336"
                     android:text="@string/premium_deactivate"
                     android:textSize="15sp"

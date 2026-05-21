@@ -20,6 +20,10 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class PremiumActivity : AppCompatActivity() {
+    private var updateCheckStarted = false
+    private var updateCheckInProgress = false
+    private var updateStatusText: String? = null
+    private var availableUpdate: PremiumActivator.DexUpdateStatus.Available? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +34,9 @@ class PremiumActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.item_edge_lighting).setOnClickListener {
             startActivity(Intent(this, EdgeLightingSettingsActivity::class.java))
+        }
+        findViewById<Button>(R.id.btn_update).setOnClickListener {
+            performUpdate()
         }
 
         refreshStatus()
@@ -78,12 +85,6 @@ class PremiumActivity : AppCompatActivity() {
                     PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
                         append(getString(R.string.premium_code_label, it))
                     }
-                    PremiumActivator.getDexInfo(this@PremiumActivity)?.let { info ->
-                        if (isNotEmpty()) append("\n")
-                        val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-                            .format(Date(info.installedAtMs))
-                        append("DEX ${info.hashPrefix}  ·  $time")
-                    }
                 }.takeIf { it.isNotEmpty() },
             )
         }
@@ -122,6 +123,86 @@ class PremiumActivity : AppCompatActivity() {
         btnDeactivate.setOnClickListener {
             showDeactivateConfirmDialog()
         }
+
+        refreshDexInfo(status)
+        startUpdateCheckIfNeeded(status)
+    }
+
+    private fun refreshDexInfo(status: PremiumActivator.Status) {
+        val dexInfoView = findViewById<TextView>(R.id.text_dex_info)
+        val btnUpdate = findViewById<Button>(R.id.btn_update)
+        val activated = status != PremiumActivator.Status.NotActivated
+
+        if (!activated) {
+            updateCheckStarted = false
+            updateCheckInProgress = false
+            updateStatusText = null
+            availableUpdate = null
+            dexInfoView.visibility = View.GONE
+            btnUpdate.visibility = View.GONE
+            return
+        }
+
+        val lines = mutableListOf<String>()
+        PremiumActivator.getDexInfo(this)?.let { info ->
+            val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
+                .format(Date(info.installedAtMs))
+            lines += getString(R.string.premium_dex_info, info.apiVersion, info.hashPrefix, time)
+        }
+        updateStatusText?.let { lines += it }
+
+        dexInfoView.visibility = if (lines.isEmpty()) View.GONE else View.VISIBLE
+        dexInfoView.text = lines.joinToString("\n")
+        btnUpdate.visibility = if (availableUpdate != null && !updateCheckInProgress) View.VISIBLE else View.GONE
+        btnUpdate.isEnabled = availableUpdate != null && !updateCheckInProgress
+        if (!updateCheckInProgress) {
+            btnUpdate.setText(R.string.premium_update_download)
+        }
+    }
+
+    private fun startUpdateCheckIfNeeded(status: PremiumActivator.Status) {
+        if (status == PremiumActivator.Status.NotActivated || updateCheckStarted || updateCheckInProgress) return
+
+        updateCheckStarted = true
+        updateCheckInProgress = true
+        updateStatusText = getString(R.string.premium_dex_update_checking)
+        availableUpdate = null
+        refreshDexInfo(status)
+
+        val appContext = applicationContext
+        thread(name = "EdgeXPremiumUpdateCheck") {
+            val result = PremiumActivator.checkInstalledDexUpdate(appContext)
+            runOnUiThread {
+                updateCheckInProgress = false
+                result.onSuccess { updateStatus ->
+                    when (updateStatus) {
+                        is PremiumActivator.DexUpdateStatus.Available -> {
+                            availableUpdate = updateStatus
+                            updateStatusText = getString(
+                                R.string.premium_dex_update_available,
+                                updateStatus.info.hashPrefix,
+                            )
+                        }
+                        PremiumActivator.DexUpdateStatus.UpToDate -> {
+                            availableUpdate = null
+                            updateStatusText = getString(R.string.premium_dex_update_up_to_date)
+                        }
+                        PremiumActivator.DexUpdateStatus.NotInstalled,
+                        PremiumActivator.DexUpdateStatus.MissingActivationCode -> {
+                            availableUpdate = null
+                            updateStatusText = null
+                        }
+                    }
+                }.onFailure {
+                    availableUpdate = null
+                    updateStatusText = getString(
+                        R.string.premium_update_failed,
+                        it.message ?: it.javaClass.simpleName,
+                    )
+                }
+                refreshDexInfo(PremiumActivator.status(this))
+            }
+        }
     }
 
     private fun showDeactivateConfirmDialog() {
@@ -150,6 +231,42 @@ class PremiumActivity : AppCompatActivity() {
                         getString(R.string.premium_activation_failed, it.message ?: it.javaClass.simpleName),
                         Toast.LENGTH_LONG,
                     ).show()
+                }
+                refreshStatus()
+            }
+        }
+    }
+
+    private fun performUpdate() {
+        val btnUpdate = findViewById<Button>(R.id.btn_update)
+        btnUpdate.isEnabled = false
+        btnUpdate.setText(R.string.premium_update_downloading)
+        updateCheckInProgress = true
+        refreshDexInfo(PremiumActivator.status(this))
+
+        val appContext = applicationContext
+        thread(name = "EdgeXPremiumUpdateDownload") {
+            val result = PremiumActivator.updateInstalledDexIfNeeded(appContext)
+            runOnUiThread {
+                updateCheckInProgress = false
+                result.onSuccess { updateResult ->
+                    availableUpdate = null
+                    updateCheckStarted = true
+                    updateStatusText = when (updateResult) {
+                        PremiumActivator.UpdateResult.Updated -> getString(R.string.premium_update_success)
+                        PremiumActivator.UpdateResult.UpToDate -> getString(R.string.premium_dex_update_up_to_date)
+                        PremiumActivator.UpdateResult.NotInstalled,
+                        PremiumActivator.UpdateResult.SkippedMissingActivationCode -> null
+                    }
+                    if (updateResult == PremiumActivator.UpdateResult.Updated) {
+                        Toast.makeText(this, R.string.premium_update_success, Toast.LENGTH_LONG).show()
+                    }
+                }.onFailure {
+                    updateStatusText = getString(
+                        R.string.premium_update_failed,
+                        it.message ?: it.javaClass.simpleName,
+                    )
+                    Toast.makeText(this, updateStatusText, Toast.LENGTH_LONG).show()
                 }
                 refreshStatus()
             }
