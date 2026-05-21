@@ -17,7 +17,7 @@
     <string name="menu_freezer">冰箱</string>
     <string name="menu_freezer_desc">管理冻结应用</string>
     <string name="menu_edge_lighting">Edge Lighting</string>
-    <string name="menu_edge_lighting_desc">Supporter Extras 通知边缘光效</string>
+    <string name="menu_edge_lighting_desc">通知到来时点亮屏幕边缘</string>
     <string name="menu_advanced">高级选项</string>
     <string name="menu_debug_matrix">调试模式</string>
     <string name="menu_debug_matrix_desc">显示手势触发区域</string>
