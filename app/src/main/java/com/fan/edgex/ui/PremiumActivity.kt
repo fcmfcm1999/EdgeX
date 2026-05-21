@@ -54,19 +54,19 @@ class PremiumActivity : AppCompatActivity() {
         val visuals = when (status) {
             PremiumActivator.Status.NotActivated -> StateVisuals(
                 iconRes = R.drawable.ic_info,
-                iconColorArgb = 0xFFBDBDBD.toInt(),
+                iconColorArgb = ThemeManager.currentAccent(this),
                 titleRes = R.string.menu_premium_not_activated,
                 descText = getString(R.string.premium_desc_not_activated),
             )
             PremiumActivator.Status.RebootRequired -> StateVisuals(
                 iconRes = R.drawable.ic_restart_alt,
-                iconColorArgb = 0xFFFF9800.toInt(),
+                iconColorArgb = ThemeManager.currentAccent(this),
                 titleRes = R.string.premium_status_reboot,
                 descText = buildString {
                     append(getString(R.string.premium_desc_reboot))
                     PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
                         append("\n")
-                        append(getString(R.string.premium_code_label, maskCode(it)))
+                        append(getString(R.string.premium_code_label, it))
                     }
                 },
             )
@@ -76,7 +76,7 @@ class PremiumActivity : AppCompatActivity() {
                 titleRes = R.string.premium_status_active,
                 descText = buildString {
                     PremiumActivator.getActivationCode(this@PremiumActivity)?.let {
-                        append(getString(R.string.premium_code_label, maskCode(it)))
+                        append(getString(R.string.premium_code_label, it))
                     }
                     PremiumActivator.getDexInfo(this@PremiumActivity)?.let { info ->
                         if (isNotEmpty()) append("\n")
@@ -93,7 +93,10 @@ class PremiumActivity : AppCompatActivity() {
             shape = GradientDrawable.OVAL
             setColor(visuals.iconColorArgb)
         }
-        findViewById<ImageView>(R.id.icon_status).setImageResource(visuals.iconRes)
+        findViewById<ImageView>(R.id.icon_status).apply {
+            setImageResource(visuals.iconRes)
+            setColorFilter(ThemeManager.onAccentColor(visuals.iconColorArgb))
+        }
         findViewById<TextView>(R.id.text_status).setText(visuals.titleRes)
 
         val codeView = findViewById<TextView>(R.id.text_activation_code)
@@ -153,8 +156,4 @@ class PremiumActivity : AppCompatActivity() {
         }
     }
 
-    private fun maskCode(code: String): String {
-        if (code.length <= 4) return "****"
-        return code.take(4) + "*".repeat(code.length - 4)
-    }
 }
