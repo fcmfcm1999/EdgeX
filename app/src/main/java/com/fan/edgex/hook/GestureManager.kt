@@ -30,19 +30,19 @@ object GestureManager {
     private var screenStateReceiverRegistered = false
     private var systemConfigReceiverRegistered = false
     private var keyManagerInitialized = false
-    private var fluidPremiumInactiveLogged = false
-    private val fluidActionLock = Any()
-    private var fluidGestureSequence = 0L
-    private var activeFluidGestureId = 0L
-    private var fluidGestureActive = false
-    private val pendingFluidActions = mutableListOf<PendingFluidAction>()
-    private var fluidMovePosted = false
-    private var pendingFluidMoveX = 0f
-    private var pendingFluidMoveY = 0f
+    private var fluidEffectPremiumInactiveLogged = false
+    private val fluidEffectActionLock = Any()
+    private var fluidEffectSequence = 0L
+    private var activeFluidEffectId = 0L
+    private var fluidEffectActive = false
+    private val pendingFluidEffectActions = mutableListOf<PendingFluidEffectAction>()
+    private var fluidEffectMovePosted = false
+    private var pendingFluidEffectMoveX = 0f
+    private var pendingFluidEffectMoveY = 0f
 
     private var mHandler: Handler? = null
 
-    private data class PendingFluidAction(
+    private data class PendingFluidEffectAction(
         val gestureId: Long,
         val action: Runnable,
     )
@@ -95,7 +95,7 @@ object GestureManager {
                     val action = Runnable {
                         actionDispatcher.triggerGestureAction(zone, gestureType, context, touchX, touchY)
                     }
-                    if (!enqueueUntilFluidComplete(action)) {
+                    if (!enqueueUntilFluidEffectComplete(action)) {
                         action.run()
                     }
                 }
@@ -132,49 +132,49 @@ object GestureManager {
                     mainHandler().post { PieManager.dismiss() }
                 }
 
-                override fun onFluidGestureDown(
+                override fun onFluidEffectDown(
                     zone: String,
                     touchX: Float,
                     touchY: Float,
                     screenW: Float,
                     screenH: Float,
                 ) {
-                    if (configRepository.get(AppConfig.FLUID_GESTURE_ENABLED, "true") != "true") return
+                    if (configRepository.get(AppConfig.FLUID_EFFECT_ENABLED, "true") != "true") return
                     if (!PremiumRuntime.isActive()) {
-                        if (!fluidPremiumInactiveLogged) {
-                            fluidPremiumInactiveLogged = true
-                            log("Fluid Gesture skipped: Supporter Extras premium DEX is not active")
+                        if (!fluidEffectPremiumInactiveLogged) {
+                            fluidEffectPremiumInactiveLogged = true
+                            log("Fluid Effect skipped: Supporter Extras premium DEX is not active")
                         }
                         return
                     }
 
                     val edge = zone.substringBefore("_")
                     val edgeColorKey = when (edge) {
-                        "left" -> AppConfig.FLUID_GESTURE_COLOR_LEFT
-                        "right" -> AppConfig.FLUID_GESTURE_COLOR_RIGHT
-                        "top" -> AppConfig.FLUID_GESTURE_COLOR_TOP
-                        "bottom" -> AppConfig.FLUID_GESTURE_COLOR_BOTTOM
+                        "left" -> AppConfig.FLUID_EFFECT_COLOR_LEFT
+                        "right" -> AppConfig.FLUID_EFFECT_COLOR_RIGHT
+                        "top" -> AppConfig.FLUID_EFFECT_COLOR_TOP
+                        "bottom" -> AppConfig.FLUID_EFFECT_COLOR_BOTTOM
                         else -> null
                     }
                     val colorValue = edgeColorKey
                         ?.let { configRepository.get(it).takeIf(String::isNotEmpty) }
-                        ?: configRepository.get(AppConfig.FLUID_GESTURE_COLOR, DEFAULT_FLUID_COLOR)
-                    val color = parseFluidColor(colorValue)
+                        ?: configRepository.get(AppConfig.FLUID_EFFECT_COLOR, DEFAULT_FLUID_EFFECT_COLOR)
+                    val color = parseFluidEffectColor(colorValue)
                     val sizeProgress = configRepository
-                        .get(AppConfig.FLUID_GESTURE_SIZE, AppConfig.FLUID_GESTURE_SIZE_DEFAULT.toString())
+                        .get(AppConfig.FLUID_EFFECT_SIZE, AppConfig.FLUID_EFFECT_SIZE_DEFAULT.toString())
                         .toIntOrNull()
                         ?.coerceIn(0, 100)
-                        ?: AppConfig.FLUID_GESTURE_SIZE_DEFAULT
+                        ?: AppConfig.FLUID_EFFECT_SIZE_DEFAULT
                     val alpha = configRepository
-                        .get(AppConfig.FLUID_GESTURE_ALPHA, "0.8")
+                        .get(AppConfig.FLUID_EFFECT_ALPHA, "0.8")
                         .toFloatOrNull()
                         ?.coerceIn(0f, 1f)
                         ?: 0.8f
 
                     val sysCtx = systemContext ?: return
-                    val gestureId = beginFluidGestureGate()
+                    val gestureId = beginFluidEffectGate()
                     mainHandler().post {
-                        val shown = PremiumRuntime.onFluidGestureDown(
+                        val shown = PremiumRuntime.onFluidEffectDown(
                             sysCtx,
                             edge,
                             touchX,
@@ -186,28 +186,28 @@ object GestureManager {
                             alpha,
                         )
                         if (!shown) {
-                            log("Fluid Gesture skipped: premium runtime returned false")
-                            completeFluidGestureGate(gestureId)
+                            log("Fluid Effect skipped: premium runtime returned false")
+                            completeFluidEffectGate(gestureId)
                         }
                     }
                 }
 
-                override fun onFluidGestureMove(touchX: Float, touchY: Float) {
-                    postFluidGestureMove(touchX, touchY)
+                override fun onFluidEffectMove(touchX: Float, touchY: Float) {
+                    postFluidEffectMove(touchX, touchY)
                 }
 
-                override fun onFluidGestureUp() {
-                    val gestureId = currentFluidGestureId()
+                override fun onFluidEffectUp() {
+                    val gestureId = currentFluidEffectId()
                     mainHandler().post {
                         if (gestureId == 0L) {
-                            PremiumRuntime.onFluidGestureUp()
+                            PremiumRuntime.onFluidEffectUp()
                             return@post
                         }
-                        val accepted = PremiumRuntime.onFluidGestureUp(
-                            Runnable { completeFluidGestureGate(gestureId) },
+                        val accepted = PremiumRuntime.onFluidEffectUp(
+                            Runnable { completeFluidEffectGate(gestureId) },
                         )
                         if (!accepted) {
-                            completeFluidGestureGate(gestureId)
+                            completeFluidEffectGate(gestureId)
                         }
                     }
                 }
@@ -226,52 +226,52 @@ object GestureManager {
         XposedBridge.log("$TAG: [Gesture] $message")
     }
 
-    private fun beginFluidGestureGate(): Long =
-        synchronized(fluidActionLock) {
-            fluidGestureSequence += 1
-            activeFluidGestureId = fluidGestureSequence
-            fluidGestureActive = true
-            activeFluidGestureId
+    private fun beginFluidEffectGate(): Long =
+        synchronized(fluidEffectActionLock) {
+            fluidEffectSequence += 1
+            activeFluidEffectId = fluidEffectSequence
+            fluidEffectActive = true
+            activeFluidEffectId
         }
 
-    private fun currentFluidGestureId(): Long =
-        synchronized(fluidActionLock) {
-            if (fluidGestureActive) activeFluidGestureId else 0L
+    private fun currentFluidEffectId(): Long =
+        synchronized(fluidEffectActionLock) {
+            if (fluidEffectActive) activeFluidEffectId else 0L
         }
 
-    private fun enqueueUntilFluidComplete(action: Runnable): Boolean =
-        synchronized(fluidActionLock) {
-            if (!fluidGestureActive) return false
-            pendingFluidActions += PendingFluidAction(activeFluidGestureId, action)
+    private fun enqueueUntilFluidEffectComplete(action: Runnable): Boolean =
+        synchronized(fluidEffectActionLock) {
+            if (!fluidEffectActive) return false
+            pendingFluidEffectActions += PendingFluidEffectAction(activeFluidEffectId, action)
             true
         }
 
-    private fun postFluidGestureMove(touchX: Float, touchY: Float) {
-        synchronized(fluidActionLock) {
-            if (!fluidGestureActive) return
-            pendingFluidMoveX = touchX
-            pendingFluidMoveY = touchY
-            if (fluidMovePosted) return
-            fluidMovePosted = true
+    private fun postFluidEffectMove(touchX: Float, touchY: Float) {
+        synchronized(fluidEffectActionLock) {
+            if (!fluidEffectActive) return
+            pendingFluidEffectMoveX = touchX
+            pendingFluidEffectMoveY = touchY
+            if (fluidEffectMovePosted) return
+            fluidEffectMovePosted = true
         }
         mainHandler().post {
-            val move = synchronized(fluidActionLock) {
-                fluidMovePosted = false
-                if (!fluidGestureActive) return@post
-                pendingFluidMoveX to pendingFluidMoveY
+            val move = synchronized(fluidEffectActionLock) {
+                fluidEffectMovePosted = false
+                if (!fluidEffectActive) return@post
+                pendingFluidEffectMoveX to pendingFluidEffectMoveY
             }
-            PremiumRuntime.onFluidGestureMove(move.first, move.second)
+            PremiumRuntime.onFluidEffectMove(move.first, move.second)
         }
     }
 
-    private fun completeFluidGestureGate(gestureId: Long) {
-        val actions = synchronized(fluidActionLock) {
-            if (activeFluidGestureId == gestureId) {
-                fluidGestureActive = false
+    private fun completeFluidEffectGate(gestureId: Long) {
+        val actions = synchronized(fluidEffectActionLock) {
+            if (activeFluidEffectId == gestureId) {
+                fluidEffectActive = false
             }
-            fluidMovePosted = false
-            val ready = pendingFluidActions.filter { it.gestureId == gestureId }
-            pendingFluidActions.removeAll { it.gestureId == gestureId }
+            fluidEffectMovePosted = false
+            val ready = pendingFluidEffectActions.filter { it.gestureId == gestureId }
+            pendingFluidEffectActions.removeAll { it.gestureId == gestureId }
             ready
         }
         actions.forEach { pending ->
@@ -279,11 +279,11 @@ object GestureManager {
         }
     }
 
-    private fun cancelFluidGestureGate() {
-        synchronized(fluidActionLock) {
-            fluidGestureActive = false
-            fluidMovePosted = false
-            pendingFluidActions.clear()
+    private fun cancelFluidEffectGate() {
+        synchronized(fluidEffectActionLock) {
+            fluidEffectActive = false
+            fluidEffectMovePosted = false
+            pendingFluidEffectActions.clear()
         }
     }
 
@@ -329,7 +329,7 @@ object GestureManager {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
-                        cancelFluidGestureGate()
+                        cancelFluidEffectGate()
                         gestureDetector.reset()
                         KeyManager.reset()
                         mainHandler().post {
@@ -517,17 +517,17 @@ object GestureManager {
             fallback
         }
 
-    private fun parseFluidColor(value: String): Int {
+    private fun parseFluidEffectColor(value: String): Int {
         val normalized = value.removePrefix("#")
         return runCatching {
             when (normalized.length) {
                 6 -> (0xFF000000.toInt() or normalized.toInt(16))
                 8 -> java.lang.Long.parseLong(normalized, 16).toInt()
-                else -> java.lang.Long.parseLong(DEFAULT_FLUID_COLOR, 16).toInt()
+                else -> java.lang.Long.parseLong(DEFAULT_FLUID_EFFECT_COLOR, 16).toInt()
             }
         }.getOrDefault(0xCCFFFFFF.toInt())
     }
 
-    private const val DEFAULT_FLUID_COLOR = "CCFFFFFF"
+    private const val DEFAULT_FLUID_EFFECT_COLOR = "CCFFFFFF"
 
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/item_fluid_color_global"
+    android:id="@+id/item_fluid_effect_color_left"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?android:attr/selectableItemBackground"
@@ -19,12 +19,12 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="@string/fluid_gesture_color_global"
+        android:text="@string/fluid_effect_color_left"
         android:textColor="@color/ui_text_primary"
         android:textSize="15sp" />
 
     <TextView
-        android:id="@+id/text_fluid_color_global_value"
+        android:id="@+id/text_fluid_color_left_value"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="10dp"
@@ -32,7 +32,7 @@
         android:textSize="12sp" />
 
     <View
-        android:id="@+id/swatch_fluid_global"
+        android:id="@+id/swatch_fluid_left"
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:layout_marginEnd="10dp" />

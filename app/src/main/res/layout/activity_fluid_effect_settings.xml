@@ -34,7 +34,7 @@
             android:layout_height="?attr/actionBarSize"
             android:layout_weight="1"
             android:gravity="center_vertical"
-            android:text="@string/header_fluid_gesture"
+            android:text="@string/header_fluid_effect"
             android:textColor="@color/ui_header_text"
             android:textSize="20sp" />
     </LinearLayout>
@@ -66,8 +66,8 @@
                     android:background="@drawable/bg_edge_lighting_phone_preview"
                     android:clipToOutline="true">
 
-                    <com.fan.edgex.ui.FluidGesturePreviewView
-                        android:id="@+id/preview_fluid_gesture"
+                    <com.fan.edgex.ui.FluidEffectPreviewView
+                        android:id="@+id/preview_fluid_effect"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent" />
 
@@ -84,7 +84,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="@string/fluid_gesture_section_general"
+                android:text="@string/fluid_effect_section_general"
                 android:textAllCaps="true"
                 android:textColor="@color/ui_text_secondary"
                 android:textSize="12sp" />
@@ -98,7 +98,7 @@
                 android:orientation="vertical">
 
                 <LinearLayout
-                    android:id="@+id/row_fluid_enabled"
+                    android:id="@+id/row_fluid_effect_enabled"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:gravity="center_vertical"
@@ -110,12 +110,12 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/fluid_gesture_enabled"
+                        android:text="@string/fluid_effect_enabled"
                         android:textColor="@color/ui_text_primary"
                         android:textSize="15sp" />
 
                     <Switch
-                        android:id="@+id/switch_fluid_gesture_enabled"
+                        android:id="@+id/switch_fluid_effect_enabled"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
                 </LinearLayout>
@@ -125,7 +125,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="@string/fluid_gesture_section_color"
+                android:text="@string/fluid_effect_section_color"
                 android:textAllCaps="true"
                 android:textColor="@color/ui_text_secondary"
                 android:textSize="12sp" />
@@ -137,38 +137,38 @@
                 android:background="@drawable/bg_card"
                 android:orientation="vertical">
 
-                <include layout="@layout/item_fluid_color_global" />
+                <include layout="@layout/item_fluid_effect_color_global" />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginStart="16dp"
                     android:background="@color/ui_divider" />
-                <include layout="@layout/item_fluid_color_left" />
+                <include layout="@layout/item_fluid_effect_color_left" />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginStart="16dp"
                     android:background="@color/ui_divider" />
-                <include layout="@layout/item_fluid_color_right" />
+                <include layout="@layout/item_fluid_effect_color_right" />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginStart="16dp"
                     android:background="@color/ui_divider" />
-                <include layout="@layout/item_fluid_color_top" />
+                <include layout="@layout/item_fluid_effect_color_top" />
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
                     android:layout_marginStart="16dp"
                     android:background="@color/ui_divider" />
-                <include layout="@layout/item_fluid_color_bottom" />
+                <include layout="@layout/item_fluid_effect_color_bottom" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="@string/fluid_gesture_section_appearance"
+                android:text="@string/fluid_effect_section_appearance"
                 android:textAllCaps="true"
                 android:textColor="@color/ui_text_secondary"
                 android:textSize="12sp" />
@@ -191,7 +191,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/fluid_gesture_size"
+                        android:text="@string/fluid_effect_size"
                         android:textColor="@color/ui_text_primary"
                         android:textSize="15sp" />
 
@@ -226,7 +226,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/fluid_gesture_alpha"
+                        android:text="@string/fluid_effect_alpha"
                         android:textColor="@color/ui_text_primary"
                         android:textSize="15sp" />
 

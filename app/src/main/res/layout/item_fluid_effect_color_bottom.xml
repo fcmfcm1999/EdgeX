@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/item_fluid_color_bottom"
+    android:id="@+id/item_fluid_effect_color_bottom"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?android:attr/selectableItemBackground"
@@ -19,7 +19,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:text="@string/fluid_gesture_color_bottom"
+        android:text="@string/fluid_effect_color_bottom"
         android:textColor="@color/ui_text_primary"
         android:textSize="15sp" />
 

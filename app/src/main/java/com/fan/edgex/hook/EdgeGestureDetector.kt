@@ -25,9 +25,9 @@ internal class EdgeGestureDetector(
         fun updatePie(x: Float, y: Float)
         fun commitPie(context: Context)
         fun cancelPie()
-        fun onFluidGestureDown(zone: String, touchX: Float, touchY: Float, screenW: Float, screenH: Float) = Unit
-        fun onFluidGestureMove(touchX: Float, touchY: Float) = Unit
-        fun onFluidGestureUp() = Unit
+        fun onFluidEffectDown(zone: String, touchX: Float, touchY: Float, screenW: Float, screenH: Float) = Unit
+        fun onFluidEffectMove(touchX: Float, touchY: Float) = Unit
+        fun onFluidEffectUp() = Unit
     }
 
     private enum class Edge { LEFT, RIGHT, TOP, BOTTOM }
@@ -92,7 +92,7 @@ internal class EdgeGestureDetector(
         activeSession = null
 
         if (previousSession != null) {
-            callbacks.onFluidGestureUp()
+            callbacks.onFluidEffectUp()
         }
 
         if (previousSession?.pieMode == true) {
@@ -134,7 +134,7 @@ internal class EdgeGestureDetector(
         val bounds = (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
             .currentWindowMetrics
             .bounds
-        callbacks.onFluidGestureDown(
+        callbacks.onFluidEffectDown(
             zoneMatch.zone,
             event.rawX,
             event.rawY,
@@ -147,7 +147,7 @@ internal class EdgeGestureDetector(
     private fun handleMove(event: MotionEvent, context: Context): Boolean {
         val session = activeSession ?: return false
         updateTargetPoint(session, event.rawX, event.rawY)
-        callbacks.onFluidGestureMove(event.rawX, event.rawY)
+        callbacks.onFluidEffectMove(event.rawX, event.rawY)
 
         if (session.pieMode) {
             callbacks.updatePie(event.rawX, event.rawY)

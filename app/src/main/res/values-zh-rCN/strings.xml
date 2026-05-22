@@ -18,8 +18,8 @@
     <string name="menu_freezer_desc">管理冻结应用</string>
     <string name="menu_edge_lighting">Edge Lighting</string>
     <string name="menu_edge_lighting_desc">通知到来时点亮屏幕边缘</string>
-    <string name="menu_fluid_gesture">Fluid Gesture</string>
-    <string name="menu_fluid_gesture_desc">边缘手势弹性反馈</string>
+    <string name="menu_fluid_effect">Fluid Effect</string>
+    <string name="menu_fluid_effect_desc">边缘手势弹性反馈</string>
     <string name="menu_advanced">高级选项</string>
     <string name="menu_debug_matrix">调试模式</string>
     <string name="menu_debug_matrix_desc">显示手势触发区域</string>
@@ -411,20 +411,20 @@
     <string name="edge_lighting_preview_notification_title">新通知</string>
     <string name="edge_lighting_preview_notification_body">Edge Lighting 已触发</string>
 
-    <!-- Fluid Gesture -->
-    <string name="header_fluid_gesture">Fluid Gesture</string>
-    <string name="fluid_gesture_enabled">启用 Fluid Gesture</string>
-    <string name="fluid_gesture_section_general">常规</string>
-    <string name="fluid_gesture_section_color">颜色</string>
-    <string name="fluid_gesture_section_appearance">外观</string>
-    <string name="fluid_gesture_color_global">全局颜色</string>
-    <string name="fluid_gesture_color_left">左边缘</string>
-    <string name="fluid_gesture_color_right">右边缘</string>
-    <string name="fluid_gesture_color_top">上边缘</string>
-    <string name="fluid_gesture_color_bottom">下边缘</string>
-    <string name="fluid_gesture_color_default">默认</string>
-    <string name="fluid_gesture_size">大小</string>
-    <string name="fluid_gesture_size_value">%s</string>
-    <string name="fluid_gesture_alpha">透明度</string>
-    <string name="fluid_gesture_alpha_value">%d%%</string>
+    <!-- Fluid Effect -->
+    <string name="header_fluid_effect">Fluid Effect</string>
+    <string name="fluid_effect_enabled">启用 Fluid Effect</string>
+    <string name="fluid_effect_section_general">常规</string>
+    <string name="fluid_effect_section_color">颜色</string>
+    <string name="fluid_effect_section_appearance">外观</string>
+    <string name="fluid_effect_color_global">全局颜色</string>
+    <string name="fluid_effect_color_left">左边缘</string>
+    <string name="fluid_effect_color_right">右边缘</string>
+    <string name="fluid_effect_color_top">上边缘</string>
+    <string name="fluid_effect_color_bottom">下边缘</string>
+    <string name="fluid_effect_color_default">默认</string>
+    <string name="fluid_effect_size">大小</string>
+    <string name="fluid_effect_size_value">%s</string>
+    <string name="fluid_effect_alpha">透明度</string>
+    <string name="fluid_effect_alpha_value">%d%%</string>
 </resources>

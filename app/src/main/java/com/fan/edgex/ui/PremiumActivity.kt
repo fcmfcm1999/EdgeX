@@ -44,8 +44,8 @@ class PremiumActivity : AppCompatActivity() {
         findViewById<View>(R.id.item_edge_lighting).setOnClickListener {
             startActivity(Intent(this, EdgeLightingSettingsActivity::class.java))
         }
-        findViewById<View>(R.id.item_fluid_gesture).setOnClickListener {
-            startActivity(Intent(this, FluidGestureSettingsActivity::class.java))
+        findViewById<View>(R.id.item_fluid_effect).setOnClickListener {
+            startActivity(Intent(this, FluidEffectSettingsActivity::class.java))
         }
         findViewById<Button>(R.id.btn_update).setOnClickListener {
             performUpdate()

@@ -11,7 +11,7 @@ import kotlin.math.PI
 import kotlin.math.log10
 import kotlin.math.sin
 
-class FluidGesturePreviewView @JvmOverloads constructor(
+class FluidEffectPreviewView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {

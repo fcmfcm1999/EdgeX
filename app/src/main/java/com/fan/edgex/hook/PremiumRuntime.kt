@@ -23,7 +23,7 @@ object PremiumRuntime {
         }
     }
 
-    fun onFluidGestureDown(
+    fun onFluidEffectDown(
         context: Context,
         edge: String,
         touchX: Float,
@@ -36,7 +36,7 @@ object PremiumRuntime {
     ): Boolean {
         val plugin = PremiumPluginLoader.plugin ?: return false
         return runCatching {
-            plugin.onFluidGestureDown(
+            plugin.onFluidEffectDown(
                 context,
                 edge,
                 touchX,
@@ -53,20 +53,20 @@ object PremiumRuntime {
         }
     }
 
-    fun onFluidGestureMove(touchX: Float, touchY: Float): Boolean {
+    fun onFluidEffectMove(touchX: Float, touchY: Float): Boolean {
         val plugin = PremiumPluginLoader.plugin ?: return false
         return runCatching {
-            plugin.onFluidGestureMove(touchX, touchY)
+            plugin.onFluidEffectMove(touchX, touchY)
         }.getOrElse {
             PremiumPluginLoader.disableForCurrentProcess(it)
             false
         }
     }
 
-    fun onFluidGestureUp(onComplete: Runnable? = null): Boolean {
+    fun onFluidEffectUp(onComplete: Runnable? = null): Boolean {
         val plugin = PremiumPluginLoader.plugin ?: return false
         return runCatching {
-            plugin.onFluidGestureUp(onComplete)
+            plugin.onFluidEffectUp(onComplete)
         }.getOrElse {
             PremiumPluginLoader.disableForCurrentProcess(it)
             false

@@ -110,7 +110,7 @@
             android:theme="@style/Theme.EdgeX" />
 
         <activity
-            android:name=".ui.FluidGestureSettingsActivity"
+            android:name=".ui.FluidEffectSettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.EdgeX" />
 

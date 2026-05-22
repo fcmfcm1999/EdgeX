@@ -20,8 +20,8 @@
     <string name="menu_theme_desc">Choose an accent color</string>
     <string name="menu_edge_lighting">Edge Lighting</string>
     <string name="menu_edge_lighting_desc">Light up the screen edge for notifications</string>
-    <string name="menu_fluid_gesture">Fluid Gesture</string>
-    <string name="menu_fluid_gesture_desc">Elastic edge gesture feedback</string>
+    <string name="menu_fluid_effect">Fluid Effect</string>
+    <string name="menu_fluid_effect_desc">Elastic edge gesture feedback</string>
     <string name="menu_advanced">Advanced Options</string>
     <string name="menu_debug_matrix">Debug Mode</string>
     <string name="menu_debug_matrix_desc">Show gesture trigger area</string>
@@ -412,22 +412,22 @@
     <string name="edge_lighting_preview_notification_title">New notification</string>
     <string name="edge_lighting_preview_notification_body">Edge Lighting triggered</string>
 
-    <!-- Fluid Gesture -->
-    <string name="header_fluid_gesture">Fluid Gesture</string>
-    <string name="fluid_gesture_enabled">Enable Fluid Gesture</string>
-    <string name="fluid_gesture_section_general">General</string>
-    <string name="fluid_gesture_section_color">Color</string>
-    <string name="fluid_gesture_section_appearance">Appearance</string>
-    <string name="fluid_gesture_color_global">Global color</string>
-    <string name="fluid_gesture_color_left">Left edge</string>
-    <string name="fluid_gesture_color_right">Right edge</string>
-    <string name="fluid_gesture_color_top">Top edge</string>
-    <string name="fluid_gesture_color_bottom">Bottom edge</string>
-    <string name="fluid_gesture_color_default">Default</string>
-    <string name="fluid_gesture_size">Size</string>
-    <string name="fluid_gesture_size_value">%s</string>
-    <string name="fluid_gesture_alpha">Opacity</string>
-    <string name="fluid_gesture_alpha_value">%d%%</string>
+    <!-- Fluid Effect -->
+    <string name="header_fluid_effect">Fluid Effect</string>
+    <string name="fluid_effect_enabled">Enable Fluid Effect</string>
+    <string name="fluid_effect_section_general">General</string>
+    <string name="fluid_effect_section_color">Color</string>
+    <string name="fluid_effect_section_appearance">Appearance</string>
+    <string name="fluid_effect_color_global">Global color</string>
+    <string name="fluid_effect_color_left">Left edge</string>
+    <string name="fluid_effect_color_right">Right edge</string>
+    <string name="fluid_effect_color_top">Top edge</string>
+    <string name="fluid_effect_color_bottom">Bottom edge</string>
+    <string name="fluid_effect_color_default">Default</string>
+    <string name="fluid_effect_size">Size</string>
+    <string name="fluid_effect_size_value">%s</string>
+    <string name="fluid_effect_alpha">Opacity</string>
+    <string name="fluid_effect_alpha_value">%d%%</string>
 
     <!-- Keys Feature -->
     <string name="menu_keys">Keys</string>

@@ -23,7 +23,7 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.license.PremiumActivator
 
-class FluidGestureSettingsActivity : AppCompatActivity() {
+class FluidEffectSettingsActivity : AppCompatActivity() {
 
     private data class ColorRow(
         val configKey: String,
@@ -34,55 +34,55 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
         val allowReset: Boolean,
     )
 
-    private lateinit var previewView: FluidGesturePreviewView
+    private lateinit var previewView: FluidEffectPreviewView
     private var previewAnimator: ValueAnimator? = null
 
     private val colorRows = listOf(
         ColorRow(
-            AppConfig.FLUID_GESTURE_COLOR,
-            R.id.item_fluid_color_global,
+            AppConfig.FLUID_EFFECT_COLOR,
+            R.id.item_fluid_effect_color_global,
             R.id.swatch_fluid_global,
             R.id.text_fluid_color_global_value,
-            R.string.fluid_gesture_color_global,
+            R.string.fluid_effect_color_global,
             allowReset = false,
         ),
         ColorRow(
-            AppConfig.FLUID_GESTURE_COLOR_LEFT,
-            R.id.item_fluid_color_left,
+            AppConfig.FLUID_EFFECT_COLOR_LEFT,
+            R.id.item_fluid_effect_color_left,
             R.id.swatch_fluid_left,
             R.id.text_fluid_color_left_value,
-            R.string.fluid_gesture_color_left,
+            R.string.fluid_effect_color_left,
             allowReset = true,
         ),
         ColorRow(
-            AppConfig.FLUID_GESTURE_COLOR_RIGHT,
-            R.id.item_fluid_color_right,
+            AppConfig.FLUID_EFFECT_COLOR_RIGHT,
+            R.id.item_fluid_effect_color_right,
             R.id.swatch_fluid_right,
             R.id.text_fluid_color_right_value,
-            R.string.fluid_gesture_color_right,
+            R.string.fluid_effect_color_right,
             allowReset = true,
         ),
         ColorRow(
-            AppConfig.FLUID_GESTURE_COLOR_TOP,
-            R.id.item_fluid_color_top,
+            AppConfig.FLUID_EFFECT_COLOR_TOP,
+            R.id.item_fluid_effect_color_top,
             R.id.swatch_fluid_top,
             R.id.text_fluid_color_top_value,
-            R.string.fluid_gesture_color_top,
+            R.string.fluid_effect_color_top,
             allowReset = true,
         ),
         ColorRow(
-            AppConfig.FLUID_GESTURE_COLOR_BOTTOM,
-            R.id.item_fluid_color_bottom,
+            AppConfig.FLUID_EFFECT_COLOR_BOTTOM,
+            R.id.item_fluid_effect_color_bottom,
             R.id.swatch_fluid_bottom,
             R.id.text_fluid_color_bottom_value,
-            R.string.fluid_gesture_color_bottom,
+            R.string.fluid_effect_color_bottom,
             allowReset = true,
         ),
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_fluid_gesture_settings)
+        setContentView(R.layout.activity_fluid_effect_settings)
         ThemeManager.applyToActivity(this)
 
         findViewById<View>(R.id.header_container).setOnApplyWindowInsetsListener { view, insets ->
@@ -96,7 +96,7 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btn_back).setOnClickListener { finish() }
 
-        previewView = findViewById(R.id.preview_fluid_gesture)
+        previewView = findViewById(R.id.preview_fluid_effect)
 
         setupEnabledSwitch()
         setupColorRows()
@@ -118,10 +118,10 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
     }
 
     private fun setupEnabledSwitch() {
-        val enabledSwitch = findViewById<Switch>(R.id.switch_fluid_gesture_enabled)
-        enabledSwitch.isChecked = getConfigBool(AppConfig.FLUID_GESTURE_ENABLED, true)
+        val enabledSwitch = findViewById<Switch>(R.id.switch_fluid_effect_enabled)
+        enabledSwitch.isChecked = getConfigBool(AppConfig.FLUID_EFFECT_ENABLED, true)
         enabledSwitch.setOnCheckedChangeListener { _, isChecked ->
-            putConfig(AppConfig.FLUID_GESTURE_ENABLED, isChecked)
+            putConfig(AppConfig.FLUID_EFFECT_ENABLED, isChecked)
         }
     }
 
@@ -145,11 +145,11 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
         bindSeekBar(
             seekBarId = R.id.seek_fluid_size,
             valueId = R.id.text_fluid_size_value,
-            key = AppConfig.FLUID_GESTURE_SIZE,
-            defaultValue = AppConfig.FLUID_GESTURE_SIZE_DEFAULT,
+            key = AppConfig.FLUID_EFFECT_SIZE,
+            defaultValue = AppConfig.FLUID_EFFECT_SIZE_DEFAULT,
             min = 0,
             max = 100,
-            formatter = { getString(R.string.fluid_gesture_size_value, elasticityForProgress(it)) },
+            formatter = { getString(R.string.fluid_effect_size_value, elasticityForProgress(it)) },
             onChanged = {
                 previewView.sizeProgress = it
             },
@@ -157,16 +157,16 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
         bindSeekBar(
             seekBarId = R.id.seek_fluid_alpha,
             valueId = R.id.text_fluid_alpha_value,
-            key = AppConfig.FLUID_GESTURE_ALPHA,
+            key = AppConfig.FLUID_EFFECT_ALPHA,
             defaultValue = 80,
             min = 10,
             max = 100,
-            formatter = { getString(R.string.fluid_gesture_alpha_value, it) },
+            formatter = { getString(R.string.fluid_effect_alpha_value, it) },
             readValue = {
-                ((getConfigString(AppConfig.FLUID_GESTURE_ALPHA, "0.8").toFloatOrNull() ?: 0.8f) * 100).toInt()
+                ((getConfigString(AppConfig.FLUID_EFFECT_ALPHA, "0.8").toFloatOrNull() ?: 0.8f) * 100).toInt()
             },
             saveValue = {
-                putConfig(AppConfig.FLUID_GESTURE_ALPHA, (it / 100f).toString())
+                putConfig(AppConfig.FLUID_EFFECT_ALPHA, (it / 100f).toString())
             },
             onChanged = {
                 previewView.maxAlpha = it / 100f
@@ -216,7 +216,7 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
     }
 
     private fun refreshColorRows() {
-        val globalColor = parseColor(getConfigString(AppConfig.FLUID_GESTURE_COLOR, DEFAULT_COLOR))
+        val globalColor = parseColor(getConfigString(AppConfig.FLUID_EFFECT_COLOR, DEFAULT_COLOR))
         colorRows.forEach { row ->
             val stored = getConfigString(row.configKey)
             val usesDefault = row.allowReset && stored.isBlank()
@@ -224,22 +224,22 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
             setSwatchColor(findViewById(row.swatchId), color)
             findViewById<View>(row.swatchId).alpha = if (usesDefault) 0.45f else 1f
             findViewById<TextView>(row.valueId).text =
-                if (usesDefault) getString(R.string.fluid_gesture_color_default) else "#${displayColor(color)}"
+                if (usesDefault) getString(R.string.fluid_effect_color_default) else "#${displayColor(color)}"
         }
     }
 
     private fun syncPreviewFromConfig() {
-        val globalColor = parseColor(getConfigString(AppConfig.FLUID_GESTURE_COLOR, DEFAULT_COLOR))
+        val globalColor = parseColor(getConfigString(AppConfig.FLUID_EFFECT_COLOR, DEFAULT_COLOR))
         previewView.globalColor = globalColor
-        previewView.leftColor = edgeOverride(AppConfig.FLUID_GESTURE_COLOR_LEFT)
-        previewView.rightColor = edgeOverride(AppConfig.FLUID_GESTURE_COLOR_RIGHT)
-        previewView.topColor = edgeOverride(AppConfig.FLUID_GESTURE_COLOR_TOP)
-        previewView.bottomColor = edgeOverride(AppConfig.FLUID_GESTURE_COLOR_BOTTOM)
+        previewView.leftColor = edgeOverride(AppConfig.FLUID_EFFECT_COLOR_LEFT)
+        previewView.rightColor = edgeOverride(AppConfig.FLUID_EFFECT_COLOR_RIGHT)
+        previewView.topColor = edgeOverride(AppConfig.FLUID_EFFECT_COLOR_TOP)
+        previewView.bottomColor = edgeOverride(AppConfig.FLUID_EFFECT_COLOR_BOTTOM)
         previewView.sizeProgress = getConfigString(
-            AppConfig.FLUID_GESTURE_SIZE,
-            AppConfig.FLUID_GESTURE_SIZE_DEFAULT.toString(),
-        ).toIntOrNull()?.coerceIn(0, 100) ?: AppConfig.FLUID_GESTURE_SIZE_DEFAULT
-        previewView.maxAlpha = getConfigString(AppConfig.FLUID_GESTURE_ALPHA, "0.8")
+            AppConfig.FLUID_EFFECT_SIZE,
+            AppConfig.FLUID_EFFECT_SIZE_DEFAULT.toString(),
+        ).toIntOrNull()?.coerceIn(0, 100) ?: AppConfig.FLUID_EFFECT_SIZE_DEFAULT
+        previewView.maxAlpha = getConfigString(AppConfig.FLUID_EFFECT_ALPHA, "0.8")
             .toFloatOrNull()
             ?.coerceIn(0f, 1f)
             ?: 0.8f
@@ -281,7 +281,7 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
         val alpha = dialogView.findViewById<EditText>(R.id.et_a)
 
         val stored = getConfigString(configKey).ifBlank {
-            getConfigString(AppConfig.FLUID_GESTURE_COLOR, DEFAULT_COLOR)
+            getConfigString(AppConfig.FLUID_EFFECT_COLOR, DEFAULT_COLOR)
         }
         picker.setColor(parseColor(stored))
 
@@ -342,7 +342,7 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
 
         if (allowReset) {
-            builder.setNeutralButton(R.string.fluid_gesture_color_default) { _, _ ->
+            builder.setNeutralButton(R.string.fluid_effect_color_default) { _, _ ->
                 putConfig(configKey, "")
                 onSaved()
             }
@@ -353,8 +353,8 @@ class FluidGestureSettingsActivity : AppCompatActivity() {
 
     private fun applyPremiumGating() {
         val active = PremiumActivator.status(this) != PremiumActivator.Status.NotActivated
-        val enabledRow = findViewById<View>(R.id.row_fluid_enabled)
-        val enabledSwitch = findViewById<Switch>(R.id.switch_fluid_gesture_enabled)
+        val enabledRow = findViewById<View>(R.id.row_fluid_effect_enabled)
+        val enabledSwitch = findViewById<Switch>(R.id.switch_fluid_effect_enabled)
         enabledRow.alpha = if (active) 1f else DISABLED_ALPHA
         setGroupEnabled(enabledRow, active)
         enabledSwitch.isEnabled = active

@@ -25,7 +25,7 @@ interface IPremiumPlugin {
         alpha: Float,
     ): Boolean
 
-    fun onFluidGestureDown(
+    fun onFluidEffectDown(
         context: Context,
         edge: String,
         touchX: Float,
@@ -37,9 +37,9 @@ interface IPremiumPlugin {
         alpha: Float,
     ): Boolean
 
-    fun onFluidGestureMove(touchX: Float, touchY: Float): Boolean
+    fun onFluidEffectMove(touchX: Float, touchY: Float): Boolean
 
-    fun onFluidGestureUp(onComplete: Runnable?): Boolean
+    fun onFluidEffectUp(onComplete: Runnable?): Boolean
 
     fun onScreenOff()
 }
