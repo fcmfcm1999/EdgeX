@@ -27,6 +27,12 @@ AGENTS.md
 scripts
 .claude
 /cloudflare-worker/
+/netlify-premium/
+/premium-backend/
+/supabase/
 # Premium plugin source and build tools — not distributed in this repo
 /premium/
 /tools/
+
+# Local Netlify folder
+.netlify

@@ -8,6 +8,7 @@ import com.fan.edgex.premium.PremiumInstall
 import com.topjohnwu.superuser.Shell
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -29,14 +30,8 @@ object PremiumActivator {
         val normalizedCode = normalizeCode(code)
         require(normalizedCode.isNotEmpty()) { "Activation code is empty" }
 
-        val activation = requestActivation(context, normalizedCode)
-        downloadAndInstall(context, dexBytes = run {
-            val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
-            val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
-            val actualHash = sha256Hex(dexBytes)
-            require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
-            dexBytes
-        }, activation)
+        val activation = requestActivation(normalizedCode)
+        downloadAndInstall(context, dexBytes = downloadDex(activation), activation)
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_ACTIVATION_CODE, normalizedCode)
@@ -50,16 +45,17 @@ object PremiumActivator {
     }
 
     fun deactivate(context: Context): Result<Unit> = runCatching {
-        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
         val code = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_ACTIVATION_CODE, null)
 
-        if (workerUrl.isNotEmpty() && !code.isNullOrEmpty()) {
+        if (apiBaseUrls().isNotEmpty() && !code.isNullOrEmpty()) {
             val body = JSONObject()
                 .put("code", code)
                 .put("device_pubkey", devicePubkeyHex())
                 .toString()
-            postOk("$workerUrl/deactivate", body)
+            withApiFallback { baseUrl ->
+                postOk("$baseUrl/deactivate", body)
+            }
         }
 
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -105,7 +101,7 @@ object PremiumActivator {
         val code = prefs.getString(KEY_ACTIVATION_CODE, null)?.let(::normalizeCode).orEmpty()
         if (code.isEmpty()) return@runCatching DexUpdateStatus.MissingActivationCode
 
-        val activation = requestActivation(context, code)
+        val activation = requestActivation(code)
         val installedHash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)
         if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
             DexUpdateStatus.UpToDate
@@ -126,17 +122,13 @@ object PremiumActivator {
         val code = prefs.getString(KEY_ACTIVATION_CODE, null)?.let(::normalizeCode).orEmpty()
         if (code.isEmpty()) return@runCatching UpdateResult.SkippedMissingActivationCode
 
-        val activation = requestActivation(context, code)
+        val activation = requestActivation(code)
         val installedHash = prefs.getString(KEY_INSTALLED_DEX_HASH, null)
         if (installedHash.equals(activation.dexHash, ignoreCase = true)) {
             return@runCatching UpdateResult.UpToDate
         }
 
-        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
-        val dexBytes = getBytes("$workerUrl/download?token=${urlEncode(activation.token)}")
-        val actualHash = sha256Hex(dexBytes)
-        require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
-        downloadAndInstall(context, dexBytes, activation)
+        downloadAndInstall(context, downloadDex(activation), activation)
 
         prefs.edit()
             .putBoolean(KEY_INSTALLED, true)
@@ -181,18 +173,20 @@ object PremiumActivator {
         val dexHash: String,
         val dexVersion: Int,
         val deviceSig: String,
+        val baseUrl: String,
     )
 
-    private fun requestActivation(context: Context, code: String): ActivationResponse {
-        val workerUrl = BuildConfig.PREMIUM_WORKER_URL.trimEnd('/')
-        require(workerUrl.isNotEmpty()) { "Premium worker URL is not configured" }
+    private fun requestActivation(code: String): ActivationResponse {
+        require(apiBaseUrls().isNotEmpty()) { "Premium worker URL is not configured" }
 
         val activateBody = JSONObject()
             .put("code", code)
             .put("device_pubkey", devicePubkeyHex())
             .toString()
 
-        val activateResponse = postJson("$workerUrl/activate", activateBody)
+        val (baseUrl, activateResponse) = withApiFallbackWithBase { baseUrl ->
+            postJson("$baseUrl/activate", activateBody)
+        }
         val token = activateResponse.getString("token")
         val expectedHash = activateResponse.getString("dex_hash").lowercase()
         val dexVersion = activateResponse.optInt("dex_version", PremiumInstall.SUPPORTED_API_VERSION)
@@ -202,7 +196,16 @@ object PremiumActivator {
             "Unsupported premium version: $dexVersion"
         }
 
-        return ActivationResponse(token, expectedHash, dexVersion, deviceSig)
+        return ActivationResponse(token, expectedHash, dexVersion, deviceSig, baseUrl)
+    }
+
+    private fun downloadDex(activation: ActivationResponse): ByteArray {
+        val dexBytes = withApiFallback(preferredBaseUrl = activation.baseUrl) { baseUrl ->
+            getBytes("$baseUrl/download?token=${urlEncode(activation.token)}")
+        }
+        val actualHash = sha256Hex(dexBytes)
+        require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
+        return dexBytes
     }
 
     private fun downloadAndInstall(context: Context, dexBytes: ByteArray, activation: ActivationResponse) {
@@ -254,6 +257,49 @@ object PremiumActivator {
     private fun bootCount(context: Context): Int =
         Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, 0)
 
+    private fun apiBaseUrls(preferredBaseUrl: String? = null): List<String> {
+        val configured = BuildConfig.PREMIUM_API_URLS
+            .split(',')
+            .map { it.trim().trimEnd('/') }
+            .filter { it.isNotEmpty() }
+        val legacy = BuildConfig.PREMIUM_WORKER_URL.trim().trimEnd('/').takeIf { it.isNotEmpty() }
+        val ordered = buildList {
+            preferredBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }?.let(::add)
+            addAll(configured)
+            legacy?.let(::add)
+        }
+        return ordered.distinct()
+    }
+
+    private inline fun <T> withApiFallback(
+        preferredBaseUrl: String? = null,
+        block: (String) -> T,
+    ): T =
+        withApiFallbackWithBase(preferredBaseUrl, block).second
+
+    private inline fun <T> withApiFallbackWithBase(
+        preferredBaseUrl: String? = null,
+        block: (String) -> T,
+    ): Pair<String, T> {
+        val urls = apiBaseUrls(preferredBaseUrl)
+        require(urls.isNotEmpty()) { "Premium worker URL is not configured" }
+
+        var fallbackFailure: Throwable? = null
+        for (baseUrl in urls) {
+            try {
+                return baseUrl to block(baseUrl)
+            } catch (throwable: Throwable) {
+                if (!shouldTryNextApi(throwable)) throw throwable
+                if (fallbackFailure == null) fallbackFailure = throwable
+            }
+        }
+        throw fallbackFailure ?: error("Premium worker URL is not configured")
+    }
+
+    private fun shouldTryNextApi(throwable: Throwable): Boolean =
+        throwable is IOException ||
+            (throwable is HttpStatusException && throwable.statusCode >= 500)
+
     private fun postJson(url: String, body: String): JSONObject {
         val connection = openConnection(url).apply {
             requestMethod = "POST"
@@ -274,7 +320,7 @@ object PremiumActivator {
         val code = connection.responseCode
         if (code !in 200..299) {
             val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            error("Request failed ($code): $message")
+            throw HttpStatusException(code, "Request failed ($code): $message")
         }
     }
 
@@ -283,7 +329,7 @@ object PremiumActivator {
         val code = connection.responseCode
         if (code !in 200..299) {
             val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            error("Download failed ($code): $message")
+            throw HttpStatusException(code, "Download failed ($code): $message")
         }
         return connection.inputStream.use { it.readBytes() }
     }
@@ -292,7 +338,7 @@ object PremiumActivator {
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (code !in 200..299) error("Activation failed ($code): $body")
+        if (code !in 200..299) throw HttpStatusException(code, "Activation failed ($code): $body")
         return body
     }
 
@@ -314,4 +360,9 @@ object PremiumActivator {
 
     private fun urlEncode(value: String): String =
         java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
+
+    private class HttpStatusException(
+        val statusCode: Int,
+        message: String,
+    ) : RuntimeException(message)
 }

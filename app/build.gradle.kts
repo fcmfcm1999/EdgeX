@@ -12,6 +12,16 @@ val localProperties = Properties().apply {
     }
 }
 
+fun buildConfigString(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val premiumWorkerUrl = localProperties.getProperty("PREMIUM_WORKER_URL")
+    ?: System.getenv("PREMIUM_WORKER_URL")
+    ?: ""
+val premiumApiUrls = localProperties.getProperty("PREMIUM_API_URLS")
+    ?: System.getenv("PREMIUM_API_URLS")
+    ?: premiumWorkerUrl.ifBlank { "https://edgex-premium-api.netlify.app" }
+
 
 android {
     namespace = Configs.namespace
@@ -31,7 +41,12 @@ android {
         buildConfigField(
             "String",
             "PREMIUM_WORKER_URL",
-            "\"${localProperties.getProperty("PREMIUM_WORKER_URL") ?: System.getenv("PREMIUM_WORKER_URL") ?: ""}\""
+            buildConfigString(premiumWorkerUrl)
+        )
+        buildConfigField(
+            "String",
+            "PREMIUM_API_URLS",
+            buildConfigString(premiumApiUrls)
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
