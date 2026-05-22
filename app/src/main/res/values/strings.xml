@@ -211,8 +211,16 @@
     <string name="action_left_side_bar">Left Side Bar</string>
     <string name="action_right_side_bar">Right Side Bar</string>
     <string name="action_toggle_flashlight">Flashlight</string>
+    <string name="action_toggle_wifi">Toggle Wi-Fi</string>
+    <string name="action_toggle_mobile_data">Toggle Mobile Data</string>
     <string name="flashlight_toast_on">手电筒开启</string>
     <string name="flashlight_toast_off">手电筒关闭</string>
+    <string name="wifi_toast_on">Wi-Fi on</string>
+    <string name="wifi_toast_off">Wi-Fi off</string>
+    <string name="mobile_data_toast_on">Mobile data on</string>
+    <string name="mobile_data_toast_off">Mobile data off</string>
+    <string name="toast_wifi_toggle_failed">Failed to toggle Wi-Fi</string>
+    <string name="toast_mobile_data_toggle_failed">Failed to toggle mobile data</string>
     <string name="flashlight_notification_text">关闭手电筒</string>
     <string name="flashlight_channel_name">手电筒</string>
     <string name="action_game_mode">Game Mode</string>

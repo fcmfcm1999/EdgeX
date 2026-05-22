@@ -59,6 +59,8 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
             code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
             code == "toggle_flashlight" -> R.drawable.ic_flashlight
+            code == "toggle_wifi" -> R.drawable.ic_wifi
+            code == "toggle_mobile_data" -> R.drawable.ic_mobile_data
             code == "game_mode" -> R.drawable.ic_game_mode
             else -> R.drawable.ic_action_dot
         }
@@ -115,6 +117,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_left_side_bar), AppConfig.SIDE_BAR_LEFT_ACTION, R.drawable.ic_side_bar_left),
         ActionItem(getString(R.string.action_right_side_bar), AppConfig.SIDE_BAR_RIGHT_ACTION, R.drawable.ic_side_bar_right),
         ActionItem(getString(R.string.action_toggle_flashlight), "toggle_flashlight", R.drawable.ic_flashlight),
+        ActionItem(getString(R.string.action_toggle_wifi), "toggle_wifi", R.drawable.ic_wifi),
+        ActionItem(getString(R.string.action_toggle_mobile_data), "toggle_mobile_data", R.drawable.ic_mobile_data),
         ActionItem(getString(R.string.action_game_mode), "game_mode", R.drawable.ic_game_mode),
     ).filter { it.code !in excludedCodes }
 

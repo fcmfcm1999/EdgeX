@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.drawable.Drawable
 import android.media.AudioManager
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -15,6 +16,7 @@ import android.os.SystemClock
 import android.os.UserHandle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.telephony.TelephonyManager
 import android.view.KeyEvent
 import android.widget.Toast
 import com.fan.edgex.BuildConfig
@@ -268,6 +270,12 @@ internal class GestureActionDispatcher(
             action == "toggle_flashlight" -> {
                 FlashlightManager.toggle(context, handlerProvider())
             }
+            action == "toggle_wifi" -> {
+                toggleWifi(context)
+            }
+            action == "toggle_mobile_data" -> {
+                toggleMobileData(context)
+            }
             action == "game_mode" -> {
                 GameModeManager.enable(context, handlerProvider())
             }
@@ -390,6 +398,8 @@ internal class GestureActionDispatcher(
         action == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
         action == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
         action == "toggle_flashlight"            -> R.drawable.ic_flashlight
+        action == "toggle_wifi"                  -> R.drawable.ic_wifi
+        action == "toggle_mobile_data"           -> R.drawable.ic_mobile_data
         action == "game_mode"                    -> R.drawable.ic_game_mode
         else                                 -> 0
     }
@@ -424,8 +434,59 @@ internal class GestureActionDispatcher(
         action.startsWith("launch_app:") -> "Launch"
         action.startsWith("app_shortcut:") -> "Shortcut"
         action == "toggle_flashlight" -> "Flashlight"
+        action == "toggle_wifi"       -> "Wi-Fi"
+        action == "toggle_mobile_data" -> "Data"
         action == "game_mode"         -> "GameMode"
         else                          -> action.take(8)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun toggleWifi(context: Context) {
+        try {
+            val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wifiManager == null) {
+                showToast(context, ModuleRes.getString(R.string.toast_wifi_toggle_failed))
+                return
+            }
+            val enable = !wifiManager.isWifiEnabled
+            val success = wifiManager.setWifiEnabled(enable)
+            if (success) {
+                showToast(
+                    context,
+                    ModuleRes.getString(
+                        if (enable) R.string.wifi_toast_on else R.string.wifi_toast_off,
+                    ),
+                )
+            } else {
+                showToast(context, ModuleRes.getString(R.string.toast_wifi_toggle_failed))
+            }
+        } catch (t: Throwable) {
+            log("toggleWifi failed: ${t.message}")
+            showToast(context, ModuleRes.getString(R.string.toast_wifi_toggle_failed))
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    @SuppressLint("MissingPermission")
+    private fun toggleMobileData(context: Context) {
+        try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+            if (telephonyManager == null) {
+                showToast(context, ModuleRes.getString(R.string.toast_mobile_data_toggle_failed))
+                return
+            }
+            val enable = !telephonyManager.isDataEnabled
+            telephonyManager.setDataEnabled(enable)
+            showToast(
+                context,
+                ModuleRes.getString(
+                    if (enable) R.string.mobile_data_toast_on else R.string.mobile_data_toast_off,
+                ),
+            )
+        } catch (t: Throwable) {
+            log("toggleMobileData failed: ${t.message}")
+            showToast(context, ModuleRes.getString(R.string.toast_mobile_data_toggle_failed))
+        }
     }
 
     private fun killForegroundApp(context: Context) {

@@ -332,6 +332,8 @@ class PanelConfigActivity : AppCompatActivity() {
         action == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
         action == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
         action == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+        action == "toggle_wifi" -> R.drawable.ic_wifi
+        action == "toggle_mobile_data" -> R.drawable.ic_mobile_data
         else -> R.drawable.ic_action_dot
     }
 

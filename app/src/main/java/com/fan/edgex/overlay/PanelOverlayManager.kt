@@ -349,6 +349,8 @@ private class PanelOverlayWindow(
         action == "universal_copy" -> "Copy"
         action == "lock_screen" -> "Lock"
         action == "kill_app" -> "Kill"
+        action == "toggle_wifi" -> "Wi-Fi"
+        action == "toggle_mobile_data" -> "Data"
         action.startsWith("launch_app:") -> "App"
         action.startsWith("app_shortcut:") -> "Shortcut"
         action.startsWith("shell:") -> "Shell"
@@ -448,6 +450,8 @@ private class PanelOverlayWindow(
         action == "volume_down" -> R.drawable.ic_volume_down
         action.startsWith("music_control:") -> R.drawable.ic_music
         action.startsWith("multi_action:") -> R.drawable.ic_multi_action
+        action == "toggle_wifi" -> R.drawable.ic_wifi
+        action == "toggle_mobile_data" -> R.drawable.ic_mobile_data
         else -> R.drawable.ic_action_dot
     }
 }

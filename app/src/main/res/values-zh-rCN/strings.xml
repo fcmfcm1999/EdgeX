@@ -198,6 +198,14 @@
     <string name="action_custom_panel">自定义面板</string>
     <string name="action_left_side_bar">左侧边栏</string>
     <string name="action_right_side_bar">右侧边栏</string>
+    <string name="action_toggle_wifi">开关 Wi-Fi</string>
+    <string name="action_toggle_mobile_data">开关移动数据</string>
+    <string name="wifi_toast_on">Wi-Fi 已开启</string>
+    <string name="wifi_toast_off">Wi-Fi 已关闭</string>
+    <string name="mobile_data_toast_on">移动数据已开启</string>
+    <string name="mobile_data_toast_off">移动数据已关闭</string>
+    <string name="toast_wifi_toggle_failed">切换 Wi-Fi 失败</string>
+    <string name="toast_mobile_data_toggle_failed">切换移动数据失败</string>
     <string name="menu_custom_panel">自定义面板</string>
     <string name="menu_left_side_bar">左侧边栏</string>
     <string name="menu_right_side_bar">右侧边栏</string>
