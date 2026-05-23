@@ -20,7 +20,7 @@ val premiumWorkerUrl = localProperties.getProperty("PREMIUM_WORKER_URL")
     ?: ""
 val premiumApiUrls = localProperties.getProperty("PREMIUM_API_URLS")
     ?: System.getenv("PREMIUM_API_URLS")
-    ?: premiumWorkerUrl.ifBlank { "https://edgex-premium-api.netlify.app" }
+    ?: premiumWorkerUrl.ifBlank { "https://activation-server-production-29da.up.railway.app" }
 
 
 android {

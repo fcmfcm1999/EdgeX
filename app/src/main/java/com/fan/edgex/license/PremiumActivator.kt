@@ -54,7 +54,7 @@ object PremiumActivator {
                 .put("device_pubkey", devicePubkeyHex())
                 .toString()
             withApiFallback { baseUrl ->
-                postOk("$baseUrl/deactivate", body)
+                postOk("$baseUrl/api/unbind", body)
             }
         }
 
@@ -185,7 +185,7 @@ object PremiumActivator {
             .toString()
 
         val (baseUrl, activateResponse) = withApiFallbackWithBase { baseUrl ->
-            postJson("$baseUrl/activate", activateBody)
+            postJson("$baseUrl/api/activate", activateBody)
         }
         val token = activateResponse.getString("token")
         val expectedHash = activateResponse.getString("dex_hash").lowercase()
@@ -201,7 +201,7 @@ object PremiumActivator {
 
     private fun downloadDex(activation: ActivationResponse): ByteArray {
         val dexBytes = withApiFallback(preferredBaseUrl = activation.baseUrl) { baseUrl ->
-            getBytes("$baseUrl/download?token=${urlEncode(activation.token)}")
+            getBytes("$baseUrl/api/download/dex?token=${urlEncode(activation.token)}")
         }
         val actualHash = sha256Hex(dexBytes)
         require(actualHash == activation.dexHash) { "Downloaded premium DEX hash mismatch" }
