@@ -15,9 +15,6 @@ val localProperties = Properties().apply {
 fun buildConfigString(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-val premiumWorkerUrl = localProperties.getProperty("PREMIUM_WORKER_URL")
-    ?: System.getenv("PREMIUM_WORKER_URL")
-    ?: ""
 val premiumApiUrls = localProperties.getProperty("PREMIUM_API_URLS")
     ?: System.getenv("PREMIUM_API_URLS")
     ?: "https://activation-server-production-29da.up.railway.app"
@@ -38,11 +35,6 @@ android {
         targetSdk = Configs.targetSdk
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: Configs.versionCode
         versionName = System.getenv("VERSION_NAME") ?: Configs.versionName
-        buildConfigField(
-            "String",
-            "PREMIUM_WORKER_URL",
-            buildConfigString(premiumWorkerUrl)
-        )
         buildConfigField(
             "String",
             "PREMIUM_API_URLS",

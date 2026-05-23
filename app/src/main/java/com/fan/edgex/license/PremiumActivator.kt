@@ -177,7 +177,7 @@ object PremiumActivator {
     )
 
     private fun requestActivation(code: String): ActivationResponse {
-        require(apiBaseUrls().isNotEmpty()) { "Premium worker URL is not configured" }
+        require(apiBaseUrls().isNotEmpty()) { "Premium API URL is not configured" }
 
         val activateBody = JSONObject()
             .put("code", code)
@@ -280,7 +280,7 @@ object PremiumActivator {
         block: (String) -> T,
     ): Pair<String, T> {
         val urls = apiBaseUrls(preferredBaseUrl)
-        require(urls.isNotEmpty()) { "Premium worker URL is not configured" }
+        require(urls.isNotEmpty()) { "Premium API URL is not configured" }
 
         var fallbackFailure: Throwable? = null
         for (baseUrl in urls) {
@@ -291,7 +291,7 @@ object PremiumActivator {
                 if (fallbackFailure == null) fallbackFailure = throwable
             }
         }
-        throw fallbackFailure ?: error("Premium worker URL is not configured")
+        throw fallbackFailure ?: error("Premium API URL is not configured")
     }
 
     private fun shouldTryNextApi(throwable: Throwable): Boolean =

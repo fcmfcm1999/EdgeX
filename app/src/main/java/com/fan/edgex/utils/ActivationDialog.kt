@@ -76,7 +76,7 @@ object ActivationDialog {
                 context.getString(R.string.premium_activation_error_empty_code)
             message.contains("invalid code") || message.contains("activation failed (404)") ->
                 context.getString(R.string.premium_activation_error_invalid_code)
-            message.contains("worker url is not configured") ->
+            message.contains("api url is not configured") ->
                 context.getString(R.string.premium_activation_error_not_configured)
             message.contains("downloaded premium dex hash mismatch") ->
                 context.getString(R.string.premium_activation_error_package_verify)
