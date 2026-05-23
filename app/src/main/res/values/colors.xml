@@ -15,6 +15,7 @@
     <color name="ui_background">#FFFFFFFF</color>
     <color name="ui_text_primary">#DE000000</color>
     <color name="ui_text_secondary">#8A000000</color>
+    <color name="ui_attention_red">#D32F2F</color>
     
     <color name="ui_header_background">@color/purple_500</color>
     <color name="ui_header_text">@color/white</color>

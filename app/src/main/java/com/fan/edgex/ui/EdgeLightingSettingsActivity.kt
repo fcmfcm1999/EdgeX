@@ -365,7 +365,7 @@ class EdgeLightingSettingsActivity : AppCompatActivity() {
         val accent = ThemeManager.currentAccent(this)
         statusText.setTextColor(
             if (granted) accent
-            else resources.getColor(R.color.ui_text_secondary, null),
+            else resources.getColor(R.color.ui_attention_red, theme),
         )
     }
 
