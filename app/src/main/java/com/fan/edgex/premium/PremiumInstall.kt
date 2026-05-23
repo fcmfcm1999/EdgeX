@@ -6,5 +6,5 @@ object PremiumInstall {
     const val META_PATH = "$DIR_PATH/premium.meta"
     // Legacy path from before Keystore binding; cleaned up on deactivation.
     const val LEGACY_DEVICE_ID_PATH = "$DIR_PATH/device_id"
-    const val SUPPORTED_API_VERSION = 3
+    const val SUPPORTED_API_VERSION = 1
 }
