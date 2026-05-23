@@ -10,15 +10,15 @@ import java.security.spec.X509EncodedKeySpec
 object PremiumSignatureVerifier {
     private const val RSA_PUBLIC_KEY_DER_HEX =
         "30820122300d06092a864886f70d01010105000382010f003082010a0282010100" +
-            "96ff05c9bf77ae7b60ca7a1af426070bcef91d59ec38850b2134660c159ee503" +
-            "e960d8c02e3918f9ded31518247914fd787ae512cf750dea1fceb0c0e7bbf0f0" +
-            "d35bbcc3d599247596b355f0c8e563cb079ac1266020e00f5750c80ab242aa9a" +
-            "59069434913e477e39e286d3bc4ef526a4dd074c924df77ec34b9a3321025c0f" +
-            "71daebf584adf35f02ccceba455034ecf1b6d571844a7c7b8baf8127314f9111" +
-            "95a7a6bbc3d0cb8cc70412ee61ccfbe0e546b217ae7afabf127cbe059620388" +
-            "5e83aaf33a55498d7f5cfb6e982845f3ee40c2448635f52b18296f7c47cb69b" +
-            "ae37dce10237e83b4d58cdeea36d9e67746d1e633f2234a068b7041a6674e17" +
-            "14f0203010001"
+            "ce29f8eed32e307c8d8f1012925c7a5ca1a9046dbdbd45f95e20e6c019c8fb" +
+            "8f774be35a42470bea7b45c1fa2e6c484984f7338d92ee0dcd3676d65c9a212" +
+            "9f1c32b1aabd3c4f99828752bba2c66c62d2b3d05984f73f13bf4ed24e184bc" +
+            "89c4cc1710dad90cfebd72775821cc38d732c68b17a023909b87c11df0de6ae" +
+            "80e617c63268a7c768194dea6447afb095d3356bd8cf2978878f672576000daf" +
+            "e64cb684e361cd6019fbb6d33521cd9d2b2e56940ac4edb97fc2730485e659f" +
+            "098f8c551065ef0675c904d3c8b1a3ca7f74d787c7f381f3f9fe367c5c302ae" +
+            "b3cdcc537f2be506e9a50b9ab1048915d719968c799874b0f6c946006ede4c" +
+            "0f21b761b0203010001"
 
     fun verifyInstallationSignature(
         dex: File,
