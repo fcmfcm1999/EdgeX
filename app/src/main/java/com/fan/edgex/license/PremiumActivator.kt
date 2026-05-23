@@ -262,11 +262,9 @@ object PremiumActivator {
             .split(',')
             .map { it.trim().trimEnd('/') }
             .filter { it.isNotEmpty() }
-        val legacy = BuildConfig.PREMIUM_WORKER_URL.trim().trimEnd('/').takeIf { it.isNotEmpty() }
         val ordered = buildList {
             preferredBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }?.let(::add)
             addAll(configured)
-            legacy?.let(::add)
         }
         return ordered.distinct()
     }
