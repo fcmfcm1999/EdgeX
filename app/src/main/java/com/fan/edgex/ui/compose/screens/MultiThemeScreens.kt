@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -37,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -49,12 +49,10 @@ import androidx.compose.ui.unit.sp
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.MultiAction
 import com.fan.edgex.config.MultiActionStore
-import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
-import com.fan.edgex.config.requestHookActionExecution
 import com.fan.edgex.ui.MultiActionEditActivity
 import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.ui.compose.components.EdgeXChip
@@ -227,22 +225,8 @@ fun ThemeScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         EdgeXTopBar(title = "主题", onBack = onBack)
-        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-            Text(
-                text = "选择你的\n交互色彩",
-                color = LocalEdgeXColors.current.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                lineHeight = 32.sp,
-            )
-            Text(
-                text = "Accent 会立即应用到新 UI，旧页面同步使用近似自定义色",
-                color = LocalEdgeXColors.current.onSurfaceDim,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+        ThemeHero(accent)
+        ThemeSectionLabel("预设主题")
         AccentSwatches(
             selected = accent,
             onSelected = {
@@ -255,10 +239,11 @@ fun ThemeScreen(
                 showToast("主题已保存")
             },
         )
+        ThemeSectionLabel("深色模式")
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             EdgeXSwitchRow(
                 title = "深色模式",
-                subtitle = if (dark) "使用深色暖中性色板" else "使用浅色暖中性色板",
+                subtitle = "跟随系统或手动切换",
                 checked = dark,
                 onCheckedChange = {
                     dark = it
@@ -269,6 +254,7 @@ fun ThemeScreen(
                 modifier = Modifier.testTag("theme_dark_mode"),
             )
         }
+        ThemeSectionLabel("自定义 RGB")
         RgbSliders(
             red = red,
             green = green,
@@ -289,29 +275,106 @@ fun ThemeScreen(
 }
 
 @Composable
-private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> Unit) {
-    Row(
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+private fun ThemeHero(accent: EdgeXAccent) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 20.dp),
+        shape = RoundedCornerShape(EdgeXRadius.xl),
+        colors = CardDefaults.cardColors(containerColor = accent.lightAccent),
+        border = BorderStroke(0.dp, Color.Transparent),
     ) {
-        EdgeXAccent.entries.forEach { accent ->
-            val isSelected = selected == accent
-            Box(
-                modifier = Modifier
-                    .testTag("theme_accent_${accent.id}")
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(accent.lightAccent)
-                    .border(
-                        width = if (isSelected) 3.dp else 1.dp,
-                        color = if (isSelected) Color.White else LocalEdgeXColors.current.outlineStrong,
-                        shape = CircleShape,
-                    )
-                    .clickable { onSelected(accent) },
-            )
+        Box(
+            modifier = Modifier
+                .height(144.dp)
+                .fillMaxWidth()
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.20f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(620f, -20f),
+                        radius = 280f,
+                    ),
+                )
+                .padding(24.dp),
+        ) {
+            Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                Text("当前主题", color = Color.White.copy(alpha = 0.70f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(
+                    accentName(accent),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 34.sp,
+                    lineHeight = 36.sp,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text(
+                    "#%06X".format(accent.lightAccent.toArgb() and 0xFFFFFF),
+                    color = Color.White.copy(alpha = 0.86f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            EdgeXAccent.entries.forEach { accent ->
+                val isSelected = selected == accent
+                Box(
+                    modifier = Modifier
+                        .testTag("theme_accent_${accent.id}")
+                        .weight(1f)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(accent.lightAccent)
+                        .border(
+                            width = if (isSelected) 2.dp else 0.dp,
+                            color = if (isSelected) LocalEdgeXColors.current.onSurface else Color.Transparent,
+                            shape = RoundedCornerShape(18.dp),
+                        )
+                        .clickable { onSelected(accent) },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+            EdgeXAccent.entries.forEach { accent ->
+                Text(
+                    text = accentName(accent),
+                    color = LocalEdgeXColors.current.onSurfaceDim,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeSectionLabel(label: String) {
+    Text(
+        text = label,
+        color = LocalEdgeXColors.current.onSurfaceDim,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 10.dp),
+    )
+}
+
+private fun accentName(accent: EdgeXAccent): String =
+    when (accent) {
+        EdgeXAccent.Green -> "默认"
+        EdgeXAccent.Blue -> "海洋"
+        EdgeXAccent.Coral -> "炭火"
+        EdgeXAccent.Violet -> "雪松"
+        EdgeXAccent.Amber -> "琥珀"
+    }
 
 @Composable
 private fun RgbSliders(
