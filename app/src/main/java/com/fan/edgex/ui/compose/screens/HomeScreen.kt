@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -87,6 +86,8 @@ fun HomeScreen(
         HomeTiles(state, callbacks)
         SectionLabel("高级设置")
         AdvancedSettings(state, callbacks)
+        SectionLabel("关于")
+        AboutSettings(callbacks)
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
@@ -121,7 +122,7 @@ private fun HeroCard(stats: HomeStats) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(EdgeXRadius.xl))
             .background(Brush.linearGradient(listOf(colors.accentSoft2, colors.accentSoft)))
-            .padding(horizontal = 22.dp, vertical = 22.dp),
+            .padding(start = 22.dp, top = 22.dp, end = 22.dp, bottom = 18.dp),
     ) {
         Row(
             modifier = Modifier
@@ -143,16 +144,16 @@ private fun HeroCard(stats: HomeStats) {
             text = "你的手势\n掌控一切",
             color = colors.onAccentSoft,
             fontWeight = FontWeight.Bold,
-            fontSize = 34.sp,
-            lineHeight = 36.sp,
-            modifier = Modifier.padding(top = 16.dp),
+            fontSize = 28.sp,
+            lineHeight = 31.sp,
+            modifier = Modifier.padding(top = 14.dp),
         )
         Text(
             text = "已配置 ${stats.configuredGestures} 个手势动作 · ${stats.activeZones}/16 区域已启用",
             color = colors.onAccentSoft.copy(alpha = 0.72f),
             fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(top = 8.dp),
+            fontSize = 14.sp,
+            modifier = Modifier.padding(top = 6.dp),
         )
         Row(
             modifier = Modifier
@@ -160,7 +161,7 @@ private fun HeroCard(stats: HomeStats) {
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(22.dp))
                 .background(colors.onAccentSoft)
-                .padding(vertical = 16.dp),
+                .padding(6.dp),
         ) {
             HeroStat("${stats.configuredGestures}", "手势", Modifier.weight(1f))
             HeroStat("${stats.frozenApps}", "已冻结", Modifier.weight(1f))
@@ -172,9 +173,14 @@ private fun HeroCard(stats: HomeStats) {
 @Composable
 private fun HeroStat(value: String, label: String, modifier: Modifier = Modifier) {
     val colors = LocalEdgeXColors.current
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-        Text(label, color = colors.accentSoft.copy(alpha = 0.75f), fontWeight = FontWeight.Medium, fontSize = 12.sp)
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(value, color = colors.accentSoft2, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+        Text(label, color = colors.accentSoft2.copy(alpha = 0.70f), fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
     }
 }
 
@@ -291,7 +297,7 @@ private fun FeatureTile(
         onClick = onClick,
         modifier = modifier
             .testTag(tag)
-            .aspectRatio(1f),
+            .height(132.dp),
         iconBackground = iconBackground,
         iconTint = iconTint,
     )
@@ -324,7 +330,7 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
         EdgeXDivider()
         EdgeXSwitchRow(
             title = "震动反馈",
-            subtitle = "触发动作时震动",
+            subtitle = if (state.haptic) "已启用 · 轻触" else "触发动作时震动",
             checked = state.haptic,
             onCheckedChange = callbacks.setHaptic,
             icon = EdgeXIcons.Gesture,
@@ -332,17 +338,40 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
         EdgeXDivider()
         EdgeXSwitchRow(
             title = "弧形冰箱",
-            subtitle = "从右侧以弧形抽屉显示应用列表",
+            subtitle = "右侧弧形抽屉显示应用",
             checked = state.arcDrawer,
             onCheckedChange = callbacks.setArcDrawer,
             icon = EdgeXIcons.Freeze,
         )
         EdgeXDivider()
         EdgeXRow(
-            title = "Edge Lighting",
-            subtitle = if (state.edgeLighting) "通知边缘光效已启用" else "通知边缘光效未启用",
+            title = "重启 SystemUI",
+            subtitle = "应用部分系统级更改",
             icon = EdgeXIcons.Sparkle,
-            onClick = { callbacks.openRoute(EdgeXRoute.EdgeLighting) },
+            onClick = { callbacks.showToast("正在重启 SystemUI…") },
+        ) {
+            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+        }
+    }
+}
+
+@Composable
+private fun AboutSettings(callbacks: HomeCallbacks) {
+    EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+        EdgeXRow(
+            title = "支持作者",
+            subtitle = "支付宝 · 微信 · ETH · SOL",
+            icon = EdgeXIcons.Sparkle,
+            onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
+        ) {
+            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+        }
+        EdgeXDivider()
+        EdgeXRow(
+            title = "EdgeX v0.1",
+            subtitle = "github.com/fcmfcm1999/EdgeX",
+            icon = EdgeXIcons.Gesture,
+            onClick = { callbacks.openRoute(EdgeXRoute.About) },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
         }
