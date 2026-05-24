@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -275,6 +276,7 @@ fun ThemeScreen(
                     onThemeChanged()
                 },
                 icon = EdgeXIcons.Theme,
+                modifier = Modifier.testTag("theme_dark_mode"),
             )
         }
         RgbSliders(
@@ -306,6 +308,7 @@ private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> U
             val isSelected = selected == accent
             Box(
                 modifier = Modifier
+                    .testTag("theme_accent_${accent.id}")
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(accent.lightAccent)
@@ -358,6 +361,7 @@ private fun RgbSliders(
             contentColor = LocalEdgeXColors.current.onAccent,
         ),
         modifier = Modifier
+            .testTag("theme_custom_apply")
             .fillMaxWidth()
             .padding(16.dp),
     ) {

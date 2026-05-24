@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -423,7 +424,9 @@ private fun ZoneCard(
 ) {
     val colors = LocalEdgeXColors.current
     Card(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .testTag("gesture_zone_${zone.id}")
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(EdgeXRadius.md),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         border = BorderStroke(1.dp, colors.outline),
@@ -495,6 +498,7 @@ private fun ActionSheet(
                     title = action.label,
                     subtitle = action.code,
                     icon = action.icon,
+                    modifier = Modifier.testTag("gesture_action_${action.code}"),
                     onClick = { onAction(zone, gesture, action) },
                 ) {
                     if (selected == action.code) {

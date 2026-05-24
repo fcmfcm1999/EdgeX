@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -253,6 +254,7 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
             cursorColor = colors.accent,
         ),
         modifier = Modifier
+            .testTag("freezer_search")
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp),
     )

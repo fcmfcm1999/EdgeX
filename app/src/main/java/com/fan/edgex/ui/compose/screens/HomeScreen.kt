@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -190,6 +191,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = "${state.stats.activeZones} 区域已配置",
                 icon = EdgeXIcons.Gesture,
                 onClick = { callbacks.openRoute(EdgeXRoute.Gestures) },
+                tag = "home_tile_gestures",
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
@@ -197,6 +199,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = "${state.stats.frozenApps} 个已冻结",
                 icon = EdgeXIcons.Freeze,
                 onClick = { callbacks.openRoute(EdgeXRoute.Freezer) },
+                tag = "home_tile_freezer",
                 iconBackground = Color(0xFFD5E0FB),
                 iconTint = Color(0xFF3B6CE5),
                 modifier = Modifier.weight(1f),
@@ -208,6 +211,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = if (state.keysEnabled) "已启用" else "未启用",
                 icon = EdgeXIcons.Keys,
                 onClick = { callbacks.openRoute(EdgeXRoute.Keys) },
+                tag = "home_tile_keys",
                 iconBackground = Color(0xFFF6E2B4),
                 iconTint = Color(0xFFC68A1A),
                 modifier = Modifier.weight(1f),
@@ -217,6 +221,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = "4 边缘 · 2 环",
                 icon = EdgeXIcons.Pie,
                 onClick = { callbacks.openRoute(EdgeXRoute.Pie) },
+                tag = "home_tile_pie",
                 modifier = Modifier.weight(1f),
             )
         }
@@ -226,6 +231,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = "可复用动作序列",
                 icon = EdgeXIcons.Multi,
                 onClick = { callbacks.openRoute(EdgeXRoute.Multi) },
+                tag = "home_tile_multi",
                 iconBackground = colors.warnSoft,
                 iconTint = colors.warn,
                 modifier = Modifier.weight(1f),
@@ -235,6 +241,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 meta = "轻点切换风格",
                 icon = EdgeXIcons.Theme,
                 onClick = { callbacks.openRoute(EdgeXRoute.Theme) },
+                tag = "home_tile_theme",
                 modifier = Modifier.weight(1f),
             )
         }
@@ -243,7 +250,9 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
             meta = "解锁全部高级功能",
             icon = EdgeXIcons.Sparkle,
             onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .testTag("home_tile_premium")
+                .fillMaxWidth(),
             trailing = {
                 EdgeXIcon(
                     imageVector = EdgeXIcons.ChevronRight,
@@ -270,6 +279,7 @@ private fun FeatureTile(
     meta: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    tag: String,
     modifier: Modifier = Modifier,
     iconBackground: Color = LocalEdgeXColors.current.accentSoft,
     iconTint: Color = LocalEdgeXColors.current.onAccentSoft,
@@ -279,7 +289,9 @@ private fun FeatureTile(
         meta = meta,
         icon = icon,
         onClick = onClick,
-        modifier = modifier.aspectRatio(1f),
+        modifier = modifier
+            .testTag(tag)
+            .aspectRatio(1f),
         iconBackground = iconBackground,
         iconTint = iconTint,
     )
