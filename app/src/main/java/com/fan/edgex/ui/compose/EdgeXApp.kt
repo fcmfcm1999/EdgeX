@@ -32,6 +32,7 @@ import com.fan.edgex.ui.PremiumActivity
 import com.fan.edgex.ui.ThemeActivity
 import com.fan.edgex.ui.compose.components.EdgeXToast
 import com.fan.edgex.ui.compose.screens.EdgeXPlaceholderScreen
+import com.fan.edgex.ui.compose.screens.GesturesScreen
 import com.fan.edgex.ui.compose.screens.HomeCallbacks
 import com.fan.edgex.ui.compose.screens.HomeScreen
 import com.fan.edgex.ui.compose.screens.HomeStats
@@ -114,6 +115,12 @@ fun EdgeXApp() {
                             refresh()
                         },
                     ),
+                )
+                EdgeXRoute.Gestures -> GesturesScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    showToast = ::showToast,
                 )
                 else -> EdgeXPlaceholderScreen(
                     route = route,
