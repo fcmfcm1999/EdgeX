@@ -6,15 +6,13 @@ import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import java.io.File
-import java.io.FileOutputStream
-import java.util.Properties
 import java.lang.reflect.Method
 
 class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
@@ -25,7 +23,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     companion object {
         private const val TAG = "EdgeX"
-        const val KEY_MODULE_ACTIVE_TS = "module_active_ts"
         
         /**
          * Check if the current call was initiated by our own code.
@@ -47,27 +44,24 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
             "android" -> {
-                writeModuleActiveTimestamp()
                 PremiumPluginLoader.tryLoad()
                 hookInputManager(lpparam)
             }
         }
     }
 
-    private fun writeModuleActiveTimestamp() {
+    private fun notifyModuleLoaded(context: android.content.Context) {
         runCatching {
-            val dir = File("/data/system/edgex")
-            dir.mkdirs()
-            // Ensure app process can traverse into this directory
-            dir.setExecutable(true, false)
-            dir.setReadable(true, false)
-            dir.parentFile?.setExecutable(true, false) // /data/system
-
-            val file = File(dir, "hook_active.properties")
-            val properties = Properties()
-            properties.setProperty(KEY_MODULE_ACTIVE_TS, System.currentTimeMillis().toString())
-            FileOutputStream(file).use { properties.store(it, "EdgeX hook active marker") }
-            file.setReadable(true, false)
+            context.sendBroadcast(
+                android.content.Intent(HookConfigSnapshot.ACTION_HOOK_LOADED).apply {
+                    component = android.content.ComponentName(
+                        BuildConfig.APPLICATION_ID,
+                        "${BuildConfig.APPLICATION_ID}.config.ConfigSnapshotReceiver",
+                    )
+                    setPackage(BuildConfig.APPLICATION_ID)
+                    addFlags(android.content.Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+                }
+            )
         }
     }
 
@@ -266,6 +260,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                                 as android.content.Context
                             GestureManager.initSystemServer(context)
                             PremiumPluginLoader.verifyDeviceBinding(context)
+                            notifyModuleLoaded(context)
                         } catch (t: Throwable) {
                             XposedBridge.log("$TAG: Failed to initialize GestureManager in start(): ${t.message}")
                         }

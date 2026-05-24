@@ -10,6 +10,9 @@ class ConfigSnapshotReceiver : BroadcastReceiver() {
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
             HookConfigSnapshot.ACTION_CONFIG_SNAPSHOT_REQUEST -> context.broadcastFullConfigSnapshot()
+            HookConfigSnapshot.ACTION_HOOK_LOADED -> {
+                context.putConfig(AppConfig.MODULE_ACTIVE_TS, System.currentTimeMillis().toString())
+            }
         }
     }
 }
