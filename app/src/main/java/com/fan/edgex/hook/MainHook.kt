@@ -6,7 +6,6 @@ import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
-import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
@@ -47,21 +46,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 PremiumPluginLoader.tryLoad()
                 hookInputManager(lpparam)
             }
-        }
-    }
-
-    private fun notifyModuleLoaded(context: android.content.Context) {
-        runCatching {
-            context.sendBroadcast(
-                android.content.Intent(HookConfigSnapshot.ACTION_HOOK_LOADED).apply {
-                    component = android.content.ComponentName(
-                        BuildConfig.APPLICATION_ID,
-                        "${BuildConfig.APPLICATION_ID}.config.ConfigSnapshotReceiver",
-                    )
-                    setPackage(BuildConfig.APPLICATION_ID)
-                    addFlags(android.content.Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-                }
-            )
         }
     }
 
@@ -260,7 +244,6 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                                 as android.content.Context
                             GestureManager.initSystemServer(context)
                             PremiumPluginLoader.verifyDeviceBinding(context)
-                            notifyModuleLoaded(context)
                         } catch (t: Throwable) {
                             XposedBridge.log("$TAG: Failed to initialize GestureManager in start(): ${t.message}")
                         }

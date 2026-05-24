@@ -11,7 +11,6 @@ object HookConfigSnapshot {
     val ACTION_CONFIG_CHANGED = "${BuildConfig.APPLICATION_ID}.ACTION_CONFIG_CHANGED"
     val ACTION_CONFIG_SNAPSHOT_REQUEST = "${BuildConfig.APPLICATION_ID}.ACTION_CONFIG_SNAPSHOT_REQUEST"
     val ACTION_EXECUTE_ACTION = "${BuildConfig.APPLICATION_ID}.ACTION_EXECUTE_ACTION"
-    val ACTION_HOOK_LOADED = "${BuildConfig.APPLICATION_ID}.ACTION_HOOK_LOADED"
     val ACTION_EDGE_LIGHTING = "${BuildConfig.APPLICATION_ID}.ACTION_EDGE_LIGHTING"
     val ACTION_EDGE_LIGHTING_DISMISS = "${BuildConfig.APPLICATION_ID}.ACTION_EDGE_LIGHTING_DISMISS"
     const val EXTRA_KEYS = "keys"
@@ -28,27 +27,12 @@ object HookConfigSnapshot {
 
     fun snapshotFileForHook(): File =
         systemSnapshotFile().takeIf { it.isFile && it.canRead() }
-            ?: File("/data/data/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
+            ?: File("/data/user_de/0/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
 
     fun writeFromPreferences(context: Context): Boolean {
         val prefs = context.configPrefs()
         val values = prefs.all.mapValues { (_, value) -> value?.toString() ?: "" }
-        val hookValues = valuesForHook(values)
-        writeForHook(hookValues)
-        return write(context, hookValues)
-    }
-
-    private fun repairSnapshotIfNeeded(context: Context) {
-        runCatching {
-            val file = snapshotFile(context)
-            if (file.exists() && !file.canWrite()) {
-                file.delete()
-            }
-            val systemFile = systemSnapshotFile()
-            if (systemFile.exists() && !systemFile.canWrite()) {
-                systemFile.delete()
-            }
-        }
+        return write(context, valuesForHook(values))
     }
 
     fun readFromHookFile(): Map<String, String> =
@@ -106,7 +90,7 @@ object HookConfigSnapshot {
         values.filterKeys(::isHookRuntimeKey)
 
     private fun snapshotFile(context: Context): File =
-        File(context.filesDir, SNAPSHOT_FILE)
+        File(context.createDeviceProtectedStorageContext().filesDir, SNAPSHOT_FILE)
 
     private fun systemSnapshotFile(): File =
         File("/data/system/edgex/$SNAPSHOT_FILE")

@@ -5,7 +5,6 @@ object AppConfig {
 
     // Top-level flags
     const val GESTURES_ENABLED = "gestures_enabled"
-    const val MODULE_ACTIVE_TS = "module_active_ts"
     const val KEYS_ENABLED = "keys_enabled"
     const val DEBUG_MATRIX = "debug_matrix_enabled"
     const val FREEZER_ARC_DRAWER = "freezer_arc_drawer_enabled"

@@ -84,7 +84,7 @@ fun HomeScreen(
             },
         )
         AppHeader()
-        HeroCard(state.stats, state.moduleActive)
+        HeroCard(state.stats)
         HomeTiles(state, callbacks)
         SectionLabel(stringResource(R.string.menu_advanced))
         AdvancedSettings(state, callbacks)
@@ -116,7 +116,7 @@ private fun AppHeader() {
 }
 
 @Composable
-private fun HeroCard(stats: HomeStats, moduleActive: Boolean) {
+private fun HeroCard(stats: HomeStats) {
     val colors = LocalEdgeXColors.current
     Column(
         modifier = Modifier
@@ -138,10 +138,10 @@ private fun HeroCard(stats: HomeStats, moduleActive: Boolean) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (moduleActive) Color(0xFF4CAF50) else Color(0xFFEF5350)),
+                    .background(Color(0xFF4CAF50)),
             )
             Text(
-                text = stringResource(if (moduleActive) R.string.compose_module_active else R.string.compose_module_inactive),
+                text = stringResource(R.string.compose_module_active),
                 color = colors.accentSoft,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
