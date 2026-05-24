@@ -1,6 +1,7 @@
 package com.fan.edgex.ui.compose
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
@@ -38,17 +40,17 @@ import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import kotlinx.coroutines.delay
 
-enum class EdgeXRoute(val label: String) {
-    Home("主页"),
-    Gestures("手势"),
-    Freezer("冰箱"),
-    Keys("按键"),
-    Pie("Pie 菜单"),
-    Multi("组合动作"),
-    Theme("主题"),
-    EdgeLighting("Edge Lighting"),
-    Premium("Premium"),
-    About("关于"),
+enum class EdgeXRoute(@StringRes val labelRes: Int) {
+    Home(R.string.compose_route_home),
+    Gestures(R.string.header_gestures),
+    Freezer(R.string.header_freezer),
+    Keys(R.string.header_keys),
+    Pie(R.string.header_pie_settings),
+    Multi(R.string.menu_multi_actions),
+    Theme(R.string.header_theme),
+    EdgeLighting(R.string.menu_edge_lighting),
+    Premium(R.string.compose_premium_title),
+    About(R.string.menu_about),
 }
 
 data class HomeUiState(

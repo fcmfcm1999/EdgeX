@@ -24,10 +24,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fan.edgex.R
 import com.fan.edgex.ui.compose.EdgeXRoute
 import com.fan.edgex.ui.compose.HomeUiState
 import com.fan.edgex.ui.compose.components.EdgeXDivider
@@ -64,6 +66,7 @@ fun HomeScreen(
     callbacks: HomeCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    val searchPendingToast = stringResource(R.string.compose_search_pending_toast)
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -72,20 +75,20 @@ fun HomeScreen(
         EdgeXTopBar(
             title = "",
             trailing = {
-                EdgeXIconButton(onClick = { callbacks.showToast("搜索即将迁移") }) {
-                    EdgeXIcon(EdgeXIcons.Search, contentDescription = "搜索", tint = LocalEdgeXColors.current.onSurface)
+                EdgeXIconButton(onClick = { callbacks.showToast(searchPendingToast) }) {
+                    EdgeXIcon(EdgeXIcons.Search, contentDescription = stringResource(R.string.compose_search), tint = LocalEdgeXColors.current.onSurface)
                 }
                 EdgeXIconButton(onClick = { callbacks.openRoute(EdgeXRoute.About) }) {
-                    EdgeXIcon(EdgeXIcons.More, contentDescription = "更多", tint = LocalEdgeXColors.current.onSurface)
+                    EdgeXIcon(EdgeXIcons.More, contentDescription = stringResource(R.string.compose_more), tint = LocalEdgeXColors.current.onSurface)
                 }
             },
         )
         AppHeader()
         HeroCard(state.stats)
         HomeTiles(state, callbacks)
-        SectionLabel("高级设置")
+        SectionLabel(stringResource(R.string.menu_advanced))
         AdvancedSettings(state, callbacks)
-        SectionLabel("关于")
+        SectionLabel(stringResource(R.string.compose_section_about))
         AboutSettings(callbacks)
         Spacer(modifier = Modifier.height(28.dp))
     }
@@ -96,14 +99,14 @@ private fun AppHeader() {
     val colors = LocalEdgeXColors.current
     Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 14.dp)) {
         Text(
-            text = "EdgeX",
+            text = stringResource(R.string.app_name),
             color = colors.onSurface,
             fontWeight = FontWeight.Bold,
             fontSize = 38.sp,
             lineHeight = 40.sp,
         )
         Text(
-            text = "边缘手势 · 智能交互",
+            text = stringResource(R.string.compose_app_subtitle),
             color = colors.onSurfaceDim,
             fontWeight = FontWeight.Medium,
             fontSize = 14.sp,
@@ -137,10 +140,10 @@ private fun HeroCard(stats: HomeStats) {
                     .clip(RoundedCornerShape(8.dp))
                     .background(colors.accent),
             )
-            Text("模块已激活", color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(stringResource(R.string.compose_module_active), color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
         Text(
-            text = "你的手势\n掌控一切",
+            text = stringResource(R.string.compose_home_hero_title),
             color = colors.onAccentSoft,
             fontWeight = FontWeight.Bold,
             fontSize = 28.sp,
@@ -148,7 +151,7 @@ private fun HeroCard(stats: HomeStats) {
             modifier = Modifier.padding(top = 14.dp),
         )
         Text(
-            text = "已配置 ${stats.configuredGestures} 个手势动作 · ${stats.activeZones}/16 区域已启用",
+            text = stringResource(R.string.compose_home_hero_subtitle, stats.configuredGestures, stats.activeZones),
             color = colors.onAccentSoft.copy(alpha = 0.72f),
             fontWeight = FontWeight.Medium,
             fontSize = 14.sp,
@@ -162,9 +165,9 @@ private fun HeroCard(stats: HomeStats) {
                 .background(colors.onAccentSoft)
                 .padding(6.dp),
         ) {
-            HeroStat("${stats.configuredGestures}", "手势", Modifier.weight(1f))
-            HeroStat("${stats.frozenApps}", "已冻结", Modifier.weight(1f))
-            HeroStat("${stats.keyCount}", "按键", Modifier.weight(1f))
+            HeroStat("${stats.configuredGestures}", stringResource(R.string.compose_stat_gestures), Modifier.weight(1f))
+            HeroStat("${stats.frozenApps}", stringResource(R.string.compose_stat_frozen), Modifier.weight(1f))
+            HeroStat("${stats.keyCount}", stringResource(R.string.compose_stat_keys), Modifier.weight(1f))
         }
     }
 }
@@ -192,16 +195,16 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
     ) {
         TileRow {
             FeatureTile(
-                title = "手势",
-                meta = "${state.stats.activeZones} 区域已配置",
+                title = stringResource(R.string.menu_gestures),
+                meta = stringResource(R.string.compose_home_gesture_meta, state.stats.activeZones),
                 icon = EdgeXIcons.Gesture,
                 onClick = { callbacks.openRoute(EdgeXRoute.Gestures) },
                 tag = "home_tile_gestures",
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
-                title = "冰箱",
-                meta = "${state.stats.frozenApps} 个已冻结",
+                title = stringResource(R.string.menu_freezer),
+                meta = stringResource(R.string.compose_home_freezer_meta, state.stats.frozenApps),
                 icon = EdgeXIcons.Freeze,
                 onClick = { callbacks.openRoute(EdgeXRoute.Freezer) },
                 tag = "home_tile_freezer",
@@ -212,8 +215,8 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
         }
         TileRow {
             FeatureTile(
-                title = "按键",
-                meta = if (state.keysEnabled) "已启用" else "未启用",
+                title = stringResource(R.string.menu_keys),
+                meta = if (state.keysEnabled) stringResource(R.string.compose_enabled) else stringResource(R.string.compose_disabled),
                 icon = EdgeXIcons.Keys,
                 onClick = { callbacks.openRoute(EdgeXRoute.Keys) },
                 tag = "home_tile_keys",
@@ -222,8 +225,8 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
-                title = "Pie 菜单",
-                meta = "4 边缘 · 2 环",
+                title = stringResource(R.string.header_pie_settings),
+                meta = stringResource(R.string.compose_home_pie_meta),
                 icon = EdgeXIcons.Pie,
                 onClick = { callbacks.openRoute(EdgeXRoute.Pie) },
                 tag = "home_tile_pie",
@@ -232,8 +235,8 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
         }
         TileRow {
             FeatureTile(
-                title = "组合动作",
-                meta = "可复用动作序列",
+                title = stringResource(R.string.action_multi_action),
+                meta = stringResource(R.string.compose_home_multi_meta),
                 icon = EdgeXIcons.Multi,
                 onClick = { callbacks.openRoute(EdgeXRoute.Multi) },
                 tag = "home_tile_multi",
@@ -242,8 +245,8 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
-                title = "主题",
-                meta = "轻点切换风格",
+                title = stringResource(R.string.header_theme),
+                meta = stringResource(R.string.compose_home_theme_meta),
                 icon = EdgeXIcons.Theme,
                 onClick = { callbacks.openRoute(EdgeXRoute.Theme) },
                 tag = "home_tile_theme",
@@ -251,8 +254,8 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
             )
         }
         EdgeXTile(
-            title = "Premium",
-            meta = "解锁全部高级功能",
+            title = stringResource(R.string.compose_premium_title),
+            meta = stringResource(R.string.compose_premium_unlock),
             icon = EdgeXIcons.Sparkle,
             onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
             modifier = Modifier
@@ -318,36 +321,37 @@ private fun SectionLabel(label: String) {
 
 @Composable
 private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
+    val restartToast = stringResource(R.string.compose_restart_sysui_toast)
     EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
         EdgeXSwitchRow(
-            title = "调试模式",
-            subtitle = "显示手势触发区域",
+            title = stringResource(R.string.menu_debug_matrix),
+            subtitle = stringResource(R.string.menu_debug_matrix_desc),
             checked = state.debug,
             onCheckedChange = callbacks.setDebug,
             icon = EdgeXIcons.Theme,
         )
         EdgeXDivider()
         EdgeXSwitchRow(
-            title = "震动反馈",
-            subtitle = if (state.haptic) "已启用 · 轻触" else "触发动作时震动",
+            title = stringResource(R.string.menu_haptic_feedback),
+            subtitle = if (state.haptic) stringResource(R.string.compose_haptic_enabled_light) else stringResource(R.string.menu_haptic_feedback_desc),
             checked = state.haptic,
             onCheckedChange = callbacks.setHaptic,
             icon = EdgeXIcons.Gesture,
         )
         EdgeXDivider()
         EdgeXSwitchRow(
-            title = "弧形冰箱",
-            subtitle = "右侧弧形抽屉显示应用",
+            title = stringResource(R.string.menu_arc_drawer),
+            subtitle = stringResource(R.string.compose_arc_drawer_desc),
             checked = state.arcDrawer,
             onCheckedChange = callbacks.setArcDrawer,
             icon = EdgeXIcons.Freeze,
         )
         EdgeXDivider()
         EdgeXRow(
-            title = "重启 SystemUI",
-            subtitle = "应用部分系统级更改",
+            title = stringResource(R.string.menu_restart_sysui),
+            subtitle = stringResource(R.string.compose_restart_sysui_desc),
             icon = EdgeXIcons.Sparkle,
-            onClick = { callbacks.showToast("正在重启 SystemUI…") },
+            onClick = { callbacks.showToast(restartToast) },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
         }
@@ -358,8 +362,8 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
 private fun AboutSettings(callbacks: HomeCallbacks) {
     EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
         EdgeXRow(
-            title = "支持作者",
-            subtitle = "支付宝 · 微信 · ETH · SOL",
+            title = stringResource(R.string.compose_about_support_author),
+            subtitle = stringResource(R.string.compose_about_support_author_subtitle),
             icon = EdgeXIcons.Sparkle,
             onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
         ) {
@@ -367,8 +371,8 @@ private fun AboutSettings(callbacks: HomeCallbacks) {
         }
         EdgeXDivider()
         EdgeXRow(
-            title = "EdgeX v0.1",
-            subtitle = "github.com/fcmfcm1999/EdgeX",
+            title = "${stringResource(R.string.app_name)} v${stringResource(R.string.value_version)}",
+            subtitle = stringResource(R.string.value_project_url),
             icon = EdgeXIcons.Gesture,
             onClick = { callbacks.openRoute(EdgeXRoute.About) },
         ) {

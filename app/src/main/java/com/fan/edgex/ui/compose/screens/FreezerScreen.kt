@@ -33,11 +33,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.configPrefs
@@ -57,10 +59,10 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.absoluteValue
 
-private enum class FreezerFilter(val label: String) {
-    All("全部"),
-    Frozen("已冻结"),
-    Active("使用中"),
+private enum class FreezerFilter {
+    All,
+    Frozen,
+    Active,
 }
 
 private data class FreezerApp(
@@ -118,7 +120,7 @@ fun FreezerScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 96.dp),
         ) {
             item {
-                EdgeXTopBar(title = "冰箱", onBack = onBack)
+                EdgeXTopBar(title = stringResource(R.string.header_freezer), onBack = onBack)
                 FreezerHeader(frozenCount = frozenCount, total = apps.size)
                 SearchBox(query = query, onQueryChange = { query = it })
                 FilterTabs(
@@ -126,14 +128,14 @@ fun FreezerScreen(
                     onFilter = { filter = it },
                     onRefreeze = {
                         scope.launch {
-                            showToast("正在重新冻结")
+                            showToast(context.getString(R.string.compose_refreezing))
                             withContext(Dispatchers.IO) {
                                 apps.filter { it.frozen }.forEach {
                                     runRootCommand("pm disable ${it.packageName}")
                                 }
                             }
                             reload()
-                            showToast("已重新冻结")
+                            showToast(context.getString(R.string.compose_refrozen))
                         }
                     },
                 )
@@ -164,10 +166,10 @@ fun FreezerScreen(
                                         }
                                         if (success) {
                                             context.updateFreezerList(app.packageName, freeze)
-                                            showToast(if (freeze) "已冻结: ${app.label}" else "已解冻: ${app.label}")
+                                            showToast(context.getString(if (freeze) R.string.compose_freeze_success else R.string.compose_unfreeze_success, app.label))
                                             reload()
                                         } else {
-                                            showToast(if (freeze) "冻结失败" else "解冻失败")
+                                            showToast(context.getString(if (freeze) R.string.compose_freeze_failed else R.string.compose_unfreeze_failed))
                                         }
                                         busyPackage = null
                                     }
@@ -187,14 +189,14 @@ fun FreezerScreen(
             FloatingActionButton(
                 onClick = {
                     scope.launch {
-                        showToast("正在重新冻结")
+                        showToast(context.getString(R.string.compose_refreezing))
                         withContext(Dispatchers.IO) {
                             apps.filter { it.frozen }.forEach {
                                 runRootCommand("pm disable ${it.packageName}")
                             }
                         }
                         reload()
-                        showToast("已重新冻结")
+                        showToast(context.getString(R.string.compose_refrozen))
                     }
                 },
                 containerColor = LocalEdgeXColors.current.accent,
@@ -209,7 +211,7 @@ fun FreezerScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     EdgeXIcon(EdgeXIcons.Sparkle, contentDescription = null)
-                    Text("全部重冻", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.compose_refreeze_all), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -237,7 +239,7 @@ private fun FreezerHeader(frozenCount: Int, total: Int) {
             )
         }
         Text(
-            text = "应用已冻结，预计节省 ${String.format(Locale.getDefault(), "%.1f", frozenCount * 0.16)} GB 内存",
+            text = stringResource(R.string.compose_freezer_saving, String.format(Locale.getDefault(), "%.1f", frozenCount * 0.16)),
             color = colors.onSurfaceDim,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
@@ -276,7 +278,7 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
                 .weight(1f),
             decorationBox = { innerTextField ->
                 if (query.isBlank()) {
-                    Text("搜索应用...", color = colors.onSurfaceDim, fontSize = 15.sp)
+                    Text(stringResource(R.string.compose_search_apps_hint), color = colors.onSurfaceDim, fontSize = 15.sp)
                 }
                 innerTextField()
             },
@@ -297,15 +299,22 @@ private fun FilterTabs(
     ) {
         FreezerFilter.entries.forEach {
             EdgeXChip(
-                label = it.label,
+                label = stringResource(freezerFilterLabel(it)),
                 selected = it == filter,
                 onClick = { onFilter(it) },
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        EdgeXChip(label = "重新冻结", selected = false, onClick = onRefreeze)
+        EdgeXChip(label = stringResource(R.string.compose_refreeze), selected = false, onClick = onRefreeze)
     }
 }
+
+private fun freezerFilterLabel(filter: FreezerFilter): Int =
+    when (filter) {
+        FreezerFilter.All -> R.string.compose_filter_all
+        FreezerFilter.Frozen -> R.string.compose_stat_frozen
+        FreezerFilter.Active -> R.string.compose_filter_active
+    }
 
 @Composable
 private fun FreezerAppRow(
@@ -335,7 +344,7 @@ private fun FreezerAppRow(
                 )
                 if (app.frozen) {
                     Text(
-                        text = "已冻结",
+                        text = stringResource(R.string.compose_stat_frozen),
                         color = colors.info,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -392,7 +401,7 @@ private fun EmptyFreezerRow() {
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("没有匹配的应用", color = colors.onSurfaceDim, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.compose_no_matching_apps), color = colors.onSurfaceDim, fontWeight = FontWeight.Medium)
     }
 }
 

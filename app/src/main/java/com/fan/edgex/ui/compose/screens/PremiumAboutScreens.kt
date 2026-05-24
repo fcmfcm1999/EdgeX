@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.BuildConfig
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.putConfig
@@ -68,15 +70,16 @@ fun PremiumScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val thanksSupport = stringResource(R.string.compose_thanks_support)
     var status by remember { mutableStateOf(PremiumActivator.status(context)) }
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        EdgeXTopBar(title = "Premium", onBack = onBack)
+        EdgeXTopBar(title = stringResource(R.string.compose_premium_title), onBack = onBack)
         PremiumHero(status)
-        PremiumSectionLabel("PREMIUM 功能")
+        PremiumSectionLabel(stringResource(R.string.compose_premium_features))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             premiumRows().forEachIndexed { index, row ->
                 EdgeXRow(title = row.first, subtitle = row.second, icon = EdgeXIcons.Sparkle) {
@@ -85,11 +88,11 @@ fun PremiumScreen(
                 if (index != premiumRows().lastIndex) EdgeXDivider()
             }
         }
-        PremiumSectionLabel("支持方式")
+        PremiumSectionLabel(stringResource(R.string.compose_support_methods))
         SupportGrid(
             onDonate = {
                 DonateDialog.show(context)
-                showToast("感谢支持 EdgeX")
+                showToast(thanksSupport)
             },
         )
         Spacer(modifier = Modifier.height(28.dp))
@@ -130,10 +133,10 @@ private fun PremiumHero(status: PremiumActivator.Status) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     EdgeXIcon(EdgeXIcons.Sparkle, contentDescription = null, tint = colors.accent, modifier = Modifier.size(12.dp))
-                    Text("PREMIUM", color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(stringResource(R.string.compose_premium_badge), color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Text(
-                    "支持开发者\n解锁全部功能",
+                    stringResource(R.string.compose_premium_hero),
                     color = Color(0xFFF4F0E8),
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
@@ -141,7 +144,11 @@ private fun PremiumHero(status: PremiumActivator.Status) {
                     modifier = Modifier.padding(top = 14.dp),
                 )
                 Text(
-                    text = if (status == PremiumActivator.Status.NotActivated) "每一笔捐赠都让 EdgeX 走得更远" else premiumStatusText(status),
+                    text = if (status == PremiumActivator.Status.NotActivated) {
+                        stringResource(R.string.compose_premium_hero_subtitle)
+                    } else {
+                        premiumStatusText(status)
+                    },
                     color = Color(0xFFF4F0E8).copy(alpha = 0.70f),
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
@@ -154,11 +161,12 @@ private fun PremiumHero(status: PremiumActivator.Status) {
 
 @Composable
 private fun SupportGrid(onDonate: () -> Unit) {
+    val methods = listOf(
+        listOf(stringResource(R.string.donate_alipay) to Color(0xFFCFE0FA), stringResource(R.string.donate_wechat) to Color(0xFFC7EFCC)),
+        listOf(stringResource(R.string.donate_kofi) to Color(0xFFFBD7CF), stringResource(R.string.compose_donate_crypto_short) to Color(0xFFE1D5FA)),
+    )
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        listOf(
-            listOf("支付宝" to Color(0xFFCFE0FA), "微信" to Color(0xFFC7EFCC)),
-            listOf("Ko-fi" to Color(0xFFFBD7CF), "ETH/SOL" to Color(0xFFE1D5FA)),
-        ).forEach { row ->
+        methods.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { (title, color) ->
                     Card(
@@ -182,7 +190,7 @@ private fun SupportGrid(onDonate: () -> Unit) {
                             )
                             Column {
                                 Text(title, color = LocalEdgeXColors.current.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("扫码捐赠", color = LocalEdgeXColors.current.onSurfaceDim, fontSize = 11.sp)
+                                Text(stringResource(R.string.compose_scan_donate), color = LocalEdgeXColors.current.onSurfaceDim, fontSize = 11.sp)
                             }
                         }
                     }
@@ -199,42 +207,43 @@ fun AboutScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val projectUrl = stringResource(R.string.value_project_url)
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        EdgeXTopBar(title = "关于", onBack = onBack)
+        EdgeXTopBar(title = stringResource(R.string.menu_about), onBack = onBack)
         AboutHeader()
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
             EdgeXRow(
-                title = "作者",
-                subtitle = "fantasy1999",
+                title = stringResource(R.string.label_author),
+                subtitle = stringResource(R.string.value_author),
                 icon = EdgeXIcons.Check,
             )
             EdgeXDivider()
             EdgeXRow(
-                title = "项目地址",
-                subtitle = "github.com/fcmfcm1999/EdgeX",
+                title = stringResource(R.string.label_project_url),
+                subtitle = projectUrl,
                 icon = EdgeXIcons.Multi,
-                onClick = { context.openUrl("https://github.com/fcmfcm1999/EdgeX") },
+                onClick = { context.openUrl("https://$projectUrl") },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
             }
             EdgeXDivider()
             EdgeXRow(
-                title = "支持作者",
-                subtitle = "支付宝 · 微信 · 加密货币",
+                title = stringResource(R.string.compose_about_support_author),
+                subtitle = stringResource(R.string.compose_about_support_author_crypto),
                 icon = EdgeXIcons.Sparkle,
                 onClick = { DonateDialog.show(context) },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
             }
         }
-        PremiumSectionLabel("开发者")
+        PremiumSectionLabel(stringResource(R.string.compose_developer))
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             EdgeXRow(
-                title = "调试日志",
+                title = stringResource(R.string.compose_debug_logs),
                 icon = EdgeXIcons.Theme,
                 onClick = {
                     (context as? Activity)?.let(UpdateChecker::checkNow)
@@ -242,15 +251,15 @@ fun AboutScreen(
             )
             EdgeXDivider()
             EdgeXRow(
-                title = "导出配置",
+                title = stringResource(R.string.compose_export_config),
                 icon = EdgeXIcons.Pie,
-                onClick = { context.openUrl("https://github.com/fcmfcm1999/EdgeX") },
+                onClick = { context.openUrl("https://$projectUrl") },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
             }
         }
         Text(
-            text = "Build ${BuildConfig.VERSION_CODE} · ${BuildConfig.APPLICATION_ID}",
+            text = stringResource(R.string.compose_build_info, BuildConfig.VERSION_CODE, BuildConfig.APPLICATION_ID),
             color = LocalEdgeXColors.current.onSurfaceDim,
             fontFamily = FontFamily.Monospace,
             fontSize = 11.sp,
@@ -278,16 +287,16 @@ private fun AboutHeader() {
         ) {
             EdgeXIcon(EdgeXIcons.Gesture, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(40.dp))
         }
-        Text("EdgeX", color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 32.sp, modifier = Modifier.padding(top = 16.dp))
+        Text(stringResource(R.string.app_name), color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 32.sp, modifier = Modifier.padding(top = 16.dp))
         Text(
-            text = "v${BuildConfig.VERSION_NAME} · 2026",
+            text = stringResource(R.string.compose_version_info, BuildConfig.VERSION_NAME),
             color = colors.onSurfaceDim,
             fontFamily = FontFamily.Monospace,
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 4.dp),
         )
         Text(
-            text = "基于 Xposed 框架的边缘手势控制模块",
+            text = stringResource(R.string.compose_about_description),
             color = colors.onSurface2,
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
@@ -296,11 +305,12 @@ private fun AboutHeader() {
     }
 }
 
+@Composable
 private fun premiumRows(): List<Pair<String, String>> =
     listOf(
-        "Edge Lighting" to "通知光效 · 9 种特效",
-        "Pie 菜单进阶" to "多环 · 自定义触发",
-        "组合动作无上限" to "可保存任意多组",
+        stringResource(R.string.header_edge_lighting) to stringResource(R.string.compose_premium_feature_edge_lighting),
+        stringResource(R.string.compose_premium_feature_pie_title) to stringResource(R.string.compose_premium_feature_pie),
+        stringResource(R.string.compose_premium_feature_multi_title) to stringResource(R.string.compose_premium_feature_multi),
     )
 
 @Composable
@@ -314,11 +324,12 @@ private fun PremiumSectionLabel(label: String) {
     )
 }
 
+@Composable
 private fun premiumStatusText(status: PremiumActivator.Status): String =
     when (status) {
-        PremiumActivator.Status.NotActivated -> "解锁全部高级功能"
-        PremiumActivator.Status.RebootRequired -> "已安装，重启后生效"
-        PremiumActivator.Status.Installed -> "Premium 已激活"
+        PremiumActivator.Status.NotActivated -> stringResource(R.string.compose_premium_unlock)
+        PremiumActivator.Status.RebootRequired -> stringResource(R.string.compose_premium_status_reboot)
+        PremiumActivator.Status.Installed -> stringResource(R.string.compose_premium_status_installed)
     }
 
 private fun Context.openUrl(url: String) {

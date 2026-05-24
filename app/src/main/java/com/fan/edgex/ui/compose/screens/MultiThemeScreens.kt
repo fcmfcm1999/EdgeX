@@ -41,11 +41,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.MultiAction
 import com.fan.edgex.config.MultiActionStore
@@ -86,10 +88,10 @@ fun MultiScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
-            EdgeXTopBar(title = "组合动作", onBack = onBack)
+            EdgeXTopBar(title = stringResource(R.string.action_multi_action), onBack = onBack)
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
                 Text(
-                    text = "一个手势\n触发动作序列",
+                    text = stringResource(R.string.compose_multi_hero),
                     color = LocalEdgeXColors.current.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 30.sp,
@@ -137,7 +139,7 @@ fun MultiScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     EdgeXIcon(EdgeXIcons.Plus, contentDescription = null)
-                    Text("新建", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.compose_new), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -157,13 +159,13 @@ private fun EmptyMultiState(onCreate: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             EdgeXIconBox(EdgeXIcons.Multi, contentDescription = null)
-            Text("还没有组合动作", color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-            Text("创建后可以把多个系统动作串成一次触发。", color = colors.onSurfaceDim, fontSize = 13.sp)
+            Text(stringResource(R.string.compose_empty_multi_title), color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(stringResource(R.string.compose_empty_multi_subtitle), color = colors.onSurfaceDim, fontSize = 13.sp)
             Button(
                 onClick = onCreate,
                 colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
             ) {
-                Text("新建", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.compose_new), fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -184,21 +186,21 @@ private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit) {
                 EdgeXIcon(EdgeXIcons.Multi, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("${item.steps.size} 个步骤", color = colors.onSurfaceDim, fontSize = 12.sp)
+                    Text(stringResource(R.string.compose_step_count, item.steps.size), color = colors.onSurfaceDim, fontSize = 12.sp)
                 }
                 EdgeXIconButton(onClick = onEdit) {
-                    EdgeXIcon(EdgeXIcons.Theme, contentDescription = "编辑", tint = colors.onSurface)
+                    EdgeXIcon(EdgeXIcons.Theme, contentDescription = stringResource(R.string.compose_edit), tint = colors.onSurface)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 item.steps.take(3).forEachIndexed { index, step ->
-                    EdgeXChip(label = "${index + 1} · ${step.label}", selected = false, onClick = {})
+                    EdgeXChip(label = stringResource(R.string.compose_step_chip, index + 1, step.label), selected = false, onClick = {})
                     if (index < item.steps.take(3).lastIndex) {
                         EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(14.dp))
                     }
                 }
                 if (item.steps.size > 3) {
-                    EdgeXChip(label = "+${item.steps.size - 3}", selected = true, onClick = {})
+                    EdgeXChip(label = stringResource(R.string.compose_plus_count, item.steps.size - 3), selected = true, onClick = {})
                 }
             }
         }
@@ -225,9 +227,9 @@ fun ThemeScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        EdgeXTopBar(title = "主题", onBack = onBack)
+        EdgeXTopBar(title = stringResource(R.string.header_theme), onBack = onBack)
         ThemeHero(accent)
-        ThemeSectionLabel("预设主题")
+        ThemeSectionLabel(stringResource(R.string.compose_theme_preset))
         AccentSwatches(
             selected = accent,
             onSelected = {
@@ -237,14 +239,14 @@ fun ThemeScreen(
                 blue = it.lightAccent.toArgb() and 0xFF
                 context.saveUiTheme(it, dark)
                 onThemeChanged()
-                showToast("主题已保存")
+                showToast(context.getString(R.string.compose_theme_saved))
             },
         )
-        ThemeSectionLabel("深色模式")
+        ThemeSectionLabel(stringResource(R.string.compose_theme_dark))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             EdgeXSwitchRow(
-                title = "深色模式",
-                subtitle = "跟随系统或手动切换",
+                title = stringResource(R.string.compose_theme_dark),
+                subtitle = stringResource(R.string.compose_theme_dark_desc),
                 checked = dark,
                 onCheckedChange = {
                     dark = it
@@ -255,7 +257,7 @@ fun ThemeScreen(
                 modifier = Modifier.testTag("theme_dark_mode"),
             )
         }
-        ThemeSectionLabel("自定义 RGB")
+        ThemeSectionLabel(stringResource(R.string.compose_theme_custom_rgb))
         RgbSliders(
             red = red,
             green = green,
@@ -267,7 +269,7 @@ fun ThemeScreen(
                 ThemeManager.saveCustomColor(context, customColor.toArgb())
                 context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
                 onThemeChanged()
-                showToast("自定义颜色已保存")
+                showToast(context.getString(R.string.compose_theme_custom_saved))
             },
         )
         ThemePreview(color = customColor)
@@ -299,7 +301,7 @@ private fun ThemeHero(accent: EdgeXAccent) {
                 .padding(24.dp),
         ) {
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                Text("当前主题", color = Color.White.copy(alpha = 0.70f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(stringResource(R.string.compose_theme_current), color = Color.White.copy(alpha = 0.70f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text(
                     accentName(accent),
                     color = Color.White,
@@ -368,14 +370,17 @@ private fun ThemeSectionLabel(label: String) {
     )
 }
 
+@Composable
 private fun accentName(accent: EdgeXAccent): String =
-    when (accent) {
-        EdgeXAccent.Green -> "默认"
-        EdgeXAccent.Blue -> "海洋"
-        EdgeXAccent.Coral -> "炭火"
-        EdgeXAccent.Violet -> "雪松"
-        EdgeXAccent.Amber -> "琥珀"
-    }
+    stringResource(
+        when (accent) {
+            EdgeXAccent.Green -> R.string.compose_theme_default
+            EdgeXAccent.Blue -> R.string.compose_theme_ocean
+            EdgeXAccent.Coral -> R.string.compose_theme_coral
+            EdgeXAccent.Violet -> R.string.compose_theme_violet
+            EdgeXAccent.Amber -> R.string.compose_theme_amber
+        },
+    )
 
 @Composable
 private fun RgbSliders(
@@ -397,7 +402,7 @@ private fun RgbSliders(
         EdgeXDivider()
         EdgeXRow(
             title = "#%02X%02X%02X".format(red, green, blue),
-            subtitle = "自定义 RGB",
+            subtitle = stringResource(R.string.compose_theme_custom_rgb),
             icon = EdgeXIcons.Theme,
         ) {
             Box(
@@ -419,7 +424,7 @@ private fun RgbSliders(
             .clickable(onClick = onApply),
         contentAlignment = Alignment.Center,
     ) {
-        Text("应用自定义颜色", color = LocalEdgeXColors.current.onAccent, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.compose_theme_apply_custom), color = LocalEdgeXColors.current.onAccent, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -470,8 +475,8 @@ private fun ThemePreview(color: Color) {
                 EdgeXIcon(EdgeXIcons.Gesture, contentDescription = null, tint = Color.White)
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("实时预览", color = colors.onSurface, fontWeight = FontWeight.Bold)
-                Text("新的强调色将用于按钮、开关和高亮区域", color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.compose_theme_preview_title), color = colors.onSurface, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.compose_theme_preview_subtitle), color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }

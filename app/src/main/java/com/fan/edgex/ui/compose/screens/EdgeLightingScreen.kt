@@ -33,10 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
@@ -54,19 +56,19 @@ import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 
 private data class EdgeLightingEffect(
     val code: String,
-    val label: String,
+    val labelRes: Int,
 )
 
 private val edgeLightingEffects = listOf(
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_BASIC, "基础光晕"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_BREATHING, "呼吸"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_FLOW, "流光"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_MULTICOLOR, "多彩"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_SPOTLIGHT, "聚光"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_ECLIPSE, "月蚀"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_ECHO, "回声"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_COMET, "彗星"),
-    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_RIPPLE, "涟漪"),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_BASIC, R.string.edge_lighting_effect_basic),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_BREATHING, R.string.edge_lighting_effect_breathing),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_FLOW, R.string.edge_lighting_effect_flow),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_MULTICOLOR, R.string.edge_lighting_effect_multicolor),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_SPOTLIGHT, R.string.edge_lighting_effect_spotlight),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_ECLIPSE, R.string.edge_lighting_effect_eclipse),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_ECHO, R.string.edge_lighting_effect_echo),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_COMET, R.string.edge_lighting_effect_comet),
+    EdgeLightingEffect(AppConfig.EDGE_LIGHTING_EFFECT_RIPPLE, R.string.edge_lighting_effect_ripple),
 )
 
 @Composable
@@ -88,17 +90,17 @@ fun EdgeLightingScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         EdgeXTopBar(
-            title = "Edge Lighting",
+            title = stringResource(R.string.header_edge_lighting),
             onBack = onBack,
             trailing = {
-                EdgeXIconButton(onClick = { showToast("Edge Lighting") }) {
-                    EdgeXIcon(EdgeXIcons.Check, contentDescription = "信息", tint = LocalEdgeXColors.current.onSurface)
+                EdgeXIconButton(onClick = { showToast(context.getString(R.string.header_edge_lighting)) }) {
+                    EdgeXIcon(EdgeXIcons.Info, contentDescription = stringResource(R.string.compose_info), tint = LocalEdgeXColors.current.onSurface)
                 }
             },
         )
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
-                text = "通知亮起时\n屏幕开始呼吸",
+                text = stringResource(R.string.compose_edge_lighting_hero),
                 color = LocalEdgeXColors.current.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 28.sp,
@@ -106,23 +108,23 @@ fun EdgeLightingScreen(
             )
         }
         EdgeLightingPreview(selectedEffect = selectedEffect, enabled = enabled)
-        EdgeLightingSectionLabel("通用")
+        EdgeLightingSectionLabel(stringResource(R.string.edge_lighting_section_general))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             EdgeXSwitchRow(
-                title = "启用 Edge Lighting",
-                subtitle = if (enabled) "通知监听服务将显示边缘光效" else "不会显示通知边缘光效",
+                title = stringResource(R.string.compose_edge_lighting_enabled),
+                subtitle = if (enabled) stringResource(R.string.compose_edge_lighting_enabled_desc) else stringResource(R.string.compose_edge_lighting_disabled_desc),
                 checked = enabled,
                 onCheckedChange = {
                     enabled = it
                     context.putConfig(AppConfig.EDGE_LIGHTING_ENABLED, it)
-                    showToast(if (it) "Edge Lighting 已启用" else "Edge Lighting 已停用")
+                    showToast(context.getString(if (it) R.string.compose_edge_lighting_enabled_toast else R.string.compose_edge_lighting_disabled_toast))
                 },
                 icon = EdgeXIcons.Sparkle,
             )
             EdgeXDivider()
             EdgeXSwitchRow(
-                title = "自动使用通知颜色",
-                subtitle = "优先从通知图标或应用色彩取色",
+                title = stringResource(R.string.compose_edge_lighting_auto_color),
+                subtitle = stringResource(R.string.compose_edge_lighting_auto_color_desc),
                 checked = autoColor,
                 onCheckedChange = {
                     autoColor = it
@@ -136,7 +138,7 @@ fun EdgeLightingScreen(
             onSelected = {
                 selectedEffect = it.code
                 context.putConfig(AppConfig.EDGE_LIGHTING_EFFECT, it.code)
-                showToast("已选择: ${it.label}")
+                showToast(context.getString(R.string.compose_selected_toast, context.getString(it.labelRes)))
             },
         )
         Spacer(modifier = Modifier.height(28.dp))
@@ -179,7 +181,7 @@ private fun EffectGrid(selected: String, onSelected: (EdgeLightingEffect) -> Uni
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        EdgeLightingSectionLabel("特效", compact = true)
+        EdgeLightingSectionLabel(stringResource(R.string.edge_lighting_effect), compact = true)
         edgeLightingEffects.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { effect ->
@@ -239,7 +241,7 @@ private fun EffectTile(
                 .background(previewBrush(effect.code, enabled = true)),
         )
         Text(
-            text = effect.label,
+            text = stringResource(effect.labelRes),
             color = if (selected) colors.onAccentSoft else colors.onSurface,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,

@@ -37,10 +37,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fan.edgex.R
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 
@@ -62,7 +64,7 @@ fun EdgeXTopBar(
     ) {
         if (onBack != null) {
             EdgeXIconButton(onClick = onBack) {
-                EdgeXIcon(EdgeXIcons.Back, contentDescription = "返回", tint = colors.onSurface)
+                EdgeXIcon(EdgeXIcons.Back, contentDescription = stringResource(R.string.compose_back), tint = colors.onSurface)
             }
         }
         Text(
