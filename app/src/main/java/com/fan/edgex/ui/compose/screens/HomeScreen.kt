@@ -208,8 +208,6 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 icon = EdgeXIcons.Freeze,
                 onClick = { callbacks.openRoute(EdgeXRoute.Freezer) },
                 tag = "home_tile_freezer",
-                iconBackground = Color(0xFFD5E0FB),
-                iconTint = Color(0xFF3B6CE5),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -220,8 +218,6 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 icon = EdgeXIcons.Keys,
                 onClick = { callbacks.openRoute(EdgeXRoute.Keys) },
                 tag = "home_tile_keys",
-                iconBackground = Color(0xFFF6E2B4),
-                iconTint = Color(0xFFC68A1A),
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
@@ -240,8 +236,6 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 icon = EdgeXIcons.Multi,
                 onClick = { callbacks.openRoute(EdgeXRoute.Multi) },
                 tag = "home_tile_multi",
-                iconBackground = colors.warnSoft,
-                iconTint = colors.warn,
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
