@@ -196,7 +196,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
         TileRow {
             FeatureTile(
                 title = stringResource(R.string.menu_gestures),
-                meta = stringResource(R.string.compose_home_gesture_meta, state.stats.activeZones),
+                meta = if (state.gesturesEnabled) stringResource(R.string.compose_home_gesture_meta, state.stats.activeZones) else stringResource(R.string.compose_disabled),
                 icon = EdgeXIcons.Gesture,
                 onClick = { callbacks.openRoute(EdgeXRoute.Gestures) },
                 tag = "home_tile_gestures",

@@ -483,6 +483,7 @@
     <string name="compose_set_action_toast">已设置: %s</string>
     <string name="compose_freezer_saving">应用已冻结，预计节省 %s GB 内存</string>
     <string name="compose_search_apps_hint">搜索应用...</string>
+    <string name="compose_search_actions_hint">搜索动作...</string>
     <string name="compose_refreeze">重新冻结</string>
     <string name="compose_refreeze_all">全部重冻</string>
     <string name="compose_refreezing">正在重新冻结</string>

@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -87,6 +89,7 @@ private data class GestureAction(
     val code: String,
     val labelRes: Int,
     val icon: Int,
+    val needsSecondary: Boolean = false,
 )
 
 private data class GestureScreenState(
@@ -139,25 +142,37 @@ private val directActions = listOf(
     GestureAction("back", R.string.action_back, EdgeXIcons.Back),
     GestureAction("home", R.string.action_home, EdgeXIcons.Home),
     GestureAction("recents", R.string.action_recents, EdgeXIcons.Recents),
+    GestureAction("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
     GestureAction("lock_screen", R.string.action_lock_screen, EdgeXIcons.Lock),
     GestureAction("screenshot", R.string.action_screenshot, EdgeXIcons.Screenshot),
-    GestureAction(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.Screenshot),
-    GestureAction("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
+    GestureAction(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.PartialScreenshot),
     GestureAction("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
     GestureAction("brightness_up", R.string.action_brightness_up, EdgeXIcons.BrightnessUp),
     GestureAction("brightness_down", R.string.action_brightness_down, EdgeXIcons.BrightnessDown),
     GestureAction("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
     GestureAction("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
     GestureAction("freezer_drawer", R.string.action_freezer_drawer, EdgeXIcons.Freeze),
-    GestureAction("refreeze", R.string.action_refreeze, EdgeXIcons.Freeze),
+    GestureAction("refreeze", R.string.action_refreeze, EdgeXIcons.Refreeze),
     GestureAction("clear_background", R.string.action_clear_background, EdgeXIcons.ClearBackground),
     GestureAction("kill_app", R.string.action_kill_app, EdgeXIcons.KillApp),
     GestureAction("prev_app", R.string.action_prev_app, EdgeXIcons.PrevApp),
     GestureAction("next_app", R.string.action_next_app, EdgeXIcons.NextApp),
+    GestureAction("clipboard", R.string.action_clipboard, EdgeXIcons.Clipboard),
+    GestureAction("universal_copy", R.string.action_universal_copy, EdgeXIcons.UniversalCopy),
+    GestureAction("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
+    GestureAction("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
+    GestureAction("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
     GestureAction("pie", R.string.action_pie, EdgeXIcons.Pie),
     GestureAction(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
     GestureAction(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
     GestureAction(AppConfig.SIDE_BAR_RIGHT_ACTION, R.string.action_right_side_bar, EdgeXIcons.SideBarRight),
+    GestureAction("multi_action", R.string.action_multi_action, EdgeXIcons.Multi),
+    GestureAction("condition", R.string.action_condition, EdgeXIcons.Condition),
+    GestureAction("shell_command", R.string.action_shell_command, EdgeXIcons.Terminal, needsSecondary = true),
+    GestureAction("sub_gesture", R.string.action_sub_gesture, EdgeXIcons.SubGesture, needsSecondary = true),
+    GestureAction("launch_app", R.string.action_launch_app, EdgeXIcons.LaunchApp, needsSecondary = true),
+    GestureAction("app_shortcut", R.string.action_app_shortcut, EdgeXIcons.AppShortcut, needsSecondary = true),
+    GestureAction("music_control", R.string.action_music_control, EdgeXIcons.Music, needsSecondary = true),
 )
 
 @Composable
@@ -535,35 +550,67 @@ private fun ActionSheet(
     onAction: (GestureZone, GestureOption, GestureAction) -> Unit,
     onOpenLegacy: (GestureZone, GestureOption) -> Unit,
 ) {
+    val colors = LocalEdgeXColors.current
+    var searchQuery by remember { mutableStateOf("") }
     EdgeXBottomSheet(
         open = zone != null && gesture != null,
         title = gesture?.let { stringResource(it.labelRes) }.orEmpty(),
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            searchQuery = ""
+            onDismiss()
+        },
     ) {
         if (zone == null || gesture == null) return@EdgeXBottomSheet
         val selected = state.actionCode(zone.id, gesture.id)
-        EdgeXListGroup {
-            directActions.forEachIndexed { index, action ->
-                EdgeXRow(
-                    title = stringResource(action.labelRes),
-                    subtitle = action.code,
-                    icon = action.icon,
-                    modifier = Modifier.testTag("gesture_action_${action.code}"),
-                    onClick = { onAction(zone, gesture, action) },
-                ) {
-                    if (selected == action.code) {
-                        EdgeXIcon(EdgeXIcons.Check, contentDescription = null, tint = LocalEdgeXColors.current.accent)
+        val query = searchQuery.trim()
+        val filtered = if (query.isBlank()) directActions else directActions.filter { action ->
+            val label = stringResource(action.labelRes)
+            label.contains(query, ignoreCase = true) || action.code.contains(query, ignoreCase = true)
+        }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
+            singleLine = true,
+            shape = RoundedCornerShape(EdgeXRadius.sm),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.outline,
+                cursorColor = colors.accent,
+            ),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                filtered.forEachIndexed { index, action ->
+                    EdgeXRow(
+                        title = stringResource(action.labelRes),
+                        subtitle = action.code,
+                        icon = action.icon,
+                        modifier = Modifier.testTag("gesture_action_${action.code}"),
+                        onClick = {
+                            if (action.needsSecondary) {
+                                onOpenLegacy(zone, gesture)
+                            } else {
+                                onAction(zone, gesture, action)
+                            }
+                        },
+                    ) {
+                        if (selected == action.code) {
+                            EdgeXIcon(EdgeXIcons.Check, contentDescription = null, tint = colors.accent)
+                        }
                     }
+                    if (index != filtered.lastIndex) EdgeXDivider()
                 }
-                if (index != directActions.lastIndex) EdgeXDivider()
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        EdgeXChip(
-            label = stringResource(R.string.compose_more_actions),
-            selected = false,
-            onClick = { onOpenLegacy(zone, gesture) },
-        )
     }
 }
 
@@ -617,6 +664,7 @@ private fun Context.openLegacyActionPicker(zone: GestureZone, gesture: GestureOp
     startActivity(
         Intent(this, ActionSelectionActivity::class.java)
             .putExtra("title", getString(R.string.compose_title_pair, getString(zone.labelRes), getString(gesture.labelRes)))
-            .putExtra("pref_key", key),
+            .putExtra("pref_key", key)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
 }

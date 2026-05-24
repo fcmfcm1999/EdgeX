@@ -46,6 +46,18 @@ object EdgeXIcons {
     @DrawableRes val Terminal = R.drawable.ic_terminal
     @DrawableRes val Vibration = R.drawable.ic_vibration
     @DrawableRes val Restart = R.drawable.ic_restart_alt
+    @DrawableRes val SubGesture = R.drawable.ic_sub_gesture
+    @DrawableRes val LaunchApp = R.drawable.ic_launch_app
+    @DrawableRes val AppShortcut = R.drawable.ic_app_shortcut
+    @DrawableRes val Clipboard = R.drawable.ic_paste
+    @DrawableRes val UniversalCopy = R.drawable.ic_content_copy
+    @DrawableRes val Music = R.drawable.ic_music
+    @DrawableRes val Condition = R.drawable.ic_condition
+    @DrawableRes val Wifi = R.drawable.ic_wifi
+    @DrawableRes val MobileData = R.drawable.ic_mobile_data
+    @DrawableRes val GameMode = R.drawable.ic_game_mode
+    @DrawableRes val Refreeze = R.drawable.ic_refreeze
+    @DrawableRes val PartialScreenshot = R.drawable.ic_partial_screenshot
 }
 
 @Composable

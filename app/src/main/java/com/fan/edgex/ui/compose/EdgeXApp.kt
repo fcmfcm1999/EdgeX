@@ -55,6 +55,7 @@ enum class EdgeXRoute(@StringRes val labelRes: Int) {
 
 data class HomeUiState(
     val stats: HomeStats,
+    val gesturesEnabled: Boolean,
     val debug: Boolean,
     val haptic: Boolean,
     val arcDrawer: Boolean,
@@ -117,6 +118,7 @@ fun EdgeXApp() {
                 )
                 EdgeXRoute.Gestures -> GesturesScreen(
                     onBack = {
+                        refresh()
                         if (stack.size > 1) stack.removeAt(stack.lastIndex)
                     },
                     showToast = ::showToast,
@@ -183,6 +185,7 @@ fun EdgeXApp() {
 private fun Context.readHomeUiState(): HomeUiState =
     HomeUiState(
         stats = readHomeStats(),
+        gesturesEnabled = getConfigBool(AppConfig.GESTURES_ENABLED),
         debug = getConfigBool(AppConfig.DEBUG_MATRIX),
         haptic = getConfigBool(AppConfig.HAPTIC_FEEDBACK, default = true),
         arcDrawer = getConfigBool(AppConfig.FREEZER_ARC_DRAWER),
