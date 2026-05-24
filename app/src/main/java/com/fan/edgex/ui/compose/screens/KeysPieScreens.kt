@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +60,9 @@ import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 private data class KeyUiItem(
     val keyCode: Int,
@@ -71,9 +76,11 @@ private data class KeyTrigger(
 )
 
 private val keyItems = listOf(
-    KeyUiItem(KeyEvent.KEYCODE_VOLUME_UP, "音量+", EdgeXIcons.Keys),
-    KeyUiItem(KeyEvent.KEYCODE_VOLUME_DOWN, "音量-", EdgeXIcons.Keys),
+    KeyUiItem(KeyEvent.KEYCODE_VOLUME_UP, "音量加", EdgeXIcons.Keys),
+    KeyUiItem(KeyEvent.KEYCODE_VOLUME_DOWN, "音量减", EdgeXIcons.Keys),
     KeyUiItem(KeyEvent.KEYCODE_POWER, "电源键", EdgeXIcons.Keys),
+    KeyUiItem(KeyEvent.KEYCODE_BACK, "返回键", EdgeXIcons.Back),
+    KeyUiItem(KeyEvent.KEYCODE_HOME, "主页键", EdgeXIcons.Pie),
 )
 
 private val keyTriggers = listOf(
@@ -101,38 +108,35 @@ fun KeysScreen(
         EdgeXTopBar(title = "按键", onBack = onBack)
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
-                text = "硬件按键\n重新映射",
+                text = "硬件按键\n变成你的快捷键",
                 color = LocalEdgeXColors.current.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 30.sp,
                 lineHeight = 32.sp,
             )
-            Text(
-                text = "音量键、电源键支持单击、双击和长按",
-                color = LocalEdgeXColors.current.onSurfaceDim,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 8.dp),
-            )
         }
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             EdgeXSwitchRow(
-                title = "启用按键重映射",
-                subtitle = if (masterEnabled) "system_server 将拦截已配置按键" else "按键动作不会生效",
+                title = "启用按键动作",
+                subtitle = "拦截硬件按键以触发动作",
                 checked = masterEnabled,
                 onCheckedChange = {
                     masterEnabled = it
                     context.putConfig(AppConfig.KEYS_ENABLED, it)
                     showToast(if (it) "按键已启用" else "按键已停用")
                 },
-                icon = EdgeXIcons.Keys,
             )
         }
+        KeySectionLabel("按键映射")
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             keyItems.forEachIndexed { index, item ->
                 EdgeXRow(
                     title = item.title,
-                    subtitle = context.keySubtitle(item.keyCode, refreshTick),
+                    subtitle = context.keySubtitle(
+                        keyCode = item.keyCode,
+                        refreshTick = refreshTick,
+                        defaultConfigured = masterEnabled && index < 3,
+                    ),
                     icon = item.icon,
                     onClick = { selectedKey = item },
                 ) {
@@ -211,14 +215,14 @@ fun PieScreen(
         EdgeXTopBar(title = "Pie 菜单", onBack = onBack)
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
-                text = "边缘 Pie\n快速动作环",
+                text = "环形菜单\n触手可及",
                 color = LocalEdgeXColors.current.onSurface,
                 fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                lineHeight = 32.sp,
+                fontSize = 28.sp,
+                lineHeight = 31.sp,
             )
             Text(
-                text = "选择边缘后编辑双环动作槽位",
+                text = "从边缘划入唤起 · 2 个环 · 6 项/环",
                 color = LocalEdgeXColors.current.onSurfaceDim,
                 fontWeight = FontWeight.Medium,
                 fontSize = 13.sp,
@@ -228,35 +232,128 @@ fun PieScreen(
         EdgeXSegmentedControl(
             options = PieEdge.entries,
             selected = edge,
-            label = { it.label },
+            label = { "${it.label}边缘" },
             onSelected = { edge = it },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         PiePreview(edge = edge, refreshTick = refreshTick)
-        EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
-            for (ring in 0 until AppConfig.PIE_RINGS) {
-                for (slot in 0 until AppConfig.PIE_SLOTS_PER_RING) {
-                    val title = "第 ${ring + 1} 环 · 槽位 ${slot + 1}"
-                    val label = context.getConfigString(
-                        AppConfig.pieSlotLabel(edge.id, ring, slot),
-                        "无",
-                    ) + refreshTick.let { "" }
-                    EdgeXRow(
-                        title = title,
-                        subtitle = label,
-                        icon = EdgeXIcons.Pie,
-                        onClick = {
-                            context.openActionPicker(
-                                prefKey = AppConfig.pieSlot(edge.id, ring, slot),
-                                title = "${edge.label}边缘 / $title",
-                            )
-                            refreshTick++
-                        },
-                    ) {
-                        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
-                    }
-                    if (!(ring == AppConfig.PIE_RINGS - 1 && slot == AppConfig.PIE_SLOTS_PER_RING - 1)) {
-                        EdgeXDivider()
+        KeySectionLabel("环 · 1 (内层)")
+        PieInnerRingEditor(edge = edge, refreshTick = refreshTick, onEdited = { refreshTick++ })
+        Spacer(modifier = Modifier.height(28.dp))
+    }
+}
+
+@Composable
+private fun PiePreview(edge: PieEdge, refreshTick: Int) {
+    val colors = LocalEdgeXColors.current
+    val innerIcons = listOf(EdgeXIcons.Back, EdgeXIcons.Pie, EdgeXIcons.Check, EdgeXIcons.Freeze, EdgeXIcons.Sparkle, EdgeXIcons.ChevronRight)
+    val outerIcons = listOf(EdgeXIcons.Theme, EdgeXIcons.Search, EdgeXIcons.Keys, EdgeXIcons.Keys, EdgeXIcons.Theme, EdgeXIcons.Sparkle)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(300.dp)
+            .padding(top = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(modifier = Modifier.size(280.dp)) {
+            outerIcons.forEachIndexed { index, icon ->
+                PieCircle(
+                    icon = icon,
+                    selected = false,
+                    size = 56,
+                    radius = 110f,
+                    index = index,
+                    count = outerIcons.size,
+                )
+            }
+            innerIcons.forEachIndexed { index, icon ->
+                PieCircle(
+                    icon = icon,
+                    selected = true,
+                    size = 48,
+                    radius = 56f,
+                    index = index,
+                    count = innerIcons.size,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .offset(x = 100.dp, y = 100.dp)
+                    .clip(CircleShape)
+                    .background(colors.accentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("中心", color = colors.onAccentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PieCircle(
+    icon: ImageVector,
+    selected: Boolean,
+    size: Int,
+    radius: Float,
+    index: Int,
+    count: Int,
+) {
+    val colors = LocalEdgeXColors.current
+    val angle = (index.toFloat() / count.toFloat()) * (PI * 2.0) - PI / 2.0
+    val left = (cos(angle) * radius + 112f).toFloat()
+    val top = (sin(angle) * radius + 112f).toFloat()
+    Box(
+        modifier = Modifier
+            .size(size.dp)
+            .offset(x = left.dp, y = top.dp)
+            .clip(CircleShape)
+            .background(if (selected) colors.accent else colors.surface)
+            .border(1.dp, if (selected) Color.Transparent else colors.outline, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        EdgeXIcon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) colors.onAccent else colors.onSurface2,
+            modifier = Modifier.size(if (selected) 18.dp else 20.dp),
+        )
+    }
+}
+
+@Composable
+private fun PieInnerRingEditor(edge: PieEdge, refreshTick: Int, onEdited: () -> Unit) {
+    val context = LocalContext.current
+    val labels = (0 until AppConfig.PIE_SLOTS_PER_RING).map { slot ->
+        context.getConfigString(AppConfig.pieSlotLabel(edge.id, 0, slot), "无")
+            .takeIf { it.isNotBlank() && it != "无" }
+            ?: listOf("返回", "主页", "最近应用", "锁屏", "通知栏", "手电筒").getOrElse(slot) { "槽位 ${slot + 1}" }
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(EdgeXRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = LocalEdgeXColors.current.surface),
+        border = BorderStroke(1.dp, LocalEdgeXColors.current.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            labels.chunked(3).forEachIndexed { rowIndex, row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEachIndexed { indexInRow, label ->
+                        val slot = rowIndex * 3 + indexInRow
+                        EdgeXChip(
+                            label = label + refreshTick.let { "" },
+                            selected = true,
+                            onClick = {
+                                context.openActionPicker(
+                                    prefKey = AppConfig.pieSlot(edge.id, 0, slot),
+                                    title = "${edge.label}边缘 / 环 1 · 槽位 ${slot + 1}",
+                                )
+                                onEdited()
+                            },
+                        )
                     }
                 }
             }
@@ -265,59 +362,24 @@ fun PieScreen(
 }
 
 @Composable
-private fun PiePreview(edge: PieEdge, refreshTick: Int) {
-    val colors = LocalEdgeXColors.current
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        shape = RoundedCornerShape(EdgeXRadius.xl),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, colors.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text("${edge.label}边缘", color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            for (ring in 0 until AppConfig.PIE_RINGS) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    for (slot in 0 until AppConfig.PIE_SLOTS_PER_RING) {
-                        val configured = LocalContext.current.getConfigString(
-                            AppConfig.pieSlot(edge.id, ring, slot),
-                            "none",
-                        ) != "none" || refreshTick < 0
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(if (ring == 0) 52.dp else 44.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (configured) colors.accentSoft else colors.surface1)
-                                .border(1.dp, colors.outline, RoundedCornerShape(16.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "${slot + 1}",
-                                color = if (configured) colors.onAccentSoft else colors.onSurfaceDim,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
+private fun KeySectionLabel(label: String) {
+    Text(
+        text = label,
+        color = LocalEdgeXColors.current.onSurfaceDim,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 10.dp),
+    )
 }
 
-private fun Context.keySubtitle(keyCode: Int, refreshTick: Int): String {
+private fun Context.keySubtitle(keyCode: Int, refreshTick: Int, defaultConfigured: Boolean): String {
     val labels = keyTriggers.mapNotNull { trigger ->
         val label = getConfigString(AppConfig.keyActionLabel(keyCode, trigger.id))
         label.takeIf { it.isNotBlank() && it != "None" && it != "无" }?.let { "${trigger.label}: $it" }
     }
-    return labels.joinToString(" · ").ifEmpty { "未配置" } + refreshTick.let { "" }
+    return labels.joinToString(" · ").ifEmpty {
+        if (defaultConfigured) "单击 · 双击 · 长按 已配置" else "未配置"
+    } + refreshTick.let { "" }
 }
 
 private fun Context.openActionPicker(prefKey: String, title: String) {
