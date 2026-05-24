@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -370,6 +371,7 @@ private fun ZonePill(
     val configured = count > 0
     Box(
         modifier = modifier
+            .testTag("gesture_zone_${zone.id}")
             .clip(RoundedCornerShape(12.dp))
             .background(if (configured) colors.accentSoft else Color.Transparent)
             .border(

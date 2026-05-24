@@ -49,7 +49,7 @@ class EdgeXComposeSmokeTest {
     @Test
     fun homeTilesNavigateThroughComposeStack() {
         composeRule.onNodeWithTag("home_tile_theme").performScrollTo().performClick()
-        composeRule.onNodeWithText("选择你的\n交互色彩").assertIsDisplayed()
+        composeRule.onNodeWithText("当前主题").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("返回").assert(hasClickAction()).performClick()
         composeRule.onNodeWithText("EdgeX").assertIsDisplayed()

@@ -53,6 +53,7 @@ import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.MultiActionEditActivity
 import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.ui.compose.components.EdgeXChip
@@ -263,7 +264,7 @@ fun ThemeScreen(
             onGreen = { green = it },
             onBlue = { blue = it },
             onApply = {
-                context.putConfig(AppConfig.UI_ACCENT, "custom")
+                context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
                 ThemeManager.saveCustomColor(context, customColor.toArgb())
                 onThemeChanged()
                 showToast("自定义颜色已保存")

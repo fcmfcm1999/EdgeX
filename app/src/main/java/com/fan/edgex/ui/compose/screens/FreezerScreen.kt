@@ -251,7 +251,6 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
     val colors = LocalEdgeXColors.current
     Row(
         modifier = Modifier
-            .testTag("freezer_search")
             .fillMaxWidth()
             .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 14.dp)
             .height(52.dp)
@@ -272,7 +271,9 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
                 fontWeight = FontWeight.Medium,
             ),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .testTag("freezer_search")
+                .weight(1f),
             decorationBox = { innerTextField ->
                 if (query.isBlank()) {
                     Text("搜索应用...", color = colors.onSurfaceDim, fontSize = 15.sp)
