@@ -1,8 +1,6 @@
 package com.fan.edgex.ui.compose
 
-import android.app.Activity
 import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,16 +20,8 @@ import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
-import com.fan.edgex.ui.EdgeLightingSettingsActivity
-import com.fan.edgex.ui.FreezerActivity
-import com.fan.edgex.ui.GesturesActivity
-import com.fan.edgex.ui.KeysActivity
-import com.fan.edgex.ui.MultiActionsListActivity
-import com.fan.edgex.ui.PieSettingsActivity
-import com.fan.edgex.ui.PremiumActivity
-import com.fan.edgex.ui.ThemeActivity
 import com.fan.edgex.ui.compose.components.EdgeXToast
-import com.fan.edgex.ui.compose.screens.EdgeXPlaceholderScreen
+import com.fan.edgex.ui.compose.screens.AboutScreen
 import com.fan.edgex.ui.compose.screens.EdgeLightingScreen
 import com.fan.edgex.ui.compose.screens.FreezerScreen
 import com.fan.edgex.ui.compose.screens.GesturesScreen
@@ -41,7 +31,6 @@ import com.fan.edgex.ui.compose.screens.HomeStats
 import com.fan.edgex.ui.compose.screens.KeysScreen
 import com.fan.edgex.ui.compose.screens.MultiScreen
 import com.fan.edgex.ui.compose.screens.PieScreen
-import com.fan.edgex.ui.compose.screens.AboutScreen
 import com.fan.edgex.ui.compose.screens.PremiumScreen
 import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
@@ -179,15 +168,6 @@ fun EdgeXApp() {
                     },
                     showToast = ::showToast,
                 )
-                else -> EdgeXPlaceholderScreen(
-                    route = route,
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
-                    onOpenLegacy = {
-                        context.openLegacyRoute(route)
-                    },
-                )
             }
 
             EdgeXToast(
@@ -244,24 +224,4 @@ private fun Context.readHomeStats(): HomeStats {
         frozenApps = frozenCount,
         keyCount = keyCount,
     )
-}
-
-private fun Context.openLegacyRoute(route: EdgeXRoute) {
-    val target = when (route) {
-        EdgeXRoute.Gestures -> GesturesActivity::class.java
-        EdgeXRoute.Freezer -> FreezerActivity::class.java
-        EdgeXRoute.Keys -> KeysActivity::class.java
-        EdgeXRoute.Pie -> PieSettingsActivity::class.java
-        EdgeXRoute.Multi -> MultiActionsListActivity::class.java
-        EdgeXRoute.Theme -> ThemeActivity::class.java
-        EdgeXRoute.EdgeLighting -> EdgeLightingSettingsActivity::class.java
-        EdgeXRoute.Premium -> PremiumActivity::class.java
-        EdgeXRoute.Home,
-        EdgeXRoute.About -> null
-    }
-    if (target != null) {
-        startActivity(Intent(this, target))
-    } else if (this is Activity) {
-        android.widget.Toast.makeText(this, route.label, android.widget.Toast.LENGTH_SHORT).show()
-    }
 }
