@@ -138,7 +138,7 @@ private fun HeroCard(stats: HomeStats) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(colors.accent),
+                    .background(Color(0xFF4CAF50)),
             )
             Text(stringResource(R.string.compose_module_active), color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
