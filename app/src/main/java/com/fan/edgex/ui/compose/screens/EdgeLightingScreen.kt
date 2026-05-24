@@ -43,6 +43,7 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
+import com.fan.edgex.ui.compose.components.EdgeXIconButton
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
@@ -86,24 +87,26 @@ fun EdgeLightingScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        EdgeXTopBar(title = "Edge Lighting", onBack = onBack)
+        EdgeXTopBar(
+            title = "Edge Lighting",
+            onBack = onBack,
+            trailing = {
+                EdgeXIconButton(onClick = { showToast("Edge Lighting") }) {
+                    EdgeXIcon(EdgeXIcons.Check, contentDescription = "信息", tint = LocalEdgeXColors.current.onSurface)
+                }
+            },
+        )
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
             Text(
-                text = "通知抵达时\n点亮屏幕边缘",
+                text = "通知亮起时\n屏幕开始呼吸",
                 color = LocalEdgeXColors.current.onSurface,
                 fontWeight = FontWeight.Bold,
-                fontSize = 30.sp,
-                lineHeight = 32.sp,
-            )
-            Text(
-                text = "9 种光效 · 可自动匹配通知颜色",
-                color = LocalEdgeXColors.current.onSurfaceDim,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 8.dp),
+                fontSize = 28.sp,
+                lineHeight = 31.sp,
             )
         }
         EdgeLightingPreview(selectedEffect = selectedEffect, enabled = enabled)
+        EdgeLightingSectionLabel("通用")
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
             EdgeXSwitchRow(
                 title = "启用 Edge Lighting",
@@ -143,43 +146,29 @@ fun EdgeLightingScreen(
 @Composable
 private fun EdgeLightingPreview(selectedEffect: String, enabled: Boolean) {
     val colors = LocalEdgeXColors.current
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        shape = RoundedCornerShape(EdgeXRadius.xl),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, colors.outline),
+            .padding(horizontal = 24.dp, vertical = 14.dp)
+            .aspectRatio(9f / 16f)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0xFF0A0B07))
+            .border(4.dp, previewBrush(selectedEffect, enabled), RoundedCornerShape(28.dp))
+            .padding(4.dp),
     ) {
         Box(
             modifier = Modifier
-                .padding(18.dp)
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(26.dp))
-                .background(colors.surface1)
-                .border(
-                    width = 5.dp,
-                    brush = previewBrush(selectedEffect, enabled),
-                    shape = RoundedCornerShape(26.dp),
-                )
-                .padding(18.dp),
+                .fillMaxSize()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFF1D2018))
+                .border(1.dp, colors.accent.copy(alpha = if (enabled) 0.45f else 0.12f), RoundedCornerShape(24.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                EdgeXIcon(EdgeXIcons.Sparkle, contentDescription = null, tint = colors.accent, modifier = Modifier.size(36.dp))
-                Text(
-                    text = edgeLightingEffects.firstOrNull { it.code == selectedEffect }?.label.orEmpty(),
-                    color = colors.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                Text(
-                    text = if (enabled) "实时预览" else "已关闭",
-                    color = colors.onSurfaceDim,
-                    fontSize = 12.sp,
-                )
-            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colors.accent.copy(alpha = if (enabled) 0.08f else 0.02f)),
+            )
         }
     }
 }
@@ -190,6 +179,7 @@ private fun EffectGrid(selected: String, onSelected: (EdgeLightingEffect) -> Uni
         modifier = Modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        EdgeLightingSectionLabel("特效", compact = true)
         edgeLightingEffects.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { effect ->
@@ -206,6 +196,17 @@ private fun EffectGrid(selected: String, onSelected: (EdgeLightingEffect) -> Uni
             }
         }
     }
+}
+
+@Composable
+private fun EdgeLightingSectionLabel(label: String, compact: Boolean = false) {
+    Text(
+        text = label,
+        color = LocalEdgeXColors.current.onSurfaceDim,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(start = if (compact) 0.dp else 24.dp, end = 24.dp, top = 18.dp, bottom = 10.dp),
+    )
 }
 
 @Composable
