@@ -264,8 +264,8 @@ fun ThemeScreen(
             onGreen = { green = it },
             onBlue = { blue = it },
             onApply = {
-                context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
                 ThemeManager.saveCustomColor(context, customColor.toArgb())
+                context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
                 onThemeChanged()
                 showToast("自定义颜色已保存")
             },
@@ -408,18 +408,18 @@ private fun RgbSliders(
             )
         }
     }
-    Button(
-        onClick = onApply,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = LocalEdgeXColors.current.accent,
-            contentColor = LocalEdgeXColors.current.onAccent,
-        ),
+    Box(
         modifier = Modifier
             .testTag("theme_custom_apply")
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(16.dp)
+            .height(48.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(LocalEdgeXColors.current.accent)
+            .clickable(onClick = onApply),
+        contentAlignment = Alignment.Center,
     ) {
-        Text("应用自定义颜色", fontWeight = FontWeight.Bold)
+        Text("应用自定义颜色", color = LocalEdgeXColors.current.onAccent, fontWeight = FontWeight.Bold)
     }
 }
 
