@@ -6,13 +6,16 @@ import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
+import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.Properties
 import java.lang.reflect.Method
 
 class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
@@ -23,6 +26,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     companion object {
         private const val TAG = "EdgeX"
+        const val KEY_MODULE_ACTIVE_TS = "module_active_ts"
         
         /**
          * Check if the current call was initiated by our own code.
@@ -53,13 +57,20 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     private fun writeModuleActiveTimestamp() {
         runCatching {
-            val dir = File("/data/system/edgex")
-            dir.mkdirs()
-            dir.setExecutable(true, false)
-            dir.setReadable(true, false)
-            val file = File(dir, "module_active")
-            file.writeText(System.currentTimeMillis().toString())
+            val file = HookConfigSnapshot.snapshotFileForHook()
+            val properties = if (file.isFile && file.canRead()) {
+                FileInputStream(file).use { Properties().also { p -> p.load(it) } }
+            } else {
+                Properties()
+            }
+            properties.setProperty(KEY_MODULE_ACTIVE_TS, System.currentTimeMillis().toString())
+            file.parentFile?.mkdirs()
+            FileOutputStream(file).use { properties.store(it, "EdgeX hook config snapshot") }
             file.setReadable(true, false)
+            file.parentFile?.let { dir ->
+                dir.setExecutable(true, false)
+                dir.setReadable(true, false)
+            }
         }
     }
 
