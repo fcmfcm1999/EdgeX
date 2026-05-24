@@ -24,6 +24,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -60,6 +61,7 @@ import com.fan.edgex.ui.compose.components.EdgeXChip
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIconBox
+import com.fan.edgex.ui.compose.components.EdgeXIconButton
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
@@ -88,18 +90,11 @@ fun MultiScreen(
             EdgeXTopBar(title = "组合动作", onBack = onBack)
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
                 Text(
-                    text = "保存常用\n动作序列",
+                    text = "一个手势\n触发动作序列",
                     color = LocalEdgeXColors.current.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 30.sp,
                     lineHeight = 32.sp,
-                )
-                Text(
-                    text = "${items.size} 个组合动作 · 可从手势、按键和 Pie 中复用",
-                    color = LocalEdgeXColors.current.onSurfaceDim,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             if (items.isEmpty()) {
@@ -119,28 +114,33 @@ fun MultiScreen(
                                 context.openMultiActionEdit(item.id)
                                 refreshTick++
                             },
-                            onRun = {
-                                context.requestHookActionExecution(MultiActionStore.actionCode(item.id))
-                                showToast("已请求执行: ${item.name}")
-                            },
                         )
-                    }
-                    Button(
-                        onClick = {
-                            context.createMultiAction()
-                            refreshTick++
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = LocalEdgeXColors.current.accent,
-                            contentColor = LocalEdgeXColors.current.onAccent,
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("新建组合动作", fontWeight = FontWeight.Bold)
                     }
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
+        }
+        if (items.isNotEmpty()) {
+            FloatingActionButton(
+                onClick = {
+                    context.createMultiAction()
+                    refreshTick++
+                },
+                containerColor = LocalEdgeXColors.current.accent,
+                contentColor = LocalEdgeXColors.current.onAccent,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(22.dp),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    EdgeXIcon(EdgeXIcons.Plus, contentDescription = null)
+                    Text("新建", fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -171,7 +171,7 @@ private fun EmptyMultiState(onCreate: () -> Unit) {
 }
 
 @Composable
-private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit, onRun: () -> Unit) {
+private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit) {
     val colors = LocalEdgeXColors.current
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -182,34 +182,24 @@ private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit, onRun: () -> 
     ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                EdgeXIconBox(EdgeXIcons.Multi, contentDescription = null)
+                EdgeXIcon(EdgeXIcons.Multi, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(item.name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(item.name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text("${item.steps.size} 个步骤", color = colors.onSurfaceDim, fontSize = 12.sp)
                 }
+                EdgeXIconButton(onClick = onEdit) {
+                    EdgeXIcon(EdgeXIcons.Theme, contentDescription = "编辑", tint = colors.onSurface)
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                item.steps.take(3).forEach { step ->
-                    EdgeXChip(label = step.label, selected = false, onClick = {}, modifier = Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                item.steps.take(3).forEachIndexed { index, step ->
+                    EdgeXChip(label = "${index + 1} · ${step.label}", selected = false, onClick = {})
+                    if (index < item.steps.take(3).lastIndex) {
+                        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(14.dp))
+                    }
                 }
                 if (item.steps.size > 3) {
                     EdgeXChip(label = "+${item.steps.size - 3}", selected = true, onClick = {})
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = onEdit,
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.surface1, contentColor = colors.onSurface),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("编辑", fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onRun,
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("执行", fontWeight = FontWeight.Bold)
                 }
             }
         }
