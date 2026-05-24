@@ -19,8 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.hook.MainHook
+import java.io.File
+import java.io.FileInputStream
+import java.util.Properties
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
@@ -187,8 +189,11 @@ fun EdgeXApp() {
 }
 
 private fun isModuleActive(): Boolean = runCatching {
-    val config = HookConfigSnapshot.readFromHookFile()
-    val timestamp = config[MainHook.KEY_MODULE_ACTIVE_TS]?.toLongOrNull() ?: return false
+    val file = File("/data/system/edgex/hook_active.properties")
+    if (!file.exists() || !file.canRead()) return false
+    val properties = Properties()
+    FileInputStream(file).use(properties::load)
+    val timestamp = properties.getProperty(MainHook.KEY_MODULE_ACTIVE_TS)?.toLongOrNull() ?: return false
     val bootTime = System.currentTimeMillis() - SystemClock.elapsedRealtime()
     timestamp > bootTime
 }.getOrDefault(false)

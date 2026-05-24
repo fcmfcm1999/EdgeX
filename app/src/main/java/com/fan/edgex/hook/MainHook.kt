@@ -6,14 +6,13 @@ import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.fan.edgex.BuildConfig
-import com.fan.edgex.config.HookConfigSnapshot
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import java.io.FileInputStream
+import java.io.File
 import java.io.FileOutputStream
 import java.util.Properties
 import java.lang.reflect.Method
@@ -57,20 +56,18 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     private fun writeModuleActiveTimestamp() {
         runCatching {
-            val file = HookConfigSnapshot.snapshotFileForHook()
-            val properties = if (file.isFile && file.canRead()) {
-                FileInputStream(file).use { Properties().also { p -> p.load(it) } }
-            } else {
-                Properties()
-            }
+            val dir = File("/data/system/edgex")
+            dir.mkdirs()
+            // Ensure app process can traverse into this directory
+            dir.setExecutable(true, false)
+            dir.setReadable(true, false)
+            dir.parentFile?.setExecutable(true, false) // /data/system
+
+            val file = File(dir, "hook_active.properties")
+            val properties = Properties()
             properties.setProperty(KEY_MODULE_ACTIVE_TS, System.currentTimeMillis().toString())
-            file.parentFile?.mkdirs()
-            FileOutputStream(file).use { properties.store(it, "EdgeX hook config snapshot") }
+            FileOutputStream(file).use { properties.store(it, "EdgeX hook active marker") }
             file.setReadable(true, false)
-            file.parentFile?.let { dir ->
-                dir.setExecutable(true, false)
-                dir.setReadable(true, false)
-            }
         }
     }
 
