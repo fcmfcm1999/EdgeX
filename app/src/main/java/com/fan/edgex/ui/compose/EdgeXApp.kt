@@ -38,7 +38,9 @@ import com.fan.edgex.ui.compose.screens.HomeCallbacks
 import com.fan.edgex.ui.compose.screens.HomeScreen
 import com.fan.edgex.ui.compose.screens.HomeStats
 import com.fan.edgex.ui.compose.screens.KeysScreen
+import com.fan.edgex.ui.compose.screens.MultiScreen
 import com.fan.edgex.ui.compose.screens.PieScreen
+import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -141,6 +143,20 @@ fun EdgeXApp() {
                     onBack = {
                         if (stack.size > 1) stack.removeAt(stack.lastIndex)
                     },
+                )
+                EdgeXRoute.Multi -> MultiScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    showToast = ::showToast,
+                )
+                EdgeXRoute.Theme -> ThemeScreen(
+                    onBack = {
+                        refresh()
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    onThemeChanged = ::refresh,
+                    showToast = ::showToast,
                 )
                 else -> EdgeXPlaceholderScreen(
                     route = route,
