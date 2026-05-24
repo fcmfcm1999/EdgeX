@@ -2,6 +2,8 @@ package com.fan.edgex.ui.compose.screens
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -39,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.FreezerBootstrap
@@ -69,6 +73,7 @@ private data class FreezerApp(
     val packageName: String,
     val label: String,
     val frozen: Boolean,
+    val icon: Drawable?,
 ) {
     val avatar: String = label.trim().take(1).ifBlank { packageName.take(1).uppercase() }
 }
@@ -375,6 +380,20 @@ private fun FreezerAppRow(
 
 @Composable
 private fun AppAvatar(app: FreezerApp) {
+    val bitmap = remember(app.packageName, app.icon) {
+        runCatching { app.icon?.toBitmap(width = 96, height = 96)?.asImageBitmap() }.getOrNull()
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = app.label,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(EdgeXRadius.sm)),
+        )
+        return
+    }
+
     val colors = avatarColors(app.packageName)
     Box(
         modifier = Modifier
@@ -415,6 +434,7 @@ private suspend fun Context.loadFreezerApps(): List<FreezerApp> = withContext(Di
                 packageName = info.packageName,
                 label = runCatching { info.loadLabel(pm).toString() }.getOrDefault(info.packageName),
                 frozen = !info.enabled,
+                icon = runCatching { info.loadIcon(pm) }.getOrNull(),
             )
         }
         .sortedWith(compareBy<FreezerApp> { !it.frozen }.thenBy { it.label.lowercase(Locale.getDefault()) })
