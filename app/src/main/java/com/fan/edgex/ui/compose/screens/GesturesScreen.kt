@@ -44,7 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.ActionSelectionActivity
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
@@ -57,6 +59,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
+import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -165,6 +168,7 @@ fun GesturesScreen(
 ) {
     val context = LocalContext.current
     var state by remember { mutableStateOf(context.readGestureScreenState()) }
+    var gesturesEnabled by remember { mutableStateOf(context.getConfigBool(AppConfig.GESTURES_ENABLED)) }
     var filter by remember { mutableStateOf(GestureFilter.Visual) }
     var selectedZone by remember { mutableStateOf<GestureZone?>(null) }
     var pickingActionFor by remember { mutableStateOf<GestureOption?>(null) }
@@ -195,6 +199,18 @@ fun GesturesScreen(
             },
         )
         GestureHeader(state)
+        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            EdgeXSwitchRow(
+                title = stringResource(R.string.compose_gestures_enabled),
+                subtitle = stringResource(R.string.compose_gestures_enabled_desc),
+                checked = gesturesEnabled,
+                onCheckedChange = {
+                    gesturesEnabled = it
+                    context.putConfig(AppConfig.GESTURES_ENABLED, it)
+                    showToast(context.getString(if (it) R.string.compose_gestures_enabled_toast else R.string.compose_gestures_disabled_toast))
+                },
+            )
+        }
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
