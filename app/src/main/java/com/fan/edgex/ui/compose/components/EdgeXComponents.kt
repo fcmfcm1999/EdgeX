@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -101,7 +100,7 @@ fun EdgeXIconButton(
 
 @Composable
 fun EdgeXIconBox(
-    imageVector: ImageVector,
+    imageVector: Int,
     contentDescription: String?,
     modifier: Modifier = Modifier,
     background: Color = LocalEdgeXColors.current.accentSoft,
@@ -127,7 +126,7 @@ fun EdgeXIconBox(
 fun EdgeXTile(
     title: String,
     meta: String,
-    icon: ImageVector,
+    icon: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconBackground: Color = LocalEdgeXColors.current.accentSoft,
@@ -190,7 +189,7 @@ fun EdgeXRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    icon: ImageVector? = null,
+    icon: Int? = null,
     onClick: (() -> Unit)? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -223,7 +222,7 @@ fun EdgeXSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    icon: ImageVector? = null,
+    icon: Int? = null,
 ) {
     EdgeXRow(
         title = title,

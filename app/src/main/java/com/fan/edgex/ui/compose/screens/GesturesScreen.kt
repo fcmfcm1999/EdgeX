@@ -34,9 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -77,13 +75,13 @@ private data class GestureZone(
 private data class GestureOption(
     val id: String,
     val label: String,
-    val icon: ImageVector,
+    val icon: Int,
 )
 
 private data class GestureAction(
     val code: String,
     val label: String,
-    val icon: ImageVector,
+    val icon: Int,
 )
 
 private data class GestureScreenState(

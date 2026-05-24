@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +66,7 @@ import kotlin.math.sin
 private data class KeyUiItem(
     val keyCode: Int,
     val title: String,
-    val icon: ImageVector,
+    val icon: Int,
 )
 
 private data class KeyTrigger(
@@ -292,7 +291,7 @@ private fun PiePreview(edge: PieEdge, refreshTick: Int) {
 
 @Composable
 private fun PieCircle(
-    icon: ImageVector,
+    icon: Int,
     selected: Boolean,
     size: Int,
     radius: Float,
