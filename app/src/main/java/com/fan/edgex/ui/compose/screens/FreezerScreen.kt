@@ -16,10 +16,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -122,7 +121,22 @@ fun FreezerScreen(
                 EdgeXTopBar(title = "冰箱", onBack = onBack)
                 FreezerHeader(frozenCount = frozenCount, total = apps.size)
                 SearchBox(query = query, onQueryChange = { query = it })
-                FilterTabs(filter = filter, onFilter = { filter = it })
+                FilterTabs(
+                    filter = filter,
+                    onFilter = { filter = it },
+                    onRefreeze = {
+                        scope.launch {
+                            showToast("正在重新冻结")
+                            withContext(Dispatchers.IO) {
+                                apps.filter { it.frozen }.forEach {
+                                    runRootCommand("pm disable ${it.packageName}")
+                                }
+                            }
+                            reload()
+                            showToast("已重新冻结")
+                        }
+                    },
+                )
             }
             if (loading) {
                 item {
@@ -223,7 +237,7 @@ private fun FreezerHeader(frozenCount: Int, total: Int) {
             )
         }
         Text(
-            text = "应用已冻结，预计节省后台资源",
+            text = "应用已冻结，预计节省 ${String.format(Locale.getDefault(), "%.1f", frozenCount * 0.16)} GB 内存",
             color = colors.onSurfaceDim,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
@@ -235,35 +249,48 @@ private fun FreezerHeader(frozenCount: Int, total: Int) {
 @Composable
 private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
     val colors = LocalEdgeXColors.current
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = { Text("搜索应用...", color = colors.onSurfaceDim) },
-        leadingIcon = {
-            EdgeXIcon(EdgeXIcons.Search, contentDescription = null, tint = colors.onSurfaceDim)
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(24.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = colors.surface1,
-            unfocusedContainerColor = colors.surface1,
-            focusedBorderColor = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent,
-            focusedTextColor = colors.onSurface,
-            unfocusedTextColor = colors.onSurface,
-            cursorColor = colors.accent,
-        ),
+    Row(
         modifier = Modifier
             .testTag("freezer_search")
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    )
+            .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 14.dp)
+            .height(52.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(colors.surface1)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        EdgeXIcon(EdgeXIcons.Search, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(18.dp))
+        BasicTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                color = colors.onSurface,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            ),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
+            modifier = Modifier.weight(1f),
+            decorationBox = { innerTextField ->
+                if (query.isBlank()) {
+                    Text("搜索应用...", color = colors.onSurfaceDim, fontSize = 15.sp)
+                }
+                innerTextField()
+            },
+        )
+    }
 }
 
 @Composable
-private fun FilterTabs(filter: FreezerFilter, onFilter: (FreezerFilter) -> Unit) {
+private fun FilterTabs(
+    filter: FreezerFilter,
+    onFilter: (FreezerFilter) -> Unit,
+    onRefreeze: () -> Unit,
+) {
     Row(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -274,6 +301,8 @@ private fun FilterTabs(filter: FreezerFilter, onFilter: (FreezerFilter) -> Unit)
                 onClick = { onFilter(it) },
             )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        EdgeXChip(label = "重新冻结", selected = false, onClick = onRefreeze)
     }
 }
 
