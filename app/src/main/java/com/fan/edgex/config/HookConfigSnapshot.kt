@@ -28,13 +28,14 @@ object HookConfigSnapshot {
 
     fun snapshotFileForHook(): File =
         systemSnapshotFile().takeIf { it.isFile && it.canRead() }
-            ?: File("/data/user_de/0/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
+            ?: File("/data/data/${BuildConfig.APPLICATION_ID}/files/$SNAPSHOT_FILE")
 
     fun writeFromPreferences(context: Context): Boolean {
         val prefs = context.configPrefs()
         val values = prefs.all.mapValues { (_, value) -> value?.toString() ?: "" }
-        repairSnapshotIfNeeded(context)
-        return write(context, valuesForHook(values))
+        val hookValues = valuesForHook(values)
+        writeForHook(hookValues)
+        return write(context, hookValues)
     }
 
     private fun repairSnapshotIfNeeded(context: Context) {
@@ -105,7 +106,7 @@ object HookConfigSnapshot {
         values.filterKeys(::isHookRuntimeKey)
 
     private fun snapshotFile(context: Context): File =
-        File(context.createDeviceProtectedStorageContext().filesDir, SNAPSHOT_FILE)
+        File(context.filesDir, SNAPSHOT_FILE)
 
     private fun systemSnapshotFile(): File =
         File("/data/system/edgex/$SNAPSHOT_FILE")
