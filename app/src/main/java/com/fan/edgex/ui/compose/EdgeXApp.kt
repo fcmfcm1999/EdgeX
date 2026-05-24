@@ -41,6 +41,8 @@ import com.fan.edgex.ui.compose.screens.HomeStats
 import com.fan.edgex.ui.compose.screens.KeysScreen
 import com.fan.edgex.ui.compose.screens.MultiScreen
 import com.fan.edgex.ui.compose.screens.PieScreen
+import com.fan.edgex.ui.compose.screens.AboutScreen
+import com.fan.edgex.ui.compose.screens.PremiumScreen
 import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
@@ -160,6 +162,18 @@ fun EdgeXApp() {
                     showToast = ::showToast,
                 )
                 EdgeXRoute.EdgeLighting -> EdgeLightingScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    showToast = ::showToast,
+                )
+                EdgeXRoute.Premium -> PremiumScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    showToast = ::showToast,
+                )
+                EdgeXRoute.About -> AboutScreen(
                     onBack = {
                         if (stack.size > 1) stack.removeAt(stack.lastIndex)
                     },
