@@ -206,12 +206,20 @@ fun GesturesScreen(
                 onZoneClick = { selectedZone = it },
                 modifier = Modifier.padding(top = 14.dp),
             )
+            GestureSectionLabel("全边缘 · 低优先级")
+            FullEdgeGrid(
+                state = state,
+                onZoneClick = { selectedZone = it },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        } else {
+            AllZoneList(
+                state = state,
+                onZoneClick = { selectedZone = it },
+                modifier = Modifier.padding(top = 12.dp, bottom = 28.dp),
+            )
         }
-        ZoneList(
-            state = state,
-            onZoneClick = { selectedZone = it },
-            modifier = Modifier.padding(top = 18.dp, bottom = 28.dp),
-        )
+        Spacer(modifier = Modifier.height(24.dp))
     }
 
     ZoneSheet(
@@ -255,7 +263,7 @@ private fun GestureHeader(state: GestureScreenState) {
             lineHeight = 32.sp,
         )
         Text(
-            text = "${state.total()} 个手势 · ${state.activeZones()} 子区域 · 4 全边缘",
+            text = "${state.total()} 个手势 · 12 子区域 + 4 全边缘",
             color = colors.onSurfaceDim,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
@@ -277,7 +285,7 @@ private fun GestureZoneCanvas(
     ) {
         Column(
             modifier = Modifier
-                .widthIn(max = 230.dp)
+                .widthIn(max = 216.dp)
                 .aspectRatio(9f / 16f)
                 .clip(RoundedCornerShape(30.dp))
                 .background(colors.surface2)
@@ -304,15 +312,6 @@ private fun GestureZoneCanvas(
             }
             EdgeRow(zonesFor("B", full = false), state, onZoneClick)
         }
-        Text(
-            text = "全边缘 · 低优先级",
-            color = colors.onSurfaceDim,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .align(Alignment.Start)
-                .padding(start = 24.dp, top = 18.dp),
-        )
     }
 }
 
@@ -392,27 +391,52 @@ private fun ZonePill(
 }
 
 @Composable
-private fun ZoneList(
+private fun FullEdgeGrid(
     state: GestureScreenState,
     onZoneClick: (GestureZone) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        listOf("L" to "左边缘", "R" to "右边缘", "T" to "上边缘", "B" to "下边缘").forEach { (edge, label) ->
-            Text(
-                text = label,
-                color = LocalEdgeXColors.current.onSurfaceDim,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(start = 8.dp),
-            )
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        zones.filter { it.lowPriority }.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                zonesFor(edge, full = true).forEach { zone ->
+                row.forEach { zone ->
                     ZoneCard(zone, state.count(zone.id), onClick = { onZoneClick(zone) }, modifier = Modifier.weight(1f))
+                }
+                if (row.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
     }
+}
+
+@Composable
+private fun AllZoneList(
+    state: GestureScreenState,
+    onZoneClick: (GestureZone) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        zones.forEach { zone ->
+            ZoneCard(
+                zone = zone,
+                count = state.count(zone.id),
+                onClick = { onZoneClick(zone) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GestureSectionLabel(label: String) {
+    Text(
+        text = label,
+        color = LocalEdgeXColors.current.onSurfaceDim,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 10.dp),
+    )
 }
 
 @Composable
