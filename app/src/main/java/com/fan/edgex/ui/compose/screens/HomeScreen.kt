@@ -126,23 +126,26 @@ private fun HeroCard(stats: HomeStats, moduleActive: Boolean) {
             .background(Brush.linearGradient(listOf(colors.accentSoft2, colors.accentSoft)))
             .padding(start = 22.dp, top = 22.dp, end = 22.dp, bottom = 18.dp),
     ) {
-        if (moduleActive) {
-            Row(
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(colors.onAccentSoft)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(colors.onAccentSoft)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF4CAF50)),
-                )
-                Text(stringResource(R.string.compose_module_active), color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (moduleActive) Color(0xFF4CAF50) else Color(0xFFEF5350)),
+            )
+            Text(
+                text = stringResource(if (moduleActive) R.string.compose_module_active else R.string.compose_module_inactive),
+                color = colors.accentSoft,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+            )
         }
         Text(
             text = stringResource(R.string.compose_home_hero_title),

@@ -466,6 +466,7 @@
     <string name="compose_app_subtitle">Edge Gestures · Smart Interaction</string>
     <string name="compose_route_home">Home</string>
     <string name="compose_module_active">Module Active</string>
+    <string name="compose_module_inactive">Not Activated</string>
     <string name="compose_home_hero_title">Your Gestures\nControl Everything</string>
     <string name="compose_home_hero_subtitle">%1$d gesture actions configured · %2$d/16 zones active</string>
     <string name="compose_stat_gestures">Gestures</string>

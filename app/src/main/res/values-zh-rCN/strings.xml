@@ -445,6 +445,7 @@
     <string name="compose_app_subtitle">边缘手势 · 智能交互</string>
     <string name="compose_route_home">主页</string>
     <string name="compose_module_active">模块已激活</string>
+    <string name="compose_module_inactive">未激活</string>
     <string name="compose_home_hero_title">你的手势\n掌控一切</string>
     <string name="compose_home_hero_subtitle">已配置 %1$d 个手势动作 · %2$d/16 区域已启用</string>
     <string name="compose_stat_gestures">手势</string>
