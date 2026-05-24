@@ -12,6 +12,7 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import java.io.File
 import java.lang.reflect.Method
 
 class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
@@ -43,9 +44,22 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         when (lpparam.packageName) {
             "android" -> {
+                writeModuleActiveTimestamp()
                 PremiumPluginLoader.tryLoad()
                 hookInputManager(lpparam)
             }
+        }
+    }
+
+    private fun writeModuleActiveTimestamp() {
+        runCatching {
+            val dir = File("/data/system/edgex")
+            dir.mkdirs()
+            dir.setExecutable(true, false)
+            dir.setReadable(true, false)
+            val file = File(dir, "module_active")
+            file.writeText(System.currentTimeMillis().toString())
+            file.setReadable(true, false)
         }
     }
 

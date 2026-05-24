@@ -84,7 +84,7 @@ fun HomeScreen(
             },
         )
         AppHeader()
-        HeroCard(state.stats)
+        HeroCard(state.stats, state.moduleActive)
         HomeTiles(state, callbacks)
         SectionLabel(stringResource(R.string.menu_advanced))
         AdvancedSettings(state, callbacks)
@@ -116,7 +116,7 @@ private fun AppHeader() {
 }
 
 @Composable
-private fun HeroCard(stats: HomeStats) {
+private fun HeroCard(stats: HomeStats, moduleActive: Boolean) {
     val colors = LocalEdgeXColors.current
     Column(
         modifier = Modifier
@@ -126,21 +126,23 @@ private fun HeroCard(stats: HomeStats) {
             .background(Brush.linearGradient(listOf(colors.accentSoft2, colors.accentSoft)))
             .padding(start = 22.dp, top = 22.dp, end = 22.dp, bottom = 18.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(colors.onAccentSoft)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
+        if (moduleActive) {
+            Row(
                 modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF4CAF50)),
-            )
-            Text(stringResource(R.string.compose_module_active), color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(colors.onAccentSoft)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF4CAF50)),
+                )
+                Text(stringResource(R.string.compose_module_active), color = colors.accentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
         }
         Text(
             text = stringResource(R.string.compose_home_hero_title),
