@@ -37,6 +37,8 @@ import com.fan.edgex.ui.compose.screens.GesturesScreen
 import com.fan.edgex.ui.compose.screens.HomeCallbacks
 import com.fan.edgex.ui.compose.screens.HomeScreen
 import com.fan.edgex.ui.compose.screens.HomeStats
+import com.fan.edgex.ui.compose.screens.KeysScreen
+import com.fan.edgex.ui.compose.screens.PieScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -128,6 +130,17 @@ fun EdgeXApp() {
                         if (stack.size > 1) stack.removeAt(stack.lastIndex)
                     },
                     showToast = ::showToast,
+                )
+                EdgeXRoute.Keys -> KeysScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
+                    showToast = ::showToast,
+                )
+                EdgeXRoute.Pie -> PieScreen(
+                    onBack = {
+                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
+                    },
                 )
                 else -> EdgeXPlaceholderScreen(
                     route = route,
