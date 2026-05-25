@@ -26,11 +26,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +66,13 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.ActionSelectionActivity
+import com.fan.edgex.ui.ConditionActionActivity
+import com.fan.edgex.ui.MultiActionsListActivity
+import com.fan.edgex.ui.ShellCommandActivity
+import com.fan.edgex.ui.ShortcutSelectionActivity
+import com.fan.edgex.ui.SubGestureActivity
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
@@ -76,6 +86,8 @@ import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -114,6 +126,8 @@ fun KeysScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val keysEnabledToast = stringResource(R.string.compose_keys_enabled_toast)
+    val keysDisabledToast = stringResource(R.string.compose_keys_disabled_toast)
     var masterEnabled by remember { mutableStateOf(context.getConfigBool(AppConfig.KEYS_ENABLED)) }
     var selectedKey by remember { mutableStateOf<KeyUiItem?>(null) }
     var refreshTick by remember { mutableStateOf(0) }
@@ -141,7 +155,7 @@ fun KeysScreen(
                 onCheckedChange = {
                     masterEnabled = it
                     context.putConfig(AppConfig.KEYS_ENABLED, it)
-                    showToast(context.getString(if (it) R.string.compose_keys_enabled_toast else R.string.compose_keys_disabled_toast))
+                    showToast(if (it) keysEnabledToast else keysDisabledToast)
                 },
             )
         }
@@ -169,10 +183,10 @@ fun KeysScreen(
         key = selectedKey,
         refreshTick = refreshTick,
         onDismiss = { selectedKey = null },
-        onTriggerClick = { key, trigger ->
+        onTriggerClick = { key, trigger, title ->
             context.openActionPicker(
                 prefKey = AppConfig.keyAction(key.keyCode, trigger.id),
-                title = context.getString(R.string.compose_title_pair, context.getString(key.titleRes), context.getString(trigger.labelRes)),
+                title = title,
             )
             selectedKey = null
             refreshTick++
@@ -185,13 +199,18 @@ private fun KeyDetailSheet(
     key: KeyUiItem?,
     refreshTick: Int,
     onDismiss: () -> Unit,
-    onTriggerClick: (KeyUiItem, KeyTrigger) -> Unit,
+    onTriggerClick: (KeyUiItem, KeyTrigger, String) -> Unit,
 ) {
     val context = LocalContext.current
     EdgeXBottomSheet(open = key != null, title = key?.let { stringResource(it.titleRes) }.orEmpty(), onDismissRequest = onDismiss) {
         if (key == null) return@EdgeXBottomSheet
         EdgeXListGroup {
             keyTriggers.forEachIndexed { index, trigger ->
+                val actionTitle = stringResource(
+                    R.string.compose_title_pair,
+                    stringResource(key.titleRes),
+                    stringResource(trigger.labelRes),
+                )
                 EdgeXRow(
                     title = stringResource(trigger.labelRes),
                     subtitle = context.getConfigString(
@@ -199,7 +218,7 @@ private fun KeyDetailSheet(
                         stringResource(R.string.action_none),
                     ) + refreshTick.let { "" },
                     icon = EdgeXIcons.Gesture,
-                    onClick = { onTriggerClick(key, trigger) },
+                    onClick = { onTriggerClick(key, trigger, actionTitle) },
                 ) {
                     EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
                 }
@@ -235,6 +254,56 @@ private data class PieGeometry(
     val outerR: Float,
 )
 
+private data class PieActionChoice(
+    val code: String,
+    val labelRes: Int,
+    val icon: Int,
+    val needsDetail: Boolean = false,
+)
+
+private data class PieAppItem(
+    val packageName: String,
+    val label: String,
+    val icon: Drawable?,
+)
+
+private val pieActionChoices = listOf(
+    PieActionChoice("none", R.string.action_none, EdgeXIcons.Check),
+    PieActionChoice("back", R.string.action_back, EdgeXIcons.Back),
+    PieActionChoice("home", R.string.action_home, EdgeXIcons.Home),
+    PieActionChoice("recents", R.string.action_recents, EdgeXIcons.Recents),
+    PieActionChoice("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
+    PieActionChoice("lock_screen", R.string.action_lock_screen, EdgeXIcons.Lock),
+    PieActionChoice("screenshot", R.string.action_screenshot, EdgeXIcons.Screenshot),
+    PieActionChoice(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.PartialScreenshot),
+    PieActionChoice("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
+    PieActionChoice("brightness_up", R.string.action_brightness_up, EdgeXIcons.BrightnessUp),
+    PieActionChoice("brightness_down", R.string.action_brightness_down, EdgeXIcons.BrightnessDown),
+    PieActionChoice("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
+    PieActionChoice("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
+    PieActionChoice("freezer_drawer", R.string.action_freezer_drawer, EdgeXIcons.Freeze),
+    PieActionChoice("refreeze", R.string.action_refreeze, EdgeXIcons.Refreeze),
+    PieActionChoice("clear_background", R.string.action_clear_background, EdgeXIcons.ClearBackground),
+    PieActionChoice("kill_app", R.string.action_kill_app, EdgeXIcons.KillApp),
+    PieActionChoice("prev_app", R.string.action_prev_app, EdgeXIcons.PrevApp),
+    PieActionChoice("next_app", R.string.action_next_app, EdgeXIcons.NextApp),
+    PieActionChoice("clipboard", R.string.action_clipboard, EdgeXIcons.Clipboard),
+    PieActionChoice("universal_copy", R.string.action_universal_copy, EdgeXIcons.UniversalCopy),
+    PieActionChoice("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
+    PieActionChoice("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
+    PieActionChoice("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
+    PieActionChoice(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
+    PieActionChoice(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
+    PieActionChoice(AppConfig.SIDE_BAR_RIGHT_ACTION, R.string.action_right_side_bar, EdgeXIcons.SideBarRight),
+    PieActionChoice("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsDetail = true),
+    PieActionChoice("condition", R.string.action_condition, EdgeXIcons.Condition, needsDetail = true),
+    PieActionChoice("shell_command", R.string.action_shell_command, EdgeXIcons.Terminal, needsDetail = true),
+    PieActionChoice("sub_gesture", R.string.action_sub_gesture, EdgeXIcons.SubGesture, needsDetail = true),
+    PieActionChoice("launch_app", R.string.action_launch_app, EdgeXIcons.LaunchApp, needsDetail = true),
+    PieActionChoice("app_shortcut", R.string.action_app_shortcut, EdgeXIcons.AppShortcut, needsDetail = true),
+    PieActionChoice("music_control", R.string.action_music_control, EdgeXIcons.Music, needsDetail = true),
+)
+
 @Composable
 fun PieScreen(
     onBack: () -> Unit,
@@ -249,6 +318,9 @@ fun PieScreen(
     var sizeScale by remember { mutableStateOf(context.getPieSizeScale()) }
     var followThemeColor by remember { mutableStateOf(context.getConfigString(AppConfig.PIE_COLOR).isBlank()) }
     var customPieColor by remember { mutableStateOf(context.getPieCustomColor(colors.accent)) }
+    var pickingSector by remember { mutableStateOf<PieSector?>(null) }
+    var appPickerSector by remember { mutableStateOf<PieSector?>(null) }
+    var musicPickerSector by remember { mutableStateOf<PieSector?>(null) }
     val edgeLabels = mapOf(
         PieEdge.Left to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Left.labelRes)),
         PieEdge.Right to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Right.labelRes)),
@@ -290,11 +362,7 @@ fun PieScreen(
             pieColor = previewColor,
             onSlotClick = { sector ->
                 selectedSector = sector
-                context.openActionPicker(
-                    prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot),
-                    title = "${context.getString(edge.labelRes)} / ${context.getString(R.string.pie_ring_slot_label, sector.ring, sector.slot + 1)}",
-                )
-                refreshTick++
+                pickingSector = sector
             },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
@@ -302,28 +370,89 @@ fun PieScreen(
             sizeScale = sizeScale,
             onSizeScaleChange = {
                 sizeScale = it
-                context.putConfig(AppConfig.PIE_SIZE_SCALE, "%.2f".format(Locale.US, it))
+                context.putConfigsSync(AppConfig.PIE_SIZE_SCALE to "%.2f".format(Locale.US, it))
             },
             followThemeColor = followThemeColor,
             pieColor = customPieColor,
             onFollowThemeColorChange = {
                 followThemeColor = it
                 if (it) {
-                    context.putConfig(AppConfig.PIE_COLOR, "")
+                    context.putConfigsSync(AppConfig.PIE_COLOR to "")
                 } else {
                     customPieColor = colors.accent
-                    context.putConfig(AppConfig.PIE_COLOR, colors.accent.toHexString())
+                    context.putConfigsSync(AppConfig.PIE_COLOR to colors.accent.toHexString())
                 }
             },
             onPieColorChange = {
                 customPieColor = it
                 followThemeColor = false
-                context.putConfig(AppConfig.PIE_COLOR, it.toHexString())
+                context.putConfigsSync(AppConfig.PIE_COLOR to it.toHexString())
             },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
         )
         Spacer(modifier = Modifier.height(28.dp))
     }
+
+    val sheetSector = pickingSector
+    val sheetTitle = sheetSector?.let { sector ->
+        "${stringResource(edge.labelRes)} / ${stringResource(R.string.pie_ring_slot_label, sector.ring, sector.slot + 1)}"
+    }.orEmpty()
+    val sheetPrefKey = sheetSector?.let { AppConfig.pieSlot(edge.id, it.ring, it.slot) }.orEmpty()
+    PieActionSheet(
+        sector = sheetSector,
+        title = sheetTitle,
+        selectedAction = if (sheetPrefKey.isBlank()) "none" else context.getConfigString(sheetPrefKey, "none"),
+        onDismiss = { pickingSector = null },
+        onPick = { action, actionLabel ->
+            val sector = sheetSector ?: return@PieActionSheet
+            val prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot)
+            when (action.code) {
+                "launch_app" -> {
+                    pickingSector = null
+                    appPickerSector = sector
+                }
+                "music_control" -> {
+                    pickingSector = null
+                    musicPickerSector = sector
+                }
+                else -> {
+                    if (action.needsDetail) {
+                        context.startPieActionDetail(prefKey, sheetTitle, action)
+                    } else {
+                        context.savePieAction(prefKey, action.code, actionLabel)
+                    }
+                    pickingSector = null
+                    refreshTick++
+                }
+            }
+        },
+    )
+    PieAppPickerSheet(
+        open = appPickerSector != null,
+        onDismiss = { appPickerSector = null },
+        onPick = { app ->
+            val sector = appPickerSector ?: return@PieAppPickerSheet
+            val prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot)
+            context.putConfigsSync(
+                prefKey to "launch_app:${app.packageName}",
+                "${prefKey}_label" to app.label,
+                "${prefKey}_title" to app.label,
+            )
+            appPickerSector = null
+            refreshTick++
+        },
+    )
+    PieMusicPickerSheet(
+        open = musicPickerSector != null,
+        onDismiss = { musicPickerSector = null },
+        onPick = { code, label ->
+            val sector = musicPickerSector ?: return@PieMusicPickerSheet
+            val prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot)
+            context.savePieAction(prefKey, "music_control:$code", label)
+            musicPickerSector = null
+            refreshTick++
+        },
+    )
 }
 
 @Composable
@@ -475,6 +604,260 @@ private fun PieSlotIcon(slot: PieSlotUi, tint: Color, selected: Boolean) {
             )
         }
     }
+}
+
+@Composable
+private fun PieActionSheet(
+    sector: PieSector?,
+    title: String,
+    selectedAction: String,
+    onDismiss: () -> Unit,
+    onPick: (PieActionChoice, String) -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    var searchQuery by remember { mutableStateOf("") }
+    EdgeXBottomSheet(
+        open = sector != null,
+        title = title,
+        onDismissRequest = {
+            searchQuery = ""
+            onDismiss()
+        },
+    ) {
+        if (sector == null) return@EdgeXBottomSheet
+        val labeledActions = pieActionChoices.map { action -> action to stringResource(action.labelRes) }
+        val query = searchQuery.trim()
+        val filtered = if (query.isBlank()) {
+            labeledActions
+        } else {
+            labeledActions.filter { (action, label) ->
+                label.contains(query, ignoreCase = true) || action.code.contains(query, ignoreCase = true)
+            }
+        }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
+            singleLine = true,
+            shape = RoundedCornerShape(EdgeXRadius.sm),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.outline,
+                cursorColor = colors.accent,
+            ),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                filtered.forEachIndexed { index, (action, label) ->
+                    EdgeXRow(
+                        title = label,
+                        subtitle = action.code,
+                        icon = action.icon,
+                        onClick = { onPick(action, label) },
+                    ) {
+                        val selected = selectedAction == action.code ||
+                            (action.code == "launch_app" && selectedAction.startsWith("launch_app:")) ||
+                            (action.code == "music_control" && selectedAction.startsWith("music_control:")) ||
+                            (action.code == "multi_action" && selectedAction.startsWith("multi_action:")) ||
+                            (action.code == "condition" && selectedAction.startsWith("condition:"))
+                        if (selected) {
+                            EdgeXIcon(EdgeXIcons.Check, contentDescription = null, tint = colors.accent)
+                        }
+                    }
+                    if (index != filtered.lastIndex) EdgeXDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PieAppPickerSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (PieAppItem) -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = LocalEdgeXColors.current
+    var apps by remember { mutableStateOf(emptyList<PieAppItem>()) }
+    var query by remember { mutableStateOf("") }
+    LaunchedEffect(open) {
+        if (open && apps.isEmpty()) {
+            apps = withContext(Dispatchers.IO) { context.loadPieLaunchableApps() }
+        }
+        if (!open) query = ""
+    }
+    EdgeXBottomSheet(open = open, title = stringResource(R.string.action_launch_app), onDismissRequest = onDismiss) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            placeholder = { Text(stringResource(R.string.hint_search_apps), color = colors.onSurfaceDim) },
+            singleLine = true,
+            shape = RoundedCornerShape(EdgeXRadius.sm),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.outline,
+                cursorColor = colors.accent,
+            ),
+        )
+        val filtered = remember(apps, query) {
+            val q = query.trim()
+            if (q.isBlank()) {
+                apps
+            } else {
+                apps.filter {
+                    it.label.contains(q, ignoreCase = true) || it.packageName.contains(q, ignoreCase = true)
+                }
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                filtered.forEachIndexed { index, app ->
+                    PieAppRow(app = app, onClick = { onPick(app) })
+                    if (index != filtered.lastIndex) EdgeXDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PieAppRow(app: PieAppItem, onClick: () -> Unit) {
+    val colors = LocalEdgeXColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+            if (app.icon != null) {
+                AndroidView(
+                    factory = { context ->
+                        ImageView(context).apply {
+                            scaleType = ImageView.ScaleType.CENTER_INSIDE
+                        }
+                    },
+                    update = { imageView ->
+                        val drawable = app.icon.constantState?.newDrawable()?.mutate() ?: app.icon
+                        imageView.setImageDrawable(drawable)
+                    },
+                    modifier = Modifier.size(30.dp),
+                )
+            } else {
+                EdgeXIconBox(EdgeXIcons.LaunchApp, contentDescription = null)
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = app.packageName,
+                color = colors.onSurfaceDim,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PieMusicPickerSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (String, String) -> Unit,
+) {
+    EdgeXBottomSheet(open = open, title = stringResource(R.string.header_music_control), onDismissRequest = onDismiss) {
+        val options = listOf(
+            Triple("play_pause", R.string.action_music_play_pause, R.drawable.ic_music_play_pause),
+            Triple("stop", R.string.action_music_stop, R.drawable.ic_music_stop),
+            Triple("previous", R.string.action_music_previous, R.drawable.ic_music_previous),
+            Triple("next", R.string.action_music_next, R.drawable.ic_music_next),
+        )
+        EdgeXListGroup {
+            options.forEachIndexed { index, option ->
+                val label = stringResource(option.second)
+                val actionLabel = stringResource(R.string.label_music_prefix, label)
+                EdgeXRow(title = label, icon = option.third, onClick = { onPick(option.first, actionLabel) })
+                if (index != options.lastIndex) EdgeXDivider()
+            }
+        }
+    }
+}
+
+private fun Context.loadPieLaunchableApps(): List<PieAppItem> {
+    val pm = packageManager
+    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+    return pm.queryIntentActivities(intent, 0)
+        .map { info ->
+            PieAppItem(
+                packageName = info.activityInfo.packageName,
+                label = info.loadLabel(pm).toString(),
+                icon = runCatching { info.loadIcon(pm) }.getOrNull(),
+            )
+        }
+        .distinctBy { it.packageName }
+        .sortedBy { it.label.lowercase(Locale.getDefault()) }
+}
+
+private fun Context.savePieAction(prefKey: String, action: String, label: String) {
+    putConfigsSync(
+        prefKey to action,
+        "${prefKey}_label" to label,
+        "${prefKey}_title" to "",
+    )
+}
+
+private fun Context.startPieActionDetail(prefKey: String, title: String, action: PieActionChoice) {
+    val intent = when (action.code) {
+        "app_shortcut" -> Intent(this, ShortcutSelectionActivity::class.java)
+            .putExtra("pref_key", prefKey)
+        "shell_command" -> Intent(this, ShellCommandActivity::class.java)
+            .putExtra("pref_key", prefKey)
+        "sub_gesture" -> {
+            putConfigsSync(
+                prefKey to "sub_gesture",
+                "${prefKey}_label" to getString(R.string.action_sub_gesture),
+            )
+            Intent(this, SubGestureActivity::class.java)
+                .putExtra("pref_key", prefKey)
+                .putExtra("title", title)
+        }
+        "multi_action" -> Intent(this, MultiActionsListActivity::class.java)
+            .putExtra(MultiActionsListActivity.EXTRA_MODE, MultiActionsListActivity.MODE_PICK)
+            .putExtra(MultiActionsListActivity.EXTRA_PREF_KEY, prefKey)
+            .putExtra(MultiActionsListActivity.EXTRA_TITLE, title)
+        "condition" -> Intent(this, ConditionActionActivity::class.java)
+            .putExtra("pref_key", prefKey)
+            .putExtra("title", title)
+        else -> return
+    }
+    startActivity(intent)
 }
 
 @Composable
