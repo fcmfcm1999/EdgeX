@@ -207,6 +207,7 @@
     <string name="toast_wifi_toggle_failed">切换 Wi-Fi 失败</string>
     <string name="toast_mobile_data_toggle_failed">切换移动数据失败</string>
     <string name="menu_custom_panel">自定义面板</string>
+    <string name="menu_side_bar">侧边栏</string>
     <string name="menu_left_side_bar">左侧边栏</string>
     <string name="menu_right_side_bar">右侧边栏</string>
     <string name="panel_row_title">第%d行</string>
@@ -459,6 +460,8 @@
     <string name="compose_enabled">已启用</string>
     <string name="compose_disabled">未启用</string>
     <string name="compose_home_pie_meta">4 边缘 · 2 环</string>
+    <string name="compose_home_custom_panel_meta">网格启动面板</string>
+    <string name="compose_home_side_bar_meta">左右侧边栏配置</string>
     <string name="compose_home_multi_meta">可复用动作序列</string>
     <string name="compose_home_theme_meta">轻点切换风格</string>
     <string name="compose_premium_title">Premium</string>
@@ -520,6 +523,10 @@
     <string name="compose_pie_color_follow_theme">跟随主题色</string>
     <string name="compose_pie_color_custom">自定义 Pie 颜色</string>
     <string name="compose_slot_number">槽位 %d</string>
+    <string name="compose_panel_preview">预览</string>
+    <string name="compose_custom_panel_subtitle">点击任意格子，配置面板中实际显示的动作。</string>
+    <string name="compose_side_bar_subtitle">选择左侧或右侧，再点击槽位配置对应动作。</string>
+    <string name="compose_panel_cell_title">第 %1$d 行 · 第 %2$d 列</string>
     <string name="compose_multi_hero">一个手势\n触发动作序列</string>
     <string name="compose_new">新建</string>
     <string name="compose_empty_multi_title">还没有组合动作</string>

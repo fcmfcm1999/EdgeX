@@ -254,6 +254,24 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 modifier = Modifier.weight(1f),
             )
         }
+        TileRow {
+            FeatureTile(
+                title = stringResource(R.string.menu_custom_panel),
+                meta = stringResource(R.string.compose_home_custom_panel_meta),
+                icon = EdgeXIcons.CustomPanel,
+                onClick = { callbacks.openRoute(EdgeXRoute.CustomPanel) },
+                tag = "home_tile_custom_panel",
+                modifier = Modifier.weight(1f),
+            )
+            FeatureTile(
+                title = stringResource(R.string.menu_side_bar),
+                meta = stringResource(R.string.compose_home_side_bar_meta),
+                icon = EdgeXIcons.SideBarRight,
+                onClick = { callbacks.openRoute(EdgeXRoute.SideBar) },
+                tag = "home_tile_side_bar",
+                modifier = Modifier.weight(1f),
+            )
+        }
         EdgeXTile(
             title = stringResource(R.string.compose_premium_title),
             meta = stringResource(R.string.compose_premium_unlock),

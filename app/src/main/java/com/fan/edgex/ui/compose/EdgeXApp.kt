@@ -35,7 +35,9 @@ import com.fan.edgex.ui.compose.screens.HomeStats
 import com.fan.edgex.ui.compose.screens.KeysScreen
 import com.fan.edgex.ui.compose.screens.MultiScreen
 import com.fan.edgex.ui.compose.screens.PieScreen
+import com.fan.edgex.ui.compose.screens.CustomPanelScreen
 import com.fan.edgex.ui.compose.screens.PremiumScreen
+import com.fan.edgex.ui.compose.screens.SideBarScreen
 import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
@@ -48,6 +50,8 @@ enum class EdgeXRoute(@StringRes val labelRes: Int) {
     Keys(R.string.header_keys),
     Freezer(R.string.header_freezer),
     Pie(R.string.header_pie_settings),
+    CustomPanel(R.string.menu_custom_panel),
+    SideBar(R.string.menu_side_bar),
     Multi(R.string.menu_multi_actions),
     Theme(R.string.header_theme),
     EdgeLighting(R.string.menu_edge_lighting),
@@ -156,6 +160,12 @@ fun EdgeXApp() {
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Pie -> PieScreen(
+                    onBack = ::popRoute,
+                )
+                EdgeXRoute.CustomPanel -> CustomPanelScreen(
+                    onBack = ::popRoute,
+                )
+                EdgeXRoute.SideBar -> SideBarScreen(
                     onBack = ::popRoute,
                 )
                 EdgeXRoute.Multi -> MultiScreen(

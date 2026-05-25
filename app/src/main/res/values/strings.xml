@@ -231,6 +231,7 @@
     <string name="game_mode_toast_on">游戏模式开启</string>
     <string name="game_mode_toast_off">游戏模式关闭</string>
     <string name="menu_custom_panel">Custom Panel</string>
+    <string name="menu_side_bar">Side Bar</string>
     <string name="menu_left_side_bar">Left Side Bar</string>
     <string name="menu_right_side_bar">Right Side Bar</string>
     <string name="panel_row_title">Row %d</string>
@@ -480,6 +481,8 @@
     <string name="compose_enabled">Enabled</string>
     <string name="compose_disabled">Disabled</string>
     <string name="compose_home_pie_meta">4 edges · 2 rings</string>
+    <string name="compose_home_custom_panel_meta">Grid launcher panel</string>
+    <string name="compose_home_side_bar_meta">Left and right side bars</string>
     <string name="compose_home_multi_meta">Reusable action sequences</string>
     <string name="compose_home_theme_meta">Tap to switch style</string>
     <string name="compose_premium_title">Premium</string>
@@ -541,6 +544,10 @@
     <string name="compose_pie_color_follow_theme">Follow theme color</string>
     <string name="compose_pie_color_custom">Custom Pie color</string>
     <string name="compose_slot_number">Slot %d</string>
+    <string name="compose_panel_preview">Preview</string>
+    <string name="compose_custom_panel_subtitle">Tap any cell to assign the action shown in the panel.</string>
+    <string name="compose_side_bar_subtitle">Choose left or right, then tap a slot to assign its action.</string>
+    <string name="compose_panel_cell_title">Row %1$d · Column %2$d</string>
     <string name="compose_multi_hero">One Gesture\nTriggers an Action Sequence</string>
     <string name="compose_new">New</string>
     <string name="compose_empty_multi_title">No multi-actions yet</string>
