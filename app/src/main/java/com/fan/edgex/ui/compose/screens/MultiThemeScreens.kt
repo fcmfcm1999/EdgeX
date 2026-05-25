@@ -2,6 +2,7 @@ package com.fan.edgex.ui.compose.screens
 
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,17 +17,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,17 +55,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.MultiAction
+import com.fan.edgex.config.MultiActionStep
 import com.fan.edgex.config.MultiActionStore
+import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
-import com.fan.edgex.ui.MultiActionEditActivity
+import com.fan.edgex.config.requestHookActionExecution
+import com.fan.edgex.ui.ConditionActionActivity
+import com.fan.edgex.ui.ShortcutSelectionActivity
+import com.fan.edgex.ui.SubGestureActivity
 import com.fan.edgex.ui.ThemeManager
+import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXChip
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
@@ -71,6 +88,57 @@ import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+private data class MultiStepAction(
+    val code: String,
+    val labelRes: Int,
+    val icon: Int,
+    val needsDetail: Boolean = false,
+)
+
+private data class MultiAppItem(
+    val packageName: String,
+    val label: String,
+)
+
+private val multiStepActions = listOf(
+    MultiStepAction("back", R.string.action_back, EdgeXIcons.Back),
+    MultiStepAction("home", R.string.action_home, EdgeXIcons.Home),
+    MultiStepAction("recents", R.string.action_recents, EdgeXIcons.Recents),
+    MultiStepAction("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
+    MultiStepAction("lock_screen", R.string.action_lock_screen, EdgeXIcons.Lock),
+    MultiStepAction("screenshot", R.string.action_screenshot, EdgeXIcons.Screenshot),
+    MultiStepAction(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.PartialScreenshot),
+    MultiStepAction("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
+    MultiStepAction("brightness_up", R.string.action_brightness_up, EdgeXIcons.BrightnessUp),
+    MultiStepAction("brightness_down", R.string.action_brightness_down, EdgeXIcons.BrightnessDown),
+    MultiStepAction("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
+    MultiStepAction("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
+    MultiStepAction("freezer_drawer", R.string.action_freezer_drawer, EdgeXIcons.Freeze),
+    MultiStepAction("refreeze", R.string.action_refreeze, EdgeXIcons.Refreeze),
+    MultiStepAction("clear_background", R.string.action_clear_background, EdgeXIcons.ClearBackground),
+    MultiStepAction("kill_app", R.string.action_kill_app, EdgeXIcons.KillApp),
+    MultiStepAction("prev_app", R.string.action_prev_app, EdgeXIcons.PrevApp),
+    MultiStepAction("next_app", R.string.action_next_app, EdgeXIcons.NextApp),
+    MultiStepAction("clipboard", R.string.action_clipboard, EdgeXIcons.Clipboard),
+    MultiStepAction("universal_copy", R.string.action_universal_copy, EdgeXIcons.UniversalCopy),
+    MultiStepAction("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
+    MultiStepAction("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
+    MultiStepAction("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
+    MultiStepAction("pie", R.string.action_pie, EdgeXIcons.Pie),
+    MultiStepAction(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
+    MultiStepAction(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
+    MultiStepAction(AppConfig.SIDE_BAR_RIGHT_ACTION, R.string.action_right_side_bar, EdgeXIcons.SideBarRight),
+    MultiStepAction("music_control", R.string.action_music_control, EdgeXIcons.Music, needsDetail = true),
+    MultiStepAction("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsDetail = true),
+    MultiStepAction("shell_command", R.string.action_shell_command, EdgeXIcons.Terminal, needsDetail = true),
+    MultiStepAction("launch_app", R.string.action_launch_app, EdgeXIcons.LaunchApp, needsDetail = true),
+    MultiStepAction("app_shortcut", R.string.action_app_shortcut, EdgeXIcons.AppShortcut, needsDetail = true),
+    MultiStepAction("condition", R.string.action_condition, EdgeXIcons.Condition, needsDetail = true),
+    MultiStepAction("sub_gesture", R.string.action_sub_gesture, EdgeXIcons.SubGesture, needsDetail = true),
+)
 
 @Composable
 fun MultiScreen(
@@ -80,7 +148,29 @@ fun MultiScreen(
 ) {
     val context = LocalContext.current
     var refreshTick by remember { mutableIntStateOf(0) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var creatingNew by remember { mutableStateOf(false) }
     val items = remember(refreshTick) { MultiActionStore.getAll(context.configPrefs()) }
+
+    if (editingId != null) {
+        MultiActionEditorScreen(
+            id = editingId.orEmpty(),
+            isNew = creatingNew,
+            onBack = {
+                editingId = null
+                creatingNew = false
+                refreshTick++
+            },
+            showToast = showToast,
+            modifier = modifier,
+        )
+        return
+    }
+
+    fun create() {
+        editingId = MultiActionStore.generateId()
+        creatingNew = true
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -100,8 +190,7 @@ fun MultiScreen(
             }
             if (items.isEmpty()) {
                 EmptyMultiState(onCreate = {
-                    context.createMultiAction()
-                    refreshTick++
+                    create()
                 })
             } else {
                 Column(
@@ -112,8 +201,8 @@ fun MultiScreen(
                         MultiActionCard(
                             item = item,
                             onEdit = {
-                                context.openMultiActionEdit(item.id)
-                                refreshTick++
+                                editingId = item.id
+                                creatingNew = false
                             },
                         )
                     }
@@ -123,10 +212,7 @@ fun MultiScreen(
         }
         if (items.isNotEmpty()) {
             FloatingActionButton(
-                onClick = {
-                    context.createMultiAction()
-                    refreshTick++
-                },
+                onClick = { create() },
                 containerColor = LocalEdgeXColors.current.accent,
                 contentColor = LocalEdgeXColors.current.onAccent,
                 modifier = Modifier
@@ -144,6 +230,289 @@ fun MultiScreen(
             }
         }
     }
+}
+
+@Composable
+private fun MultiActionEditorScreen(
+    id: String,
+    isNew: Boolean,
+    onBack: () -> Unit,
+    showToast: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val existing = remember(id, isNew) { if (isNew) null else MultiActionStore.get(context.configPrefs(), id) }
+    var name by remember(id, isNew) { mutableStateOf(existing?.name ?: id) }
+    var steps by remember(id, isNew) { mutableStateOf(existing?.steps?.toList().orEmpty()) }
+    var iconRef by remember(id, isNew) { mutableStateOf(existing?.iconRef.orEmpty()) }
+    var modified by remember(id, isNew) { mutableStateOf(isNew) }
+    var showRename by remember { mutableStateOf(false) }
+    var showUnsaved by remember { mutableStateOf(false) }
+    var choosingAction by remember { mutableStateOf(false) }
+    var editingStepIndex by remember { mutableStateOf<Int?>(null) }
+    var optionsStepIndex by remember { mutableStateOf<Int?>(null) }
+    var shellTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var multiTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var musicTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var appTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var pendingLegacyIndex by remember { mutableStateOf<Int?>(null) }
+    var showRenameStep by remember { mutableStateOf(false) }
+
+    fun save() {
+        MultiActionStore.save(context.configPrefs(), MultiAction(id, name, steps.toMutableList(), iconRef))
+        context.broadcastFullConfigSnapshot()
+        modified = false
+        showToast(context.getString(R.string.action_saved))
+    }
+
+    fun applyStep(index: Int?, step: MultiActionStep) {
+        steps = if (index == null) {
+            steps + step
+        } else {
+            steps.toMutableList().also { it[index] = step }
+        }
+        modified = true
+        choosingAction = false
+        editingStepIndex = null
+    }
+
+    fun handleBack() {
+        if (modified) {
+            showUnsaved = true
+        } else {
+            onBack()
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, pendingLegacyIndex) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event != Lifecycle.Event.ON_RESUME || pendingLegacyIndex == null) return@LifecycleEventObserver
+            val tempKey = MultiActionStore.tempStepKey()
+            val code = context.getConfigString(tempKey)
+            val label = context.getConfigString("${tempKey}_label")
+            if (code.isNotBlank() && code != "none") {
+                applyStep(pendingLegacyIndex, MultiActionStep(code, label.ifBlank { code }))
+                context.putConfig(tempKey, "")
+                context.putConfig("${tempKey}_label", "")
+            }
+            pendingLegacyIndex = null
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    BackHandler { handleBack() }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        EdgeXTopBar(
+            title = stringResource(R.string.header_multi_action_edit),
+            onBack = { handleBack() },
+            trailing = {
+                EdgeXIconButton(onClick = { save() }, tonal = true) {
+                    EdgeXIcon(EdgeXIcons.Check, contentDescription = stringResource(R.string.btn_save), tint = LocalEdgeXColors.current.onAccentSoft)
+                }
+            },
+        )
+        MultiEditHeader(
+            name = name,
+            stepCount = steps.size,
+            onRename = { showRename = true },
+        )
+        if (steps.isEmpty()) {
+            EmptyMultiSteps(onAdd = {
+                editingStepIndex = null
+                choosingAction = true
+            })
+        } else {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                steps.forEachIndexed { index, step ->
+                    MultiStepCard(
+                        index = index,
+                        step = step,
+                        onEdit = {
+                            editingStepIndex = index
+                            choosingAction = true
+                        },
+                        onMore = { optionsStepIndex = index },
+                    )
+                }
+                Button(
+                    onClick = {
+                        editingStepIndex = null
+                        choosingAction = true
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LocalEdgeXColors.current.accent,
+                        contentColor = LocalEdgeXColors.current.onAccent,
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    EdgeXIcon(EdgeXIcons.Plus, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.multi_action_add_step), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(28.dp))
+    }
+
+    RenameDialog(
+        open = showRename,
+        title = stringResource(R.string.action_rename),
+        initial = name,
+        hint = stringResource(R.string.multi_action_edit_name_hint),
+        onDismiss = { showRename = false },
+        onSave = {
+            name = it.ifBlank { name }
+            modified = true
+            showRename = false
+        },
+    )
+
+    UnsavedDialog(
+        open = showUnsaved,
+        onDismiss = { showUnsaved = false },
+        onSave = {
+            save()
+            onBack()
+        },
+        onDiscard = { onBack() },
+    )
+
+    StepOptionsSheet(
+        step = optionsStepIndex?.let { steps[it] },
+        onDismiss = { optionsStepIndex = null },
+        onEditAction = {
+            editingStepIndex = optionsStepIndex
+            optionsStepIndex = null
+            choosingAction = true
+        },
+        onRename = {
+            editingStepIndex = optionsStepIndex
+            optionsStepIndex = null
+            showRenameStep = true
+        },
+        onCopy = {
+            val index = optionsStepIndex ?: return@StepOptionsSheet
+            steps = steps.toMutableList().also { it.add(index + 1, it[index].copy()) }
+            modified = true
+            optionsStepIndex = null
+        },
+        onExecute = {
+            optionsStepIndex?.let { context.requestHookActionExecution(steps[it].code) }
+            optionsStepIndex = null
+        },
+        onDelete = {
+            val index = optionsStepIndex ?: return@StepOptionsSheet
+            steps = steps.toMutableList().also { it.removeAt(index) }
+            modified = true
+            optionsStepIndex = null
+        },
+    )
+
+    val stepForRename = editingStepIndex?.let { steps.getOrNull(it) }
+    RenameDialog(
+        open = showRenameStep && stepForRename != null,
+        title = stringResource(R.string.multi_action_step_edit_icon_name),
+        initial = stepForRename?.label.orEmpty(),
+        hint = stringResource(R.string.multi_action_step_edit_label_hint),
+        onDismiss = { showRenameStep = false },
+        onSave = { newLabel ->
+            val index = editingStepIndex ?: return@RenameDialog
+            val step = steps[index]
+            steps = steps.toMutableList().also { it[index] = step.copy(label = newLabel.ifBlank { step.label }) }
+            modified = true
+            showRenameStep = false
+            editingStepIndex = null
+        },
+    )
+
+    StepActionSheet(
+        open = choosingAction,
+        onDismiss = {
+            choosingAction = false
+            editingStepIndex = null
+        },
+        onAction = { action ->
+            val targetIndex = editingStepIndex
+            when (action.code) {
+                "shell_command" -> {
+                    shellTargetIndex = targetIndex
+                    choosingAction = false
+                }
+                "multi_action" -> {
+                    multiTargetIndex = targetIndex
+                    choosingAction = false
+                }
+                "music_control" -> {
+                    musicTargetIndex = targetIndex
+                    choosingAction = false
+                }
+                "launch_app" -> {
+                    appTargetIndex = targetIndex
+                    choosingAction = false
+                }
+                "app_shortcut", "condition", "sub_gesture" -> {
+                    pendingLegacyIndex = targetIndex
+                    context.startLegacyStepDetail(action.code, targetIndex?.let { steps[it] })
+                    choosingAction = false
+                }
+                else -> applyStep(targetIndex, MultiActionStep(action.code, context.getString(action.labelRes)))
+            }
+        },
+    )
+
+    ShellCommandDialog(
+        open = shellTargetIndex != null,
+        existing = shellTargetIndex?.let { steps.getOrNull(it)?.code },
+        onDismiss = { shellTargetIndex = null },
+        onSave = { command, runAsRoot ->
+            if (command.isBlank()) {
+                showToast(context.getString(R.string.toast_shell_command_empty))
+            } else {
+                applyStep(shellTargetIndex, MultiActionStep("shell:$runAsRoot:$command", command))
+                shellTargetIndex = null
+            }
+        },
+    )
+
+    MusicPickerSheet(
+        open = musicTargetIndex != null,
+        onDismiss = { musicTargetIndex = null },
+        onPick = { code, label ->
+            applyStep(musicTargetIndex, MultiActionStep("music_control:$code", context.getString(R.string.label_music_prefix, label)))
+            musicTargetIndex = null
+        },
+    )
+
+    MultiActionPickerSheet(
+        open = multiTargetIndex != null,
+        currentId = id,
+        onDismiss = { multiTargetIndex = null },
+        onPick = { item ->
+            applyStep(multiTargetIndex, MultiActionStep(MultiActionStore.actionCode(item.id), item.name))
+            multiTargetIndex = null
+        },
+    )
+
+    AppPickerSheet(
+        open = appTargetIndex != null,
+        onDismiss = { appTargetIndex = null },
+        onPick = { app ->
+            applyStep(appTargetIndex, MultiActionStep("launch_app:${app.packageName}", app.label))
+            appTargetIndex = null
+        },
+    )
 }
 
 @Composable
@@ -205,6 +574,484 @@ private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun MultiEditHeader(
+    name: String,
+    stepCount: Int,
+    onRename: () -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 14.dp)
+            .clickable(onClick = onRename),
+        shape = RoundedCornerShape(EdgeXRadius.xl),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        border = BorderStroke(1.dp, colors.outline),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            EdgeXIconBox(EdgeXIcons.Multi, contentDescription = null)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(stringResource(R.string.compose_step_count, stepCount), color = colors.onSurfaceDim, fontSize = 13.sp)
+            }
+            EdgeXIcon(EdgeXIcons.Theme, contentDescription = stringResource(R.string.action_rename), tint = colors.onSurfaceDim)
+        }
+    }
+}
+
+@Composable
+private fun EmptyMultiSteps(onAdd: () -> Unit) {
+    val colors = LocalEdgeXColors.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(EdgeXRadius.lg),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        border = BorderStroke(1.dp, colors.outline),
+    ) {
+        Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            EdgeXIconBox(EdgeXIcons.Plus, contentDescription = null)
+            Text(stringResource(R.string.multi_action_empty_steps), color = colors.onSurfaceDim, fontSize = 13.sp)
+            Button(
+                onClick = onAdd,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.accent, contentColor = colors.onAccent),
+            ) {
+                Text(stringResource(R.string.multi_action_add_step), fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiStepCard(
+    index: Int,
+    step: MultiActionStep,
+    onEdit: () -> Unit,
+    onMore: () -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit),
+        shape = RoundedCornerShape(EdgeXRadius.md),
+        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        border = BorderStroke(1.dp, colors.outline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = (index + 1).toString(),
+                color = colors.onAccentSoft,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(colors.accentSoft)
+                    .padding(top = 8.dp),
+            )
+            EdgeXIcon(iconForStep(step), contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(step.label, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(step.code, color = colors.onSurfaceDim, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            EdgeXIconButton(onClick = onMore) {
+                EdgeXIcon(EdgeXIcons.More, contentDescription = null, tint = colors.onSurfaceDim)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepOptionsSheet(
+    step: MultiActionStep?,
+    onDismiss: () -> Unit,
+    onEditAction: () -> Unit,
+    onRename: () -> Unit,
+    onCopy: () -> Unit,
+    onExecute: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    EdgeXBottomSheet(
+        open = step != null,
+        title = step?.label.orEmpty(),
+        onDismissRequest = onDismiss,
+    ) {
+        EdgeXListGroup {
+            val rows = listOf(
+                Triple(R.string.action_edit, EdgeXIcons.Theme, onEditAction),
+                Triple(R.string.multi_action_step_edit_icon_name, EdgeXIcons.Info, onRename),
+                Triple(R.string.copy_copy, EdgeXIcons.Check, onCopy),
+                Triple(R.string.action_execute, EdgeXIcons.Power, onExecute),
+                Triple(R.string.action_delete, EdgeXIcons.ClearBackground, onDelete),
+            )
+            rows.forEachIndexed { index, row ->
+                EdgeXRow(title = stringResource(row.first), icon = row.second, onClick = row.third)
+                if (index != rows.lastIndex) EdgeXDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepActionSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onAction: (MultiStepAction) -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    var searchQuery by remember { mutableStateOf("") }
+    EdgeXBottomSheet(
+        open = open,
+        title = stringResource(R.string.header_action_selection),
+        onDismissRequest = {
+            searchQuery = ""
+            onDismiss()
+        },
+    ) {
+        val query = searchQuery.trim()
+        val filtered = if (query.isBlank()) multiStepActions else multiStepActions.filter { action ->
+            val label = stringResource(action.labelRes)
+            label.contains(query, ignoreCase = true) || action.code.contains(query, ignoreCase = true)
+        }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
+            singleLine = true,
+            shape = RoundedCornerShape(EdgeXRadius.sm),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.outline,
+                cursorColor = colors.accent,
+            ),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                filtered.forEachIndexed { index, action ->
+                    EdgeXRow(
+                        title = stringResource(action.labelRes),
+                        subtitle = if (action.needsDetail) null else action.code,
+                        icon = action.icon,
+                        onClick = { onAction(action) },
+                    ) {
+                        if (action.needsDetail) {
+                            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)
+                        }
+                    }
+                    if (index != filtered.lastIndex) EdgeXDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenameDialog(
+    open: Boolean,
+    title: String,
+    initial: String,
+    hint: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    if (!open) return
+    var value by remember(initial, open) { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                placeholder = { Text(hint) },
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(value.trim()) }) {
+                Text(stringResource(R.string.btn_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun UnsavedDialog(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    if (!open) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.multi_action_unsaved_title)) },
+        text = { Text(stringResource(R.string.multi_action_unsaved_message)) },
+        confirmButton = {
+            TextButton(onClick = onSave) { Text(stringResource(R.string.btn_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDiscard) { Text(stringResource(R.string.multi_action_discard)) }
+        },
+    )
+}
+
+@Composable
+private fun ShellCommandDialog(
+    open: Boolean,
+    existing: String?,
+    onDismiss: () -> Unit,
+    onSave: (String, Boolean) -> Unit,
+) {
+    if (!open) return
+    val parsed = remember(existing, open) { parseShell(existing.orEmpty()) }
+    var command by remember(existing, open) { mutableStateOf(parsed.first) }
+    var runAsRoot by remember(existing, open) { mutableStateOf(parsed.second) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.header_shell_command)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = command,
+                    onValueChange = { command = it },
+                    label = { Text(stringResource(R.string.label_shell_command)) },
+                    placeholder = { Text(stringResource(R.string.hint_shell_command)) },
+                    minLines = 2,
+                )
+                EdgeXSwitchRow(
+                    title = stringResource(R.string.label_run_as_root),
+                    subtitle = stringResource(R.string.desc_run_as_root),
+                    checked = runAsRoot,
+                    onCheckedChange = { runAsRoot = it },
+                    icon = EdgeXIcons.Terminal,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(command.trim(), runAsRoot) }) {
+                Text(stringResource(R.string.btn_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun MusicPickerSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (String, String) -> Unit,
+) {
+    EdgeXBottomSheet(open = open, title = stringResource(R.string.header_music_control), onDismissRequest = onDismiss) {
+        val options = listOf(
+            Triple("play_pause", R.string.action_music_play_pause, R.drawable.ic_music_play_pause),
+            Triple("stop", R.string.action_music_stop, R.drawable.ic_music_stop),
+            Triple("previous", R.string.action_music_previous, R.drawable.ic_music_previous),
+            Triple("next", R.string.action_music_next, R.drawable.ic_music_next),
+        )
+        EdgeXListGroup {
+            options.forEachIndexed { index, option ->
+                val label = stringResource(option.second)
+                EdgeXRow(title = label, icon = option.third, onClick = { onPick(option.first, label) })
+                if (index != options.lastIndex) EdgeXDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiActionPickerSheet(
+    open: Boolean,
+    currentId: String,
+    onDismiss: () -> Unit,
+    onPick: (MultiAction) -> Unit,
+) {
+    val context = LocalContext.current
+    EdgeXBottomSheet(open = open, title = stringResource(R.string.action_multi_action), onDismissRequest = onDismiss) {
+        val items = remember(open) { MultiActionStore.getAll(context.configPrefs()).filter { it.id != currentId } }
+        if (items.isEmpty()) {
+            Text(
+                text = stringResource(R.string.compose_empty_multi_title),
+                color = LocalEdgeXColors.current.onSurfaceDim,
+                modifier = Modifier.padding(18.dp),
+            )
+        } else {
+            EdgeXListGroup {
+                items.forEachIndexed { index, item ->
+                    EdgeXRow(
+                        title = item.name,
+                        subtitle = stringResource(R.string.compose_step_count, item.steps.size),
+                        icon = EdgeXIcons.Multi,
+                        onClick = { onPick(item) },
+                    )
+                    if (index != items.lastIndex) EdgeXDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppPickerSheet(
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onPick: (MultiAppItem) -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = LocalEdgeXColors.current
+    var apps by remember { mutableStateOf(emptyList<MultiAppItem>()) }
+    var query by remember { mutableStateOf("") }
+    LaunchedEffect(open) {
+        if (open && apps.isEmpty()) {
+            apps = withContext(Dispatchers.IO) { context.loadLaunchableApps() }
+        }
+        if (!open) query = ""
+    }
+    EdgeXBottomSheet(open = open, title = stringResource(R.string.action_launch_app), onDismissRequest = onDismiss) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            placeholder = { Text(stringResource(R.string.hint_search_apps), color = colors.onSurfaceDim) },
+            singleLine = true,
+            shape = RoundedCornerShape(EdgeXRadius.sm),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = colors.accent,
+                unfocusedBorderColor = colors.outline,
+                cursorColor = colors.accent,
+            ),
+        )
+        val filtered = remember(apps, query) {
+            val q = query.trim()
+            if (q.isBlank()) apps else apps.filter {
+                it.label.contains(q, ignoreCase = true) || it.packageName.contains(q, ignoreCase = true)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                filtered.forEachIndexed { index, app ->
+                    EdgeXRow(
+                        title = app.label,
+                        subtitle = app.packageName,
+                        icon = EdgeXIcons.LaunchApp,
+                        onClick = { onPick(app) },
+                    )
+                    if (index != filtered.lastIndex) EdgeXDivider()
+                }
+            }
+        }
+    }
+}
+
+private fun parseShell(code: String): Pair<String, Boolean> {
+    if (!code.startsWith("shell:")) return "" to false
+    val parts = code.removePrefix("shell:").split(":", limit = 2)
+    return if (parts.size == 2) parts[1] to (parts[0] == "true") else "" to false
+}
+
+private fun Context.loadLaunchableApps(): List<MultiAppItem> {
+    val pm = packageManager
+    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+    return pm.queryIntentActivities(intent, 0)
+        .map {
+            MultiAppItem(
+                packageName = it.activityInfo.packageName,
+                label = it.loadLabel(pm).toString(),
+            )
+        }
+        .distinctBy { it.packageName }
+        .sortedBy { it.label.lowercase() }
+}
+
+private fun Context.startLegacyStepDetail(code: String, current: MultiActionStep?) {
+    val tempKey = MultiActionStore.tempStepKey()
+    putConfig(tempKey, current?.code.orEmpty())
+    putConfig("${tempKey}_label", current?.label.orEmpty())
+    val intent = when (code) {
+        "app_shortcut" -> Intent(this, ShortcutSelectionActivity::class.java)
+            .putExtra("pref_key", tempKey)
+        "condition" -> Intent(this, ConditionActionActivity::class.java)
+            .putExtra("pref_key", tempKey)
+            .putExtra("title", getString(R.string.header_condition_if))
+        "sub_gesture" -> {
+            putConfigsSync(
+                tempKey to "sub_gesture",
+                "${tempKey}_label" to getString(R.string.action_sub_gesture),
+            )
+            Intent(this, SubGestureActivity::class.java)
+                .putExtra("pref_key", tempKey)
+                .putExtra("title", getString(R.string.header_sub_gesture))
+        }
+        else -> return
+    }
+    startActivity(intent)
+}
+
+private fun iconForStep(step: MultiActionStep): Int = when {
+    step.code == "back" -> R.drawable.ic_arrow_back
+    step.code == "home" -> R.drawable.ic_home
+    step.code == "recents" || step.code == "recent" -> R.drawable.ic_recents
+    step.code == "expand_notifications" -> R.drawable.ic_notifications
+    step.code == "screenshot" -> R.drawable.ic_camera
+    step.code == AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.drawable.ic_partial_screenshot
+    step.code == "lock_screen" -> R.drawable.ic_power
+    step.code == "kill_app" -> R.drawable.ic_kill_app
+    step.code == "clear_background" -> R.drawable.ic_clear_recent
+    step.code == "freezer_drawer" -> R.drawable.ic_freezer
+    step.code == "refreeze" -> R.drawable.ic_refreeze
+    step.code == "clipboard" -> R.drawable.ic_paste
+    step.code == "universal_copy" -> R.drawable.ic_content_copy
+    step.code == "brightness_up" -> R.drawable.ic_brightness_up
+    step.code == "brightness_down" -> R.drawable.ic_brightness_down
+    step.code == "volume_up" -> R.drawable.ic_volume_up
+    step.code == "volume_down" -> R.drawable.ic_volume_down
+    step.code.startsWith("music_control:") -> R.drawable.ic_music
+    step.code.startsWith("launch_app:") -> R.drawable.ic_launch_app
+    step.code.startsWith("app_shortcut:") -> R.drawable.ic_app_shortcut
+    step.code.startsWith("shell:") -> R.drawable.ic_terminal
+    step.code.startsWith("multi_action:") -> R.drawable.ic_multi_action
+    step.code.startsWith("condition:") -> R.drawable.ic_condition
+    else -> R.drawable.ic_action_dot
 }
 
 @Composable
@@ -480,22 +1327,6 @@ private fun ThemePreview(color: Color) {
             }
         }
     }
-}
-
-private fun Context.createMultiAction() {
-    val id = MultiActionStore.generateId()
-    startActivity(
-        Intent(this, MultiActionEditActivity::class.java)
-            .putExtra(MultiActionEditActivity.EXTRA_ID, id)
-            .putExtra(MultiActionEditActivity.EXTRA_IS_NEW, true),
-    )
-}
-
-private fun Context.openMultiActionEdit(id: String) {
-    startActivity(
-        Intent(this, MultiActionEditActivity::class.java)
-            .putExtra(MultiActionEditActivity.EXTRA_ID, id),
-    )
 }
 
 private fun Context.saveUiTheme(accent: EdgeXAccent, dark: Boolean) {
