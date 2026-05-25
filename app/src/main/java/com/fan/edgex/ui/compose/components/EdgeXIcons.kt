@@ -46,6 +46,7 @@ object EdgeXIcons {
     @DrawableRes val Apps = R.drawable.ic_apps
     @DrawableRes val CustomPanel = R.drawable.ic_apps
     @DrawableRes val EdgePanel = R.drawable.ic_edge_panel
+    @DrawableRes val SideBar = R.drawable.ic_side_bar
     @DrawableRes val SideBarLeft = R.drawable.ic_side_bar_left
     @DrawableRes val SideBarRight = R.drawable.ic_side_bar_right
     @DrawableRes val Settings = R.drawable.ic_settings

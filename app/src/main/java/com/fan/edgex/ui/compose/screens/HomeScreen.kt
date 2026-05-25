@@ -238,6 +238,24 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
         }
         TileRow {
             FeatureTile(
+                title = stringResource(R.string.menu_custom_panel),
+                meta = stringResource(R.string.compose_home_custom_panel_meta),
+                icon = EdgeXIcons.CustomPanel,
+                onClick = { callbacks.openRoute(EdgeXRoute.CustomPanel) },
+                tag = "home_tile_custom_panel",
+                modifier = Modifier.weight(1f),
+            )
+            FeatureTile(
+                title = stringResource(R.string.menu_side_bar),
+                meta = stringResource(R.string.compose_home_side_bar_meta),
+                icon = EdgeXIcons.SideBar,
+                onClick = { callbacks.openRoute(EdgeXRoute.SideBar) },
+                tag = "home_tile_side_bar",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        TileRow {
+            FeatureTile(
                 title = stringResource(R.string.action_multi_action),
                 meta = stringResource(R.string.compose_home_multi_meta),
                 icon = EdgeXIcons.Multi,
@@ -251,24 +269,6 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 icon = EdgeXIcons.Theme,
                 onClick = { callbacks.openRoute(EdgeXRoute.Theme) },
                 tag = "home_tile_theme",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        TileRow {
-            FeatureTile(
-                title = stringResource(R.string.menu_custom_panel),
-                meta = stringResource(R.string.compose_home_custom_panel_meta),
-                icon = EdgeXIcons.CustomPanel,
-                onClick = { callbacks.openRoute(EdgeXRoute.CustomPanel) },
-                tag = "home_tile_custom_panel",
-                modifier = Modifier.weight(1f),
-            )
-            FeatureTile(
-                title = stringResource(R.string.menu_side_bar),
-                meta = stringResource(R.string.compose_home_side_bar_meta),
-                icon = EdgeXIcons.SideBarRight,
-                onClick = { callbacks.openRoute(EdgeXRoute.SideBar) },
-                tag = "home_tile_side_bar",
                 modifier = Modifier.weight(1f),
             )
         }
