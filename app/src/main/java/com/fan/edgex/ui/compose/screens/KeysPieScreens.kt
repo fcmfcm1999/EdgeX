@@ -3,12 +3,14 @@ package com.fan.edgex.ui.compose.screens
 import android.content.Context
 import android.content.Intent
 import android.view.KeyEvent
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,15 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,14 +34,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
@@ -49,7 +58,6 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.ui.ActionSelectionActivity
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
-import com.fan.edgex.ui.compose.components.EdgeXChip
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIconBox
@@ -61,9 +69,12 @@ import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
-import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 private data class KeyUiItem(
     val keyCode: Int,
@@ -197,20 +208,49 @@ private enum class PieEdge(val id: String, val labelRes: Int) {
     Bottom("bottom", R.string.compose_edge_bottom_short),
 }
 
+private data class PieSector(val ring: Int, val slot: Int)
+
+private data class PieSlotUi(
+    val sector: PieSector,
+    val label: String,
+    val icon: Int,
+)
+
+private data class PieGeometry(
+    val edge: PieEdge,
+    val anchor: Offset,
+    val innerDeadR: Float,
+    val ring0OuterR: Float,
+    val ring1InnerR: Float,
+    val outerR: Float,
+)
+
 @Composable
 fun PieScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var edge by remember { mutableStateOf(PieEdge.Left) }
     var refreshTick by remember { mutableStateOf(0) }
+    var selectedSector by remember { mutableStateOf(PieSector(ring = 1, slot = 0)) }
     val edgeLabels = mapOf(
         PieEdge.Left to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Left.labelRes)),
         PieEdge.Right to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Right.labelRes)),
         PieEdge.Top to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Top.labelRes)),
         PieEdge.Bottom to stringResource(R.string.compose_edge_label, stringResource(PieEdge.Bottom.labelRes)),
     )
+    val slots = remember(edge, refreshTick) { context.loadPieSlots(edge) }
+    val selectedSlot = slots.firstOrNull { it.sector == selectedSector }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Column(
         modifier = modifier
@@ -218,161 +258,273 @@ fun PieScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         EdgeXTopBar(title = stringResource(R.string.header_pie_settings), onBack = onBack)
-        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-            Text(
-                text = stringResource(R.string.compose_pie_hero),
-                color = LocalEdgeXColors.current.onSurface,
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
-                lineHeight = 31.sp,
-            )
-            Text(
-                text = stringResource(R.string.compose_pie_subtitle),
-                color = LocalEdgeXColors.current.onSurfaceDim,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
         EdgeXSegmentedControl(
             options = PieEdge.entries,
             selected = edge,
             label = { edgeLabels.getValue(it) },
-            onSelected = { edge = it },
+            onSelected = {
+                edge = it
+                selectedSector = PieSector(ring = 1, slot = 0)
+            },
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
+        PieModelEditor(
+            edge = edge,
+            slots = slots,
+            selectedSector = selectedSector,
+            onSlotClick = { sector ->
+                selectedSector = sector
+                context.openActionPicker(
+                    prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot),
+                    title = "${context.getString(edge.labelRes)} / ${context.getString(R.string.pie_ring_slot_label, sector.ring, sector.slot + 1)}",
+                )
+                refreshTick++
+            },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
-        PiePreview(edge = edge, refreshTick = refreshTick)
-        KeySectionLabel(stringResource(R.string.compose_pie_ring_1))
-        PieInnerRingEditor(edge = edge, refreshTick = refreshTick, onEdited = { refreshTick++ })
+        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            EdgeXRow(
+                title = selectedSlot?.label.orEmpty(),
+                subtitle = context.getString(R.string.pie_ring_slot_label, selectedSector.ring, selectedSector.slot + 1),
+                icon = selectedSlot?.icon ?: EdgeXIcons.Check,
+                onClick = {
+                    context.openActionPicker(
+                        prefKey = AppConfig.pieSlot(edge.id, selectedSector.ring, selectedSector.slot),
+                        title = "${context.getString(edge.labelRes)} / ${context.getString(R.string.pie_ring_slot_label, selectedSector.ring, selectedSector.slot + 1)}",
+                    )
+                    refreshTick++
+                },
+            ) {
+                EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+            }
+        }
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
 
 @Composable
-private fun PiePreview(edge: PieEdge, refreshTick: Int) {
+private fun PieModelEditor(
+    edge: PieEdge,
+    slots: List<PieSlotUi>,
+    selectedSector: PieSector,
+    onSlotClick: (PieSector) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = LocalEdgeXColors.current
-    val innerIcons = listOf(EdgeXIcons.Back, EdgeXIcons.Pie, EdgeXIcons.Check, EdgeXIcons.Freeze, EdgeXIcons.Sparkle, EdgeXIcons.ChevronRight)
-    val outerIcons = listOf(EdgeXIcons.Theme, EdgeXIcons.Search, EdgeXIcons.Keys, EdgeXIcons.Keys, EdgeXIcons.Theme, EdgeXIcons.Sparkle)
-    Box(
-        modifier = Modifier
+    val density = LocalDensity.current
+    val previewHeight = 390.dp
+
+    BoxWithConstraints(
+        modifier = modifier
             .fillMaxWidth()
-            .height(300.dp)
-            .padding(top = 8.dp),
-        contentAlignment = Alignment.Center,
+            .height(previewHeight)
+            .clip(RoundedCornerShape(EdgeXRadius.lg))
+            .background(colors.surface)
+            .border(1.dp, colors.outline, RoundedCornerShape(EdgeXRadius.lg)),
     ) {
-        Box(modifier = Modifier.size(280.dp)) {
-            outerIcons.forEachIndexed { index, icon ->
-                PieCircle(
-                    icon = icon,
-                    selected = false,
-                    size = 56,
-                    radius = 110f,
-                    index = index,
-                    count = outerIcons.size,
-                )
-            }
-            innerIcons.forEachIndexed { index, icon ->
-                PieCircle(
-                    icon = icon,
-                    selected = true,
-                    size = 48,
-                    radius = 56f,
-                    index = index,
-                    count = innerIcons.size,
-                )
-            }
+        val geometry = with(density) {
+            pieGeometry(
+                edge = edge,
+                width = maxWidth.toPx(),
+                height = previewHeight.toPx(),
+                sideInset = 18.dp.toPx(),
+                edgePadding = 24.dp.toPx(),
+            )
+        }
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(edge, slots, geometry) {
+                    detectTapGestures { tapOffset ->
+                        geometry.hitTest(tapOffset)?.let(onSlotClick)
+                    }
+                },
+        ) {
+            drawPieModel(geometry, slots, selectedSector, colors.accent, colors.surface2, colors.outline)
+        }
+
+        slots.forEach { slot ->
+            val center = geometry.sectorCenter(slot.sector)
+            val isSelected = slot.sector == selectedSector
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .offset(x = 100.dp, y = 100.dp)
+                    .size(if (isSelected) 36.dp else 32.dp)
+                    .offset {
+                        IntOffset(
+                            x = (center.x - with(density) { if (isSelected) 18.dp.toPx() else 16.dp.toPx() }).roundToInt(),
+                            y = (center.y - with(density) { if (isSelected) 18.dp.toPx() else 16.dp.toPx() }).roundToInt(),
+                        )
+                    }
                     .clip(CircleShape)
-                    .background(colors.accentSoft),
+                    .background(Color.White.copy(alpha = if (isSelected) 0.96f else 0.82f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(stringResource(R.string.compose_pie_center), color = colors.onAccentSoft, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                EdgeXIcon(
+                    imageVector = slot.icon,
+                    contentDescription = null,
+                    tint = colors.accent,
+                    modifier = Modifier.size(if (isSelected) 20.dp else 18.dp),
+                )
             }
+        }
+
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .offset {
+                    IntOffset(
+                        x = (geometry.anchor.x - with(density) { 10.dp.toPx() }).roundToInt(),
+                        y = (geometry.anchor.y - with(density) { 10.dp.toPx() }).roundToInt(),
+                    )
+                }
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.18f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.86f)),
+            )
         }
     }
 }
 
-@Composable
-private fun PieCircle(
-    icon: Int,
-    selected: Boolean,
-    size: Int,
-    radius: Float,
-    index: Int,
-    count: Int,
+private fun Context.loadPieSlots(edge: PieEdge): List<PieSlotUi> {
+    val none = getString(R.string.action_none)
+    return (0 until AppConfig.PIE_RINGS).flatMap { ringIndex ->
+        val ring = ringIndex + 1
+        (0 until AppConfig.PIE_SLOTS_PER_RING).map { slot ->
+            val action = getConfigString(AppConfig.pieSlot(edge.id, ring, slot), "none")
+            val label = getConfigString(AppConfig.pieSlotLabel(edge.id, ring, slot), none)
+                .takeIf { it.isNotBlank() }
+                ?: none
+            PieSlotUi(
+                sector = PieSector(ring, slot),
+                label = label,
+                icon = ActionSelectionActivity.actionIconRes(action),
+            )
+        }
+    }
+}
+
+private fun pieGeometry(
+    edge: PieEdge,
+    width: Float,
+    height: Float,
+    sideInset: Float,
+    edgePadding: Float,
+): PieGeometry {
+    val outerR = when (edge) {
+        PieEdge.Left, PieEdge.Right -> min(width - sideInset - edgePadding, (height - edgePadding) / 1.98f)
+        PieEdge.Top, PieEdge.Bottom -> min((width - edgePadding) / 1.98f, height - sideInset - edgePadding)
+    }.coerceAtLeast(1f)
+    val anchor = when (edge) {
+        PieEdge.Left -> Offset(sideInset, height / 2f)
+        PieEdge.Right -> Offset(width - sideInset, height / 2f)
+        PieEdge.Top -> Offset(width / 2f, sideInset)
+        PieEdge.Bottom -> Offset(width / 2f, height - sideInset)
+    }
+    return PieGeometry(
+        edge = edge,
+        anchor = anchor,
+        innerDeadR = outerR * 90f / 250f,
+        ring0OuterR = outerR * 154f / 250f,
+        ring1InnerR = outerR * 164f / 250f,
+        outerR = outerR,
+    )
+}
+
+private fun DrawScope.drawPieModel(
+    geometry: PieGeometry,
+    slots: List<PieSlotUi>,
+    selectedSector: PieSector,
+    accent: Color,
+    surface: Color,
+    outline: Color,
 ) {
-    val colors = LocalEdgeXColors.current
-    val angle = (index.toFloat() / count.toFloat()) * (PI * 2.0) - PI / 2.0
-    val left = (cos(angle) * radius + 112f).toFloat()
-    val top = (sin(angle) * radius + 112f).toFloat()
-    Box(
-        modifier = Modifier
-            .size(size.dp)
-            .offset(x = left.dp, y = top.dp)
-            .clip(CircleShape)
-            .background(if (selected) colors.accent else colors.surface)
-            .border(1.dp, if (selected) Color.Transparent else colors.outline, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        EdgeXIcon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (selected) colors.onAccent else colors.onSurface2,
-            modifier = Modifier.size(if (selected) 18.dp else 20.dp),
+    slots.forEach { slot ->
+        val isSelected = slot.sector == selectedSector
+        val path = geometry.sectorPath(slot.sector)
+        val fillColor = when {
+            isSelected -> accent.copy(alpha = 0.98f)
+            slot.sector.ring == 1 -> accent.copy(alpha = 0.80f)
+            else -> accent.copy(alpha = 0.64f)
+        }
+        drawPath(path, surface.copy(alpha = 0.22f))
+        drawPath(path, fillColor)
+        drawPath(
+            path = path,
+            color = if (isSelected) Color.White.copy(alpha = 0.88f) else outline.copy(alpha = 0.72f),
+            style = Stroke(width = if (isSelected) 2.4.dp.toPx() else 1.4.dp.toPx()),
         )
     }
 }
 
-@Composable
-private fun PieInnerRingEditor(edge: PieEdge, refreshTick: Int, onEdited: () -> Unit) {
-    val context = LocalContext.current
-    val ring = 1
-    val labels = (0 until AppConfig.PIE_SLOTS_PER_RING).map { slot ->
-        context.getConfigString(AppConfig.pieSlotLabel(edge.id, ring, slot), context.getString(R.string.action_none))
-            .takeIf { it.isNotBlank() && it != context.getString(R.string.action_none) }
-            ?: listOf(
-                context.getString(R.string.action_back),
-                context.getString(R.string.action_home),
-                context.getString(R.string.action_recents),
-                context.getString(R.string.action_lock_screen),
-                context.getString(R.string.action_expand_notifications),
-                context.getString(R.string.action_toggle_flashlight),
-            ).getOrElse(slot) { context.getString(R.string.compose_slot_number, slot + 1) }
-    }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(EdgeXRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = LocalEdgeXColors.current.surface),
-        border = BorderStroke(1.dp, LocalEdgeXColors.current.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            labels.chunked(3).forEachIndexed { rowIndex, row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEachIndexed { indexInRow, label ->
-                        val slot = rowIndex * 3 + indexInRow
-                        EdgeXChip(
-                            label = label + refreshTick.let { "" },
-                            selected = true,
-                            onClick = {
-                                context.openActionPicker(
-                                    prefKey = AppConfig.pieSlot(edge.id, ring, slot),
-                                    title = context.getString(R.string.compose_pie_slot_title, context.getString(edge.labelRes), slot + 1),
-                                )
-                                onEdited()
-                            },
-                        )
-                    }
-                }
-            }
-        }
+private fun PieGeometry.sectorPath(sector: PieSector): Path {
+    val (innerR, outerR) = ringRadii(sector.ring)
+    val startAngle = sectorStartAngle(sector.slot) + PIE_SECTOR_GAP_DEG / 2f
+    val sweep = PIE_FAN_ARC_DEG / AppConfig.PIE_SLOTS_PER_RING - PIE_SECTOR_GAP_DEG
+    return Path().apply {
+        arcTo(Rect(anchor.x - outerR, anchor.y - outerR, anchor.x + outerR, anchor.y + outerR), startAngle, sweep, true)
+        arcTo(Rect(anchor.x - innerR, anchor.y - innerR, anchor.x + innerR, anchor.y + innerR), startAngle + sweep, -sweep, false)
+        close()
     }
 }
+
+private fun PieGeometry.sectorCenter(sector: PieSector): Offset {
+    val (innerR, outerR) = ringRadii(sector.ring)
+    val sweep = PIE_FAN_ARC_DEG / AppConfig.PIE_SLOTS_PER_RING - PIE_SECTOR_GAP_DEG
+    val angle = Math.toRadians((sectorStartAngle(sector.slot) + PIE_SECTOR_GAP_DEG / 2f + sweep / 2f).toDouble())
+    val radius = (innerR + outerR) / 2f
+    return Offset(
+        x = anchor.x + radius * cos(angle).toFloat(),
+        y = anchor.y + radius * sin(angle).toFloat(),
+    )
+}
+
+private fun PieGeometry.hitTest(offset: Offset): PieSector? {
+    val dx = offset.x - anchor.x
+    val dy = offset.y - anchor.y
+    val dist = sqrt(dx * dx + dy * dy)
+    val ring = when {
+        dist >= innerDeadR && dist <= ring0OuterR -> 1
+        dist >= ring1InnerR && dist <= outerR -> 2
+        else -> return null
+    }
+    val angle = normalizeAngle(Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat())
+    val step = PIE_FAN_ARC_DEG / AppConfig.PIE_SLOTS_PER_RING
+    for (slot in 0 until AppConfig.PIE_SLOTS_PER_RING) {
+        val start = normalizeAngle(fanStartAngle() + slot * step)
+        if (isAngleInArc(angle, start, step)) return PieSector(ring, slot)
+    }
+    return null
+}
+
+private fun PieGeometry.ringRadii(ring: Int): Pair<Float, Float> =
+    if (ring == 1) innerDeadR to ring0OuterR else ring1InnerR to outerR
+
+private fun PieGeometry.sectorStartAngle(slot: Int): Float =
+    fanStartAngle() + slot * (PIE_FAN_ARC_DEG / AppConfig.PIE_SLOTS_PER_RING)
+
+private fun PieGeometry.fanStartAngle(): Float = when (edge) {
+    PieEdge.Right -> 100f
+    PieEdge.Left -> -80f
+    PieEdge.Bottom -> 190f
+    PieEdge.Top -> 10f
+}
+
+private fun isAngleInArc(angle: Float, start: Float, sweep: Float): Boolean {
+    val end = normalizeAngle(start + sweep)
+    return if (start <= end) angle in start..end else angle >= start || angle <= end
+}
+
+private fun normalizeAngle(angle: Float): Float = ((angle % 360f) + 360f) % 360f
+
+private const val PIE_FAN_ARC_DEG = 160f
+private const val PIE_SECTOR_GAP_DEG = 1.5f
 
 @Composable
 private fun KeySectionLabel(label: String) {
