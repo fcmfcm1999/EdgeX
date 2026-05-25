@@ -13,13 +13,14 @@ class PieWindow(
     private val pieView = PieView(context)
     private var added = false
 
-    fun show(anchorX: Float, anchorY: Float, edge: String, rings: List<PieView.Ring>, accentColor: Int) {
+    fun show(anchorX: Float, anchorY: Float, edge: String, rings: List<PieView.Ring>, accentColor: Int, sizeScale: Float) {
         if (added) return
         pieView.anchorX = anchorX
         pieView.anchorY = anchorY
         pieView.edge = edge
         pieView.rings = rings
         pieView.accentColor = accentColor
+        pieView.sizeScale = sizeScale
 
         @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams(

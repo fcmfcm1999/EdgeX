@@ -46,6 +46,11 @@ class PieView(context: Context) : View(context) {
 
     var accentColor: Int = Color.rgb(2, 134, 180)
         set(value) { field = value; invalidate() }
+    var sizeScale: Float = 1f
+        set(value) {
+            field = value.coerceIn(0.8f, 1.2f)
+            invalidate()
+        }
 
     private fun colorNormal(ringIndex: Int): Int {
         val hsv = FloatArray(3)
@@ -124,6 +129,7 @@ class PieView(context: Context) : View(context) {
     }
 
     private fun dp(v: Float) = v * resources.displayMetrics.density
+    private fun scaledDp(v: Float) = dp(v * sizeScale)
 
     private fun sp(v: Float) =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, v, resources.displayMetrics)
@@ -138,9 +144,9 @@ class PieView(context: Context) : View(context) {
 
     // Drawing radii (with gap between rings)
     private fun ringDrawInnerR(ringIndex: Int) =
-        if (ringIndex == 0) dp(INNER_DEAD_ZONE_DP) else dp(RING1_DRAW_INNER)
+        if (ringIndex == 0) scaledDp(INNER_DEAD_ZONE_DP) else scaledDp(RING1_DRAW_INNER)
     private fun ringDrawOuterR(ringIndex: Int) =
-        if (ringIndex == 0) dp(RING0_DRAW_OUTER) else dp(OUTER_LIMIT_DP)
+        if (ringIndex == 0) scaledDp(RING0_DRAW_OUTER) else scaledDp(OUTER_LIMIT_DP)
 
     private fun sectorStartAngle(slotIndex: Int, count: Int): Float =
         fanStartAngle() + slotIndex * (FAN_ARC_DEG / count) + SECTOR_GAP_DEG / 2f
@@ -174,8 +180,8 @@ class PieView(context: Context) : View(context) {
     private fun hitRingIndex(dist: Float): Int? {
         val candidates = rings.indices.filter { ringIndex ->
             rings[ringIndex].slots.isNotEmpty() &&
-                dist >= ringDrawInnerR(ringIndex) - dp(HIT_RADIUS_SLOP_DP) &&
-                dist <= ringDrawOuterR(ringIndex) + dp(HIT_RADIUS_SLOP_DP)
+                dist >= ringDrawInnerR(ringIndex) - scaledDp(HIT_RADIUS_SLOP_DP) &&
+                dist <= ringDrawOuterR(ringIndex) + scaledDp(HIT_RADIUS_SLOP_DP)
         }
         if (candidates.isEmpty()) return null
 
@@ -210,7 +216,7 @@ class PieView(context: Context) : View(context) {
         labelPaint.textSize = sp(LABEL_TEXT_SIZE_SP) * scale
         labelPaint.alpha = alpha
 
-        val iconHalf = (dp(ICON_SIZE_DP) / 2f * scale).toInt()
+        val iconHalf = (scaledDp(ICON_SIZE_DP) / 2f * scale).toInt()
 
         rings.forEachIndexed { ringIndex, ring ->
             val n = ring.slots.size
@@ -262,8 +268,8 @@ class PieView(context: Context) : View(context) {
 
         // Center anchor dot
         dotHaloPaint.alpha = (95 * scale).toInt().coerceIn(0, 95)
-        canvas.drawCircle(anchorX, anchorY, dp(15f) * scale, dotHaloPaint)
+        canvas.drawCircle(anchorX, anchorY, scaledDp(15f) * scale, dotHaloPaint)
         dotPaint.alpha = alpha
-        canvas.drawCircle(anchorX, anchorY, dp(4.5f) * scale, dotPaint)
+        canvas.drawCircle(anchorX, anchorY, scaledDp(4.5f) * scale, dotPaint)
     }
 }

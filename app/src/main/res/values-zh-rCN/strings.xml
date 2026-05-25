@@ -516,6 +516,9 @@
     <string name="compose_pie_ring_1">环 · 1 (内层)</string>
     <string name="compose_pie_center">中心</string>
     <string name="compose_pie_slot_title">%1$s边缘 / 环 1 · 槽位 %2$d</string>
+    <string name="compose_pie_size">大小</string>
+    <string name="compose_pie_color_follow_theme">跟随主题色</string>
+    <string name="compose_pie_color_custom">自定义 Pie 颜色</string>
     <string name="compose_slot_number">槽位 %d</string>
     <string name="compose_multi_hero">一个手势\n触发动作序列</string>
     <string name="compose_new">新建</string>

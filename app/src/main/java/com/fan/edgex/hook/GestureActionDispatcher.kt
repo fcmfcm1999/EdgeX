@@ -341,10 +341,26 @@ internal class GestureActionDispatcher(
             })
         }
         if (rings.all { it.slots.isEmpty() }) return
-        PieManager.show(context, anchorX, anchorY, edge, rings, resolveAccentColor())
+        PieManager.show(context, anchorX, anchorY, edge, rings, resolvePieColor(), resolvePieSizeScale())
     }
 
+    private fun resolvePieColor(): Int {
+        val hex = resolveConfig(AppConfig.PIE_COLOR)
+        if (hex.isNotBlank()) {
+            runCatching { android.graphics.Color.parseColor(hex) }.getOrNull()?.let { return it }
+        }
+        return resolveAccentColor()
+    }
+
+    private fun resolvePieSizeScale(): Float =
+        resolveConfig(AppConfig.PIE_SIZE_SCALE)
+            .toFloatOrNull()
+            ?.coerceIn(0.8f, 1.2f)
+            ?: AppConfig.PIE_SIZE_SCALE_DEFAULT
+
     private fun resolveAccentColor(): Int {
+        val uiAccentId = resolveConfig(AppConfig.UI_ACCENT).ifEmpty { "green" }
+        resolveUiAccentColor(uiAccentId)?.let { return it }
         val presetId = resolveConfig(AppConfig.THEME_PRESET).ifEmpty { ThemeManager.PRESET_DEFAULT }
         if (presetId == ThemeManager.PRESET_CUSTOM) {
             val hex = resolveConfig(AppConfig.THEME_CUSTOM_COLOR).ifEmpty { "#326D32" }
@@ -352,6 +368,19 @@ internal class GestureActionDispatcher(
         }
         return ThemeManager.presets.firstOrNull { it.id == presetId }?.accentColor
             ?: ThemeManager.presets.first().accentColor
+    }
+
+    private fun resolveUiAccentColor(id: String): Int? = when (id) {
+        "green" -> android.graphics.Color.rgb(47, 138, 62)
+        "blue" -> android.graphics.Color.rgb(59, 108, 229)
+        "coral" -> android.graphics.Color.rgb(221, 90, 72)
+        "violet" -> android.graphics.Color.rgb(123, 79, 224)
+        "amber" -> android.graphics.Color.rgb(198, 138, 26)
+        "custom" -> {
+            val hex = resolveConfig(AppConfig.THEME_CUSTOM_COLOR)
+            runCatching { android.graphics.Color.parseColor(hex) }.getOrNull()
+        }
+        else -> null
     }
 
     private fun loadActionIcon(context: Context, action: String): Drawable? {

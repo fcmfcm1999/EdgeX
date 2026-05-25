@@ -86,6 +86,9 @@ object AppConfig {
     const val PARTIAL_SCREENSHOT_ACTION = "partial_screenshot"
     const val PIE_RINGS = 2
     const val PIE_SLOTS_PER_RING = 6
+    const val PIE_SIZE_SCALE = "pie_size_scale"
+    const val PIE_COLOR = "pie_color"
+    const val PIE_SIZE_SCALE_DEFAULT = 1.0f
     val PIE_EDGES = listOf("left", "right", "top", "bottom")
 
     fun pieSlot(edge: String, ring: Int, slot: Int) = "pie_${edge}_ring${ring}_slot${slot}"

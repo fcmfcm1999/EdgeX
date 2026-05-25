@@ -537,6 +537,9 @@
     <string name="compose_pie_ring_1">Ring · 1 (Inner)</string>
     <string name="compose_pie_center">Center</string>
     <string name="compose_pie_slot_title">%1$s Edge / Ring 1 · Slot %2$d</string>
+    <string name="compose_pie_size">Size</string>
+    <string name="compose_pie_color_follow_theme">Follow theme color</string>
+    <string name="compose_pie_color_custom">Custom Pie color</string>
     <string name="compose_slot_number">Slot %d</string>
     <string name="compose_multi_hero">One Gesture\nTriggers an Action Sequence</string>
     <string name="compose_new">New</string>
