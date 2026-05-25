@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -131,18 +130,6 @@ fun FreezerScreen(
                 FilterTabs(
                     filter = filter,
                     onFilter = { filter = it },
-                    onRefreeze = {
-                        scope.launch {
-                            showToast(context.getString(R.string.compose_refreezing))
-                            withContext(Dispatchers.IO) {
-                                apps.filter { it.frozen }.forEach {
-                                    runRootCommand("pm disable ${it.packageName}")
-                                }
-                            }
-                            reload()
-                            showToast(context.getString(R.string.compose_refrozen))
-                        }
-                    },
                 )
             }
             if (loading) {
@@ -215,7 +202,7 @@ fun FreezerScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    EdgeXIcon(EdgeXIcons.Sparkle, contentDescription = null)
+                    EdgeXIcon(EdgeXIcons.Refreeze, contentDescription = null)
                     Text(stringResource(R.string.compose_refreeze_all), fontWeight = FontWeight.Bold)
                 }
             }
@@ -295,7 +282,6 @@ private fun SearchBox(query: String, onQueryChange: (String) -> Unit) {
 private fun FilterTabs(
     filter: FreezerFilter,
     onFilter: (FreezerFilter) -> Unit,
-    onRefreeze: () -> Unit,
 ) {
     Row(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
@@ -309,8 +295,6 @@ private fun FilterTabs(
                 onClick = { onFilter(it) },
             )
         }
-        Spacer(modifier = Modifier.weight(1f))
-        EdgeXChip(label = stringResource(R.string.compose_refreeze), selected = false, onClick = onRefreeze)
     }
 }
 

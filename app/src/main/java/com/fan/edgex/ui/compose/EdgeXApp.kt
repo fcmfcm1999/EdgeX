@@ -44,8 +44,8 @@ import kotlinx.coroutines.delay
 enum class EdgeXRoute(@StringRes val labelRes: Int) {
     Home(R.string.compose_route_home),
     Gestures(R.string.header_gestures),
-    Freezer(R.string.header_freezer),
     Keys(R.string.header_keys),
+    Freezer(R.string.header_freezer),
     Pie(R.string.header_pie_settings),
     Multi(R.string.menu_multi_actions),
     Theme(R.string.header_theme),

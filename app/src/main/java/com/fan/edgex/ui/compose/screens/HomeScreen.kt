@@ -173,8 +173,8 @@ private fun HeroCard(stats: HomeStats, moduleActive: Boolean) {
                 .padding(6.dp),
         ) {
             HeroStat("${stats.configuredGestures}", stringResource(R.string.compose_stat_gestures), Modifier.weight(1f))
-            HeroStat("${stats.frozenApps}", stringResource(R.string.compose_stat_frozen), Modifier.weight(1f))
             HeroStat("${stats.keyCount}", stringResource(R.string.compose_stat_keys), Modifier.weight(1f))
+            HeroStat("${stats.frozenApps}", stringResource(R.string.compose_stat_frozen), Modifier.weight(1f))
         }
     }
 }
@@ -210,21 +210,21 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
-                title = stringResource(R.string.menu_freezer),
-                meta = stringResource(R.string.compose_home_freezer_meta, state.stats.frozenApps),
-                icon = EdgeXIcons.Freeze,
-                onClick = { callbacks.openRoute(EdgeXRoute.Freezer) },
-                tag = "home_tile_freezer",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        TileRow {
-            FeatureTile(
                 title = stringResource(R.string.menu_keys),
                 meta = if (state.keysEnabled) stringResource(R.string.compose_enabled) else stringResource(R.string.compose_disabled),
                 icon = EdgeXIcons.Keys,
                 onClick = { callbacks.openRoute(EdgeXRoute.Keys) },
                 tag = "home_tile_keys",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        TileRow {
+            FeatureTile(
+                title = stringResource(R.string.menu_freezer),
+                meta = stringResource(R.string.compose_home_freezer_meta, state.stats.frozenApps),
+                icon = EdgeXIcons.Freeze,
+                onClick = { callbacks.openRoute(EdgeXRoute.Freezer) },
+                tag = "home_tile_freezer",
                 modifier = Modifier.weight(1f),
             )
             FeatureTile(
