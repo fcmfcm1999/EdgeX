@@ -12,8 +12,12 @@ object EdgeXIcons {
     @DrawableRes val Back = R.drawable.ic_arrow_back
     @DrawableRes val Search = R.drawable.ic_search
     @DrawableRes val More = R.drawable.ic_more_vert
-    @DrawableRes val ChevronRight = R.drawable.ic_expand_more
+    @DrawableRes val ChevronRight = R.drawable.ic_chevron_right
     @DrawableRes val Check = R.drawable.ic_action_dot
+    @DrawableRes val Edit = R.drawable.ic_edit
+    @DrawableRes val Save = R.drawable.ic_save
+    @DrawableRes val Duplicate = R.drawable.ic_duplicate
+    @DrawableRes val Execute = R.drawable.ic_execute
     @DrawableRes val Plus = R.drawable.ic_add
     @DrawableRes val Gesture = R.drawable.ic_gesture
     @DrawableRes val Freeze = R.drawable.ic_freezer

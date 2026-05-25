@@ -1,8 +1,12 @@
 package com.fan.edgex.ui.compose.screens
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.widget.ImageView
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.BackHandler
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -70,7 +75,9 @@ import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.config.requestHookActionExecution
+import com.fan.edgex.ui.AppIconPickerActivity
 import com.fan.edgex.ui.ConditionActionActivity
+import com.fan.edgex.ui.MultiActionIconUtils
 import com.fan.edgex.ui.ShortcutSelectionActivity
 import com.fan.edgex.ui.SubGestureActivity
 import com.fan.edgex.ui.ThemeManager
@@ -150,7 +157,24 @@ fun MultiScreen(
     var refreshTick by remember { mutableIntStateOf(0) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var creatingNew by remember { mutableStateOf(false) }
+    var optionsAction by remember { mutableStateOf<MultiAction?>(null) }
+    var renameAction by remember { mutableStateOf<MultiAction?>(null) }
+    var deleteAction by remember { mutableStateOf<MultiAction?>(null) }
+    var pendingIconAction by remember { mutableStateOf<MultiAction?>(null) }
     val items = remember(refreshTick) { MultiActionStore.getAll(context.configPrefs()) }
+    val iconPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val action = pendingIconAction ?: return@rememberLauncherForActivityResult
+        pendingIconAction = null
+        if (result.resultCode == Activity.RESULT_OK) {
+            val newRef = result.data?.getStringExtra(AppIconPickerActivity.EXTRA_ICON_REF) ?: return@rememberLauncherForActivityResult
+            MultiActionIconUtils.deleteIfCustom(context, action.iconRef)
+            MultiActionStore.save(context.configPrefs(), action.copy(iconRef = newRef))
+            context.broadcastFullConfigSnapshot()
+            refreshTick++
+        }
+    }
 
     if (editingId != null) {
         MultiActionEditorScreen(
@@ -200,6 +224,7 @@ fun MultiScreen(
                     items.forEach { item ->
                         MultiActionCard(
                             item = item,
+                            onOptions = { optionsAction = item },
                             onEdit = {
                                 editingId = item.id
                                 creatingNew = false
@@ -230,6 +255,60 @@ fun MultiScreen(
             }
         }
     }
+
+    MultiActionOptionsDialog(
+        action = optionsAction,
+        onDismiss = { optionsAction = null },
+        onEdit = {
+            editingId = it.id
+            creatingNew = false
+            optionsAction = null
+        },
+        onRename = {
+            renameAction = it
+            optionsAction = null
+        },
+        onEditIcon = {
+            pendingIconAction = it
+            optionsAction = null
+            iconPickerLauncher.launch(Intent(context, AppIconPickerActivity::class.java))
+        },
+        onExecute = {
+            context.requestHookActionExecution(MultiActionStore.actionCode(it.id))
+            optionsAction = null
+        },
+        onDelete = {
+            deleteAction = it
+            optionsAction = null
+        },
+    )
+
+    RenameDialog(
+        open = renameAction != null,
+        title = stringResource(R.string.action_rename),
+        initial = renameAction?.name.orEmpty(),
+        hint = stringResource(R.string.multi_action_edit_name_hint),
+        onDismiss = { renameAction = null },
+        onSave = { newName ->
+            val action = renameAction ?: return@RenameDialog
+            MultiActionStore.save(context.configPrefs(), action.copy(name = newName.ifBlank { action.name }))
+            context.broadcastFullConfigSnapshot()
+            renameAction = null
+            refreshTick++
+        },
+    )
+
+    DeleteMultiActionDialog(
+        action = deleteAction,
+        onDismiss = { deleteAction = null },
+        onConfirm = {
+            MultiActionIconUtils.deleteIfCustom(context, it.iconRef)
+            MultiActionStore.delete(context.configPrefs(), it.id)
+            context.broadcastFullConfigSnapshot()
+            deleteAction = null
+            refreshTick++
+        },
+    )
 }
 
 @Composable
@@ -314,7 +393,7 @@ private fun MultiActionEditorScreen(
             onBack = { handleBack() },
             trailing = {
                 EdgeXIconButton(onClick = { save() }, tonal = true) {
-                    EdgeXIcon(EdgeXIcons.Check, contentDescription = stringResource(R.string.btn_save), tint = LocalEdgeXColors.current.onAccentSoft)
+                    EdgeXIcon(EdgeXIcons.Save, contentDescription = stringResource(R.string.btn_save), tint = LocalEdgeXColors.current.onAccentSoft)
                 }
             },
         )
@@ -541,10 +620,16 @@ private fun EmptyMultiState(onCreate: () -> Unit) {
 }
 
 @Composable
-private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit) {
+private fun MultiActionCard(
+    item: MultiAction,
+    onOptions: () -> Unit,
+    onEdit: () -> Unit,
+) {
     val colors = LocalEdgeXColors.current
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOptions),
         shape = RoundedCornerShape(EdgeXRadius.lg),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         border = BorderStroke(1.dp, colors.outline),
@@ -552,28 +637,204 @@ private fun MultiActionCard(item: MultiAction, onEdit: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                EdgeXIcon(EdgeXIcons.Multi, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+                MultiActionIcon(item.iconRef, modifier = Modifier.size(36.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(stringResource(R.string.compose_step_count, item.steps.size), color = colors.onSurfaceDim, fontSize = 12.sp)
                 }
                 EdgeXIconButton(onClick = onEdit) {
-                    EdgeXIcon(EdgeXIcons.Theme, contentDescription = stringResource(R.string.compose_edit), tint = colors.onSurface)
+                    EdgeXIcon(EdgeXIcons.Edit, contentDescription = stringResource(R.string.compose_edit), tint = colors.onSurface)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                item.steps.take(3).forEachIndexed { index, step ->
-                    EdgeXChip(label = stringResource(R.string.compose_step_chip, index + 1, step.label), selected = false, onClick = {})
-                    if (index < item.steps.take(3).lastIndex) {
-                        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(14.dp))
+            val previewSteps = item.steps.take(2)
+            if (previewSteps.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    previewSteps.forEachIndexed { index, step ->
+                        StepPreviewChip(
+                            label = stringResource(R.string.compose_step_chip, index + 1, step.label),
+                            selected = false,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (index < previewSteps.lastIndex) {
+                            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(14.dp))
+                        }
                     }
-                }
-                if (item.steps.size > 3) {
-                    EdgeXChip(label = stringResource(R.string.compose_plus_count, item.steps.size - 3), selected = true, onClick = {})
+                    val remaining = item.steps.size - previewSteps.size
+                    if (remaining > 0) {
+                        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim, modifier = Modifier.size(14.dp))
+                        StepPreviewChip(
+                            label = stringResource(R.string.compose_plus_count, remaining),
+                            selected = true,
+                            modifier = Modifier.width(48.dp),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun StepPreviewChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalEdgeXColors.current
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) colors.accentSoft else colors.surface1)
+            .then(
+                if (selected) {
+                    Modifier
+                } else {
+                    Modifier.border(1.dp, colors.outline, RoundedCornerShape(10.dp))
+                },
+            )
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) colors.onAccentSoft else colors.onSurface2,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun MultiActionIcon(
+    iconRef: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(EdgeXRadius.sm))
+            .background(LocalEdgeXColors.current.accentSoft)
+            .padding(7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        AndroidView(
+            factory = { context ->
+                ImageView(context).apply {
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                }
+            },
+            update = { imageView ->
+                MultiActionIconUtils.applyTo(imageView.context, imageView, iconRef)
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun MultiActionOptionsDialog(
+    action: MultiAction?,
+    onDismiss: () -> Unit,
+    onEdit: (MultiAction) -> Unit,
+    onRename: (MultiAction) -> Unit,
+    onEditIcon: (MultiAction) -> Unit,
+    onExecute: (MultiAction) -> Unit,
+    onDelete: (MultiAction) -> Unit,
+) {
+    if (action == null) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(action.name) },
+        text = {
+            Column {
+                DialogOptionRow(
+                    title = stringResource(R.string.action_edit),
+                    icon = EdgeXIcons.Edit,
+                    onClick = { onEdit(action) },
+                )
+                DialogOptionRow(
+                    title = stringResource(R.string.action_rename),
+                    icon = EdgeXIcons.Edit,
+                    onClick = { onRename(action) },
+                )
+                DialogOptionRow(
+                    title = stringResource(R.string.multi_action_option_edit_icon),
+                    icon = EdgeXIcons.Multi,
+                    onClick = { onEditIcon(action) },
+                )
+                DialogOptionRow(
+                    title = stringResource(R.string.action_execute),
+                    icon = EdgeXIcons.Execute,
+                    onClick = { onExecute(action) },
+                )
+                DialogOptionRow(
+                    title = stringResource(R.string.action_delete),
+                    icon = EdgeXIcons.ClearBackground,
+                    onClick = { onDelete(action) },
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun DialogOptionRow(
+    title: String,
+    icon: Int,
+    onClick: () -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(EdgeXRadius.sm))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        EdgeXIconBox(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(36.dp),
+        )
+        Text(title, color = colors.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+private fun DeleteMultiActionDialog(
+    action: MultiAction?,
+    onDismiss: () -> Unit,
+    onConfirm: (MultiAction) -> Unit,
+) {
+    if (action == null) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.multi_action_option_delete_confirm, action.name)) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(action) }) {
+                Text(stringResource(R.string.action_delete))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -602,7 +863,7 @@ private fun MultiEditHeader(
                 Text(name, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(stringResource(R.string.compose_step_count, stepCount), color = colors.onSurfaceDim, fontSize = 13.sp)
             }
-            EdgeXIcon(EdgeXIcons.Theme, contentDescription = stringResource(R.string.action_rename), tint = colors.onSurfaceDim)
+            EdgeXIcon(EdgeXIcons.Edit, contentDescription = stringResource(R.string.action_rename), tint = colors.onSurfaceDim)
         }
     }
 }
@@ -653,17 +914,21 @@ private fun MultiStepCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = (index + 1).toString(),
-                color = colors.onAccentSoft,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
+            Box(
                 modifier = Modifier
                     .size(32.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(colors.accentSoft)
-                    .padding(top = 8.dp),
-            )
+                    .background(colors.accentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = (index + 1).toString(),
+                    color = colors.onAccentSoft,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    lineHeight = 12.sp,
+                )
+            }
             EdgeXIcon(iconForStep(step), contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(step.label, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -693,10 +958,10 @@ private fun StepOptionsSheet(
     ) {
         EdgeXListGroup {
             val rows = listOf(
-                Triple(R.string.action_edit, EdgeXIcons.Theme, onEditAction),
+                Triple(R.string.action_edit, EdgeXIcons.Edit, onEditAction),
                 Triple(R.string.multi_action_step_edit_icon_name, EdgeXIcons.Info, onRename),
-                Triple(R.string.copy_copy, EdgeXIcons.Check, onCopy),
-                Triple(R.string.action_execute, EdgeXIcons.Power, onExecute),
+                Triple(R.string.multi_action_step_duplicate, EdgeXIcons.Duplicate, onCopy),
+                Triple(R.string.action_execute, EdgeXIcons.Execute, onExecute),
                 Triple(R.string.action_delete, EdgeXIcons.ClearBackground, onDelete),
             )
             rows.forEachIndexed { index, row ->
