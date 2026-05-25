@@ -3,7 +3,7 @@ package com.fan.edgex.ui.compose.screens
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import androidx.appcompat.app.AlertDialog
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +16,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,7 +59,6 @@ import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
-import com.fan.edgex.utils.ActivationDialog
 import com.fan.edgex.utils.DonateDialog
 import com.fan.edgex.utils.UpdateChecker
 import java.text.SimpleDateFormat
@@ -69,12 +75,38 @@ fun PremiumScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val thanksSupport = stringResource(R.string.compose_thanks_support)
     var status by remember { mutableStateOf(PremiumActivator.status(context)) }
     var deactivating by remember { mutableStateOf(false) }
+    var showActivationDialog by remember { mutableStateOf(false) }
+    var showDeactivateDialog by remember { mutableStateOf(false) }
 
     fun refreshStatus() {
         status = PremiumActivator.status(context)
+    }
+
+    if (showActivationDialog) {
+        ActivationCodeDialog(
+            onDismiss = { showActivationDialog = false },
+            onActivated = {
+                showActivationDialog = false
+                refreshStatus()
+            },
+        )
+    }
+
+    if (showDeactivateDialog) {
+        DeactivateConfirmDialog(
+            onDismiss = { showDeactivateDialog = false },
+            onConfirm = {
+                showDeactivateDialog = false
+                deactivating = true
+                deactivateSupporterExtras(context) { message ->
+                    deactivating = false
+                    refreshStatus()
+                    showToast(message)
+                }
+            },
+        )
     }
 
     Column(
@@ -86,19 +118,8 @@ fun PremiumScreen(
         SupporterExtrasHero(
             status = status,
             deactivating = deactivating,
-            onActivate = {
-                ActivationDialog.show(context) { refreshStatus() }
-            },
-            onDeactivate = {
-                showDeactivateConfirmDialog(context) {
-                    deactivating = true
-                    deactivateSupporterExtras(context) { message ->
-                        deactivating = false
-                        refreshStatus()
-                        showToast(message)
-                    }
-                }
-            },
+            onActivate = { showActivationDialog = true },
+            onDeactivate = { showDeactivateDialog = true },
         )
         PremiumSectionLabel(stringResource(R.string.compose_premium_features))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
@@ -114,12 +135,7 @@ fun PremiumScreen(
             }
         }
         PremiumSectionLabel(stringResource(R.string.compose_support_methods))
-        SupportGrid(
-            onDonate = {
-                DonateDialog.show(context)
-                showToast(thanksSupport)
-            },
-        )
+        SupportGrid(showToast = showToast)
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
@@ -133,6 +149,11 @@ private fun SupporterExtrasHero(
 ) {
     val colors = LocalEdgeXColors.current
     val activated = status != PremiumActivator.Status.NotActivated
+    val statusColor = when (status) {
+        PremiumActivator.Status.NotActivated -> Color(0xFFEF5350)
+        PremiumActivator.Status.RebootRequired -> Color(0xFFFFA726)
+        PremiumActivator.Status.Installed -> Color(0xFF66BB6A)
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,7 +178,7 @@ private fun SupporterExtrasHero(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(colors.accent.copy(alpha = 0.18f))
+                        .background(statusColor.copy(alpha = 0.18f))
                         .padding(horizontal = 12.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -169,10 +190,10 @@ private fun SupporterExtrasHero(
                             PremiumActivator.Status.Installed -> EdgeXIcons.Sparkle
                         },
                         contentDescription = null,
-                        tint = colors.accent,
+                        tint = statusColor,
                         modifier = Modifier.size(12.dp),
                     )
-                    Text(premiumStatusText(status), color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(premiumStatusText(status), color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Text(
                     stringResource(R.string.compose_premium_hero),
@@ -180,12 +201,6 @@ private fun SupporterExtrasHero(
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
                     lineHeight = 35.sp,
-                )
-                Text(
-                    text = premiumStatusDescription(status),
-                    color = Color(0xFFF4F0E8).copy(alpha = 0.70f),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
                 )
                 premiumDetailText(status)?.let {
                     Text(it, color = Color(0xFFF4F0E8).copy(alpha = 0.78f), fontSize = 12.sp, lineHeight = 17.sp)
@@ -205,22 +220,43 @@ private fun SupporterExtrasHero(
 }
 
 @Composable
-private fun SupportGrid(onDonate: () -> Unit) {
+private fun SupportGrid(showToast: (String) -> Unit) {
+    val context = LocalContext.current
+    val thanksSupport = stringResource(R.string.compose_thanks_support)
     val methods = listOf(
-        listOf(stringResource(R.string.donate_alipay) to Color(0xFFCFE0FA), stringResource(R.string.donate_wechat) to Color(0xFFC7EFCC)),
-        listOf(stringResource(R.string.donate_kofi) to Color(0xFFFBD7CF), stringResource(R.string.compose_donate_crypto_short) to Color(0xFFE1D5FA)),
+        listOf(
+            Pair(stringResource(R.string.donate_alipay), Color(0xFFCFE0FA)) to {
+                DonateDialog.showAlipayQr(context)
+                showToast(thanksSupport)
+            },
+            Pair(stringResource(R.string.donate_wechat), Color(0xFFC7EFCC)) to {
+                DonateDialog.showWechatQr(context)
+                showToast(thanksSupport)
+            },
+        ),
+        listOf(
+            Pair(stringResource(R.string.donate_kofi), Color(0xFFFBD7CF)) to {
+                DonateDialog.openKofi(context)
+                showToast(thanksSupport)
+            },
+            Pair(stringResource(R.string.compose_donate_crypto_short), Color(0xFFE1D5FA)) to {
+                DonateDialog.showCryptoAddresses(context)
+                showToast(thanksSupport)
+            },
+        ),
     )
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         methods.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { (title, color) ->
+                row.forEach { (item, action) ->
+                    val (title, color) = item
                     Card(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(EdgeXRadius.lg),
                         colors = CardDefaults.cardColors(containerColor = LocalEdgeXColors.current.surface),
                         border = BorderStroke(1.dp, LocalEdgeXColors.current.outline),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        onClick = onDonate,
+                        onClick = action,
                     ) {
                         Row(
                             modifier = Modifier.padding(18.dp),
@@ -277,6 +313,15 @@ fun AboutScreen(
             }
             EdgeXDivider()
             EdgeXRow(
+                title = stringResource(R.string.label_version),
+                subtitle = "v${BuildConfig.VERSION_NAME}",
+                icon = EdgeXIcons.Info,
+                onClick = { (context as? Activity)?.let(UpdateChecker::checkNow) },
+            ) {
+                EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
+            }
+            EdgeXDivider()
+            EdgeXRow(
                 title = stringResource(R.string.compose_about_support_author),
                 subtitle = stringResource(R.string.compose_about_support_author_crypto),
                 icon = EdgeXIcons.Donate,
@@ -289,19 +334,9 @@ fun AboutScreen(
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             EdgeXRow(
                 title = stringResource(R.string.compose_debug_logs),
-                icon = EdgeXIcons.Info,
-                onClick = {
-                    (context as? Activity)?.let(UpdateChecker::checkNow)
-                },
+                icon = EdgeXIcons.DeveloperMode,
+                onClick = { showToast(context.getString(R.string.compose_coming_soon)) },
             )
-            EdgeXDivider()
-            EdgeXRow(
-                title = stringResource(R.string.compose_export_config),
-                icon = EdgeXIcons.Link,
-                onClick = { context.openUrl("https://$projectUrl") },
-            ) {
-                EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
-            }
         }
         Text(
             text = stringResource(R.string.compose_build_info, BuildConfig.VERSION_CODE, BuildConfig.APPLICATION_ID),
@@ -330,7 +365,7 @@ private fun AboutHeader() {
                 .background(Brush.linearGradient(listOf(colors.accent, colors.accentPress))),
             contentAlignment = Alignment.Center,
         ) {
-            EdgeXIcon(EdgeXIcons.Gesture, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(40.dp))
+            EdgeXIcon(R.drawable.ic_launcher_foreground, contentDescription = null, tint = colors.onAccent, modifier = Modifier.size(60.dp))
         }
         Text(stringResource(R.string.app_name), color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 32.sp, modifier = Modifier.padding(top = 16.dp))
         Text(
@@ -397,14 +432,6 @@ private fun premiumStatusText(status: PremiumActivator.Status): String =
     }
 
 @Composable
-private fun premiumStatusDescription(status: PremiumActivator.Status): String =
-    when (status) {
-        PremiumActivator.Status.NotActivated -> stringResource(R.string.compose_premium_hero_subtitle)
-        PremiumActivator.Status.RebootRequired -> stringResource(R.string.premium_desc_reboot)
-        PremiumActivator.Status.Installed -> stringResource(R.string.premium_status_active)
-    }
-
-@Composable
 private fun premiumDetailText(status: PremiumActivator.Status): String? {
     val context = LocalContext.current
     return when (status) {
@@ -424,13 +451,136 @@ private fun premiumDetailText(status: PremiumActivator.Status): String? {
     }
 }
 
-private fun showDeactivateConfirmDialog(context: Context, onConfirm: () -> Unit) {
-    AlertDialog.Builder(context)
-        .setTitle(R.string.premium_deactivate_confirm_title)
-        .setMessage(R.string.premium_deactivate_confirm_message)
-        .setPositiveButton(R.string.premium_deactivate) { _, _ -> onConfirm() }
-        .setNegativeButton(android.R.string.cancel, null)
-        .show()
+@Composable
+private fun DeactivateConfirmDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.premium_deactivate_confirm_title)) },
+        text = { Text(stringResource(R.string.premium_deactivate_confirm_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.premium_deactivate))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ActivationCodeDialog(
+    onDismiss: () -> Unit,
+    onActivated: () -> Unit,
+) {
+    val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var code by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!loading) onDismiss() },
+        title = { Text(stringResource(R.string.premium_activation_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = errorMessage ?: stringResource(R.string.premium_activation_message),
+                    color = if (errorMessage != null) {
+                        androidx.compose.material3.MaterialTheme.colorScheme.error
+                    } else {
+                        LocalEdgeXColors.current.onSurface2
+                    },
+                    fontSize = 14.sp,
+                )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it },
+                    enabled = !loading,
+                    placeholder = { Text(stringResource(R.string.premium_activation_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (code.isBlank()) {
+                        errorMessage = context.getString(R.string.premium_activation_error_empty_code)
+                        return@TextButton
+                    }
+                    loading = true
+                    errorMessage = null
+                    keyboardController?.hide()
+                    thread(name = "EdgeXPremiumActivation") {
+                        val result = PremiumActivator.activate(context.applicationContext, code)
+                        result.onSuccess {
+                            context.mainExecutor.execute {
+                                Toast.makeText(context, R.string.premium_activation_success, Toast.LENGTH_LONG).show()
+                                onActivated()
+                            }
+                        }.onFailure { error ->
+                            context.mainExecutor.execute {
+                                loading = false
+                                errorMessage = context.getString(
+                                    R.string.premium_activation_failed,
+                                    activationFailureMessage(context, error),
+                                )
+                            }
+                        }
+                    }
+                },
+                enabled = !loading,
+            ) {
+                Text(
+                    text = if (loading) stringResource(R.string.premium_activation_in_progress)
+                    else stringResource(R.string.premium_activate),
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !loading) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+private fun activationFailureMessage(context: Context, throwable: Throwable): String {
+    val rawMessage = throwable.message.orEmpty()
+    val message = rawMessage.lowercase()
+    return when {
+        message.contains("activation code is empty") ->
+            context.getString(R.string.premium_activation_error_empty_code)
+        message.contains("invalid code") || message.contains("activation failed (404)") ->
+            context.getString(R.string.premium_activation_error_invalid_code)
+        message.contains("api url is not configured") ->
+            context.getString(R.string.premium_activation_error_not_configured)
+        message.contains("downloaded premium dex hash mismatch") ->
+            context.getString(R.string.premium_activation_error_package_verify)
+        message.contains("unsupported premium version") ->
+            context.getString(R.string.premium_activation_error_unsupported_version)
+        message.contains("download failed") ->
+            context.getString(R.string.premium_activation_error_download)
+        message.contains("root install failed") || message.contains("permission denied") ->
+            context.getString(R.string.premium_activation_error_root)
+        message.contains("timeout") ||
+            message.contains("failed to connect") ||
+            message.contains("unable to resolve host") ||
+            throwable.javaClass.name.startsWith("java.net.") ->
+            context.getString(R.string.premium_activation_error_network)
+        message.contains("activation failed (") || message.contains("request failed (") ->
+            context.getString(R.string.premium_activation_error_server)
+        else -> rawMessage.ifBlank { throwable.javaClass.simpleName }
+    }
 }
 
 private fun deactivateSupporterExtras(context: Context, onComplete: (String) -> Unit) {

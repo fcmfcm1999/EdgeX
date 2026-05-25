@@ -1,5 +1,6 @@
 package com.fan.edgex.ui.compose.screens
 
+import com.fan.edgex.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -390,7 +391,7 @@ private fun AboutSettings(callbacks: HomeCallbacks) {
         }
         EdgeXDivider()
         EdgeXRow(
-            title = "${stringResource(R.string.app_name)} v${stringResource(R.string.value_version)}",
+            title = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
             subtitle = stringResource(R.string.value_project_url),
             icon = EdgeXIcons.About,
             onClick = { callbacks.openRoute(EdgeXRoute.About) },

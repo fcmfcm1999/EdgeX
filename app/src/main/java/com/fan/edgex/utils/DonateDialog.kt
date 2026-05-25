@@ -152,7 +152,11 @@ object DonateDialog {
         }
     }
 
-    private fun showAlipayQr(context: Context) {
+    fun openKofi(context: Context) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(KOFI_URL)))
+    }
+
+    fun showAlipayQr(context: Context) {
         val dp = { dp: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics).toInt() }
 
         val container = LinearLayout(context).apply {
@@ -194,7 +198,7 @@ object DonateDialog {
             }
     }
 
-    private fun showWechatQr(context: Context) {
+    fun showWechatQr(context: Context) {
         val dp = { dp: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics).toInt() }
 
         val container = LinearLayout(context).apply {
@@ -241,7 +245,7 @@ object DonateDialog {
             }
     }
 
-    private fun showCryptoAddresses(context: Context) {
+    fun showCryptoAddresses(context: Context) {
         val dp = { dp: Float -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics).toInt() }
 
         val container = LinearLayout(context).apply {

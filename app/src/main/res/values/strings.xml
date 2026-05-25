@@ -594,7 +594,7 @@
     <string name="compose_about_support_author_crypto">Alipay · WeChat · Crypto</string>
     <string name="compose_developer">Developer</string>
     <string name="compose_debug_logs">Debug Logs</string>
-    <string name="compose_export_config">Export Config</string>
+    <string name="compose_coming_soon">Coming soon</string>
     <string name="compose_about_description">Edge gesture control module based on Xposed framework</string>
     <string name="compose_version_info">v%1$s · 2026</string>
     <string name="compose_build_info">Build %1$d · %2$s</string>
