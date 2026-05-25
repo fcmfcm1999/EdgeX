@@ -110,4 +110,28 @@ object AppConfig {
             "bottom_left", "bottom_mid", "bottom_right" -> "bottom"
             else -> null
         }
+
+    fun isActiveActionValue(value: String): Boolean =
+        value.isNotBlank() && value != "none"
+
+    fun gestureActionParts(key: String): Pair<String, String>? {
+        val gesture = GESTURES.sortedByDescending(String::length)
+            .firstOrNull { key.endsWith("_$it") }
+            ?: return null
+        val zone = key.removeSuffix("_$gesture")
+        return if (zone in ZONES) zone to gesture else null
+    }
+
+    fun keyActionParts(key: String): Pair<Int, String>? {
+        if (!key.startsWith("key_")) return null
+        val trigger = KEY_TRIGGERS.sortedByDescending(String::length)
+            .firstOrNull { key.endsWith("_$it") }
+            ?: return null
+        val keyCode = key
+            .removePrefix("key_")
+            .removeSuffix("_$trigger")
+            .toIntOrNull()
+            ?: return null
+        return keyCode to trigger
+    }
 }

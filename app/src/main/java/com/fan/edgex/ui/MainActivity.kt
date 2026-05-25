@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowInsetsControllerCompat
 import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.broadcastFullConfigSnapshot
+import com.fan.edgex.config.syncRuntimeEnableFlagsFromConfiguredActions
 import com.fan.edgex.ui.compose.EdgeXApp
 import com.fan.edgex.utils.UpdateChecker
 
@@ -16,6 +17,7 @@ class MainActivity : AppCompatActivity() {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
         }
+        syncRuntimeEnableFlagsFromConfiguredActions()
         broadcastFullConfigSnapshot()
         FreezerBootstrap.ensureMigrated(this)
         UpdateChecker.checkOnLaunch(this)

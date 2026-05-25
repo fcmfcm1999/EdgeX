@@ -80,8 +80,6 @@ private val keyItems = listOf(
     KeyUiItem(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, EdgeXIcons.VolumeUp),
     KeyUiItem(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, EdgeXIcons.VolumeDown),
     KeyUiItem(KeyEvent.KEYCODE_POWER, R.string.key_power, EdgeXIcons.Power),
-    KeyUiItem(KeyEvent.KEYCODE_BACK, R.string.key_back, EdgeXIcons.Back),
-    KeyUiItem(KeyEvent.KEYCODE_HOME, R.string.key_home, EdgeXIcons.Home),
 )
 
 private val keyTriggers = listOf(
@@ -331,8 +329,9 @@ private fun PieCircle(
 @Composable
 private fun PieInnerRingEditor(edge: PieEdge, refreshTick: Int, onEdited: () -> Unit) {
     val context = LocalContext.current
+    val ring = 1
     val labels = (0 until AppConfig.PIE_SLOTS_PER_RING).map { slot ->
-        context.getConfigString(AppConfig.pieSlotLabel(edge.id, 0, slot), context.getString(R.string.action_none))
+        context.getConfigString(AppConfig.pieSlotLabel(edge.id, ring, slot), context.getString(R.string.action_none))
             .takeIf { it.isNotBlank() && it != context.getString(R.string.action_none) }
             ?: listOf(
                 context.getString(R.string.action_back),
@@ -362,7 +361,7 @@ private fun PieInnerRingEditor(edge: PieEdge, refreshTick: Int, onEdited: () -> 
                             selected = true,
                             onClick = {
                                 context.openActionPicker(
-                                    prefKey = AppConfig.pieSlot(edge.id, 0, slot),
+                                    prefKey = AppConfig.pieSlot(edge.id, ring, slot),
                                     title = context.getString(R.string.compose_pie_slot_title, context.getString(edge.labelRes), slot + 1),
                                 )
                                 onEdited()

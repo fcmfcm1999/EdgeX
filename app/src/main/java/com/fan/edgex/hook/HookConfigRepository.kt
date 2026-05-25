@@ -70,8 +70,14 @@ internal class HookConfigRepository(
     fun isGesturesEnabled(): Boolean =
         get(AppConfig.GESTURES_ENABLED) == "true"
 
-    fun isZoneEnabled(zone: String): Boolean =
-        get(AppConfig.zoneEnabled(zone)) == "true"
+    fun isZoneEnabled(zone: String): Boolean {
+        val enabledValue = get(AppConfig.zoneEnabled(zone))
+        if (enabledValue.isNotEmpty()) return enabledValue == "true"
+
+        return AppConfig.GESTURES.any { gesture ->
+            AppConfig.isActiveActionValue(get(AppConfig.gestureAction(zone, gesture)))
+        }
+    }
 
     fun get(key: String, defValue: String = ""): String =
         configCache[key] ?: defValue

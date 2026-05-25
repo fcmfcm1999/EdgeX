@@ -22,4 +22,13 @@ class AppConfigContractTest {
         assertTrue(AppConfig.GESTURES.contains("swipe_left"))
         assertTrue(AppConfig.GESTURES.contains("swipe_right"))
     }
+
+    @Test
+    fun actionKeysCanBeMappedBackToRuntimeEnableFlags() {
+        assertEquals("right_mid" to "swipe_left", AppConfig.gestureActionParts("right_mid_swipe_left"))
+        assertEquals(24 to "double_click", AppConfig.keyActionParts("key_24_double_click"))
+        assertTrue(AppConfig.isActiveActionValue("back"))
+        assertEquals(null, AppConfig.gestureActionParts("right_mid_swipe_left_label"))
+        assertEquals(null, AppConfig.keyActionParts("key_24_double_click_label"))
+    }
 }

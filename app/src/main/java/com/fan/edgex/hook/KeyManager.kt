@@ -103,10 +103,15 @@ object KeyManager {
         keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
 
         for (keyCode in SUPPORTED_KEYS.keys) {
-            keyEnabled[keyCode] = configCache[AppConfig.keyEnabled(keyCode)] == "true"
             keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
             keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "double_click")] ?: ""
             keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
+            val enabledValue = configCache[AppConfig.keyEnabled(keyCode)]
+            keyEnabled[keyCode] = if (enabledValue != null) {
+                enabledValue == "true"
+            } else {
+                hasAnyAction(keyCode)
+            }
         }
         
     }
