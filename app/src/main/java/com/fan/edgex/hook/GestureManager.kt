@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.PanelOverlayManager
 import de.robv.android.xposed.XposedBridge
@@ -388,6 +389,9 @@ object GestureManager {
                         log("Execute action request from UI: $action")
                         actionDispatcher.executeKeyAction(action, ctx)
                     }
+                    HookConfigSnapshot.ACTION_HOOK_STATUS_REQUEST -> {
+                        ctx.sendBroadcast(ModuleActivationState.responseIntent(System.currentTimeMillis()))
+                    }
                     HookConfigSnapshot.ACTION_EDGE_LIGHTING -> {
                         if (configRepository.get(AppConfig.EDGE_LIGHTING_ENABLED) != "true") return
 
@@ -433,6 +437,7 @@ object GestureManager {
             val filter = IntentFilter().apply {
                 addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
                 addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+                addAction(HookConfigSnapshot.ACTION_HOOK_STATUS_REQUEST)
                 addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING)
                 addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS)
                 addAction(GameModeManager.ACTION_DISABLE)

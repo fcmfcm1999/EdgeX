@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
@@ -61,6 +62,7 @@ data class HomeUiState(
     val arcDrawer: Boolean,
     val keysEnabled: Boolean,
     val edgeLighting: Boolean,
+    val moduleActive: Boolean,
     val accent: EdgeXAccent,
     val darkMode: Boolean,
 )
@@ -85,6 +87,12 @@ fun EdgeXApp() {
             delay(1800)
             toast = null
         }
+    }
+
+    LaunchedEffect(Unit) {
+        ModuleActivationState.requestRefresh(context)
+        delay(350)
+        refresh()
     }
 
     EdgeXTheme(darkTheme = uiState.darkMode, accent = uiState.accent) {
@@ -191,6 +199,7 @@ private fun Context.readHomeUiState(): HomeUiState =
         arcDrawer = getConfigBool(AppConfig.FREEZER_ARC_DRAWER),
         keysEnabled = getConfigBool(AppConfig.KEYS_ENABLED),
         edgeLighting = getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, default = true),
+        moduleActive = ModuleActivationState.isActive(this),
         accent = EdgeXAccent.fromId(getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Green.id)),
         darkMode = getConfigBool(AppConfig.UI_DARK_MODE),
     )
