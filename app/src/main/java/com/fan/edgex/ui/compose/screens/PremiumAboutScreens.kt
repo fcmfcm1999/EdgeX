@@ -219,13 +219,13 @@ fun AboutScreen(
             EdgeXRow(
                 title = stringResource(R.string.label_author),
                 subtitle = stringResource(R.string.value_author),
-                icon = EdgeXIcons.Check,
+                icon = EdgeXIcons.Person,
             )
             EdgeXDivider()
             EdgeXRow(
                 title = stringResource(R.string.label_project_url),
                 subtitle = projectUrl,
-                icon = EdgeXIcons.Multi,
+                icon = EdgeXIcons.Link,
                 onClick = { context.openUrl("https://$projectUrl") },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
@@ -234,7 +234,7 @@ fun AboutScreen(
             EdgeXRow(
                 title = stringResource(R.string.compose_about_support_author),
                 subtitle = stringResource(R.string.compose_about_support_author_crypto),
-                icon = EdgeXIcons.Sparkle,
+                icon = EdgeXIcons.Donate,
                 onClick = { DonateDialog.show(context) },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
@@ -244,7 +244,7 @@ fun AboutScreen(
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             EdgeXRow(
                 title = stringResource(R.string.compose_debug_logs),
-                icon = EdgeXIcons.Theme,
+                icon = EdgeXIcons.Info,
                 onClick = {
                     (context as? Activity)?.let(UpdateChecker::checkNow)
                 },
@@ -252,7 +252,7 @@ fun AboutScreen(
             EdgeXDivider()
             EdgeXRow(
                 title = stringResource(R.string.compose_export_config),
-                icon = EdgeXIcons.Pie,
+                icon = EdgeXIcons.Link,
                 onClick = { context.openUrl("https://$projectUrl") },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)

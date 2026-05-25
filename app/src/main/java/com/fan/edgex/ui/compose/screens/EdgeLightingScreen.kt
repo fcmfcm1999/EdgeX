@@ -119,7 +119,7 @@ fun EdgeLightingScreen(
                     context.putConfig(AppConfig.EDGE_LIGHTING_ENABLED, it)
                     showToast(context.getString(if (it) R.string.compose_edge_lighting_enabled_toast else R.string.compose_edge_lighting_disabled_toast))
                 },
-                icon = EdgeXIcons.Sparkle,
+                icon = EdgeXIcons.EdgeLighting,
             )
             EdgeXDivider()
             EdgeXSwitchRow(

@@ -347,7 +347,7 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             subtitle = stringResource(R.string.menu_debug_matrix_desc),
             checked = state.debug,
             onCheckedChange = callbacks.setDebug,
-            icon = EdgeXIcons.Theme,
+            icon = EdgeXIcons.DeveloperMode,
         )
         EdgeXDivider()
         EdgeXSwitchRow(
@@ -355,7 +355,7 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             subtitle = if (state.haptic) stringResource(R.string.compose_haptic_enabled_light) else stringResource(R.string.menu_haptic_feedback_desc),
             checked = state.haptic,
             onCheckedChange = callbacks.setHaptic,
-            icon = EdgeXIcons.Gesture,
+            icon = EdgeXIcons.Vibration,
         )
         EdgeXDivider()
         EdgeXSwitchRow(
@@ -363,13 +363,13 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             subtitle = stringResource(R.string.compose_arc_drawer_desc),
             checked = state.arcDrawer,
             onCheckedChange = callbacks.setArcDrawer,
-            icon = EdgeXIcons.Freeze,
+            icon = EdgeXIcons.ArcDrawer,
         )
         EdgeXDivider()
         EdgeXRow(
             title = stringResource(R.string.menu_restart_sysui),
             subtitle = stringResource(R.string.compose_restart_sysui_desc),
-            icon = EdgeXIcons.Sparkle,
+            icon = EdgeXIcons.Restart,
             onClick = { callbacks.showToast(restartToast) },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
@@ -392,7 +392,7 @@ private fun AboutSettings(callbacks: HomeCallbacks) {
         EdgeXRow(
             title = "${stringResource(R.string.app_name)} v${stringResource(R.string.value_version)}",
             subtitle = stringResource(R.string.value_project_url),
-            icon = EdgeXIcons.Gesture,
+            icon = EdgeXIcons.About,
             onClick = { callbacks.openRoute(EdgeXRoute.About) },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
