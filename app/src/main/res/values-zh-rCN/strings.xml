@@ -373,6 +373,8 @@
     <string name="multi_action_edit_name_hint">动作集名称</string>
     <string name="multi_action_step_edit_label_hint">步骤名称</string>
     <string name="multi_action_step_duplicate">复制一份</string>
+    <string name="multi_action_step_move_up">上移</string>
+    <string name="multi_action_step_move_down">下移</string>
     <string name="multi_action_execute_not_supported">无法在应用上下文中执行「%s」</string>
     <string name="multi_action_step_count">%d 个步骤</string>
     <string name="icon_picker_title">选择图标</string>

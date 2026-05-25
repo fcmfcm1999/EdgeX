@@ -18,6 +18,8 @@ object EdgeXIcons {
     @DrawableRes val Save = R.drawable.ic_save
     @DrawableRes val Duplicate = R.drawable.ic_duplicate
     @DrawableRes val Execute = R.drawable.ic_execute
+    @DrawableRes val MoveUp = R.drawable.ic_arrow_drop_up
+    @DrawableRes val MoveDown = R.drawable.ic_arrow_drop_down
     @DrawableRes val Plus = R.drawable.ic_add
     @DrawableRes val Gesture = R.drawable.ic_gesture
     @DrawableRes val Freeze = R.drawable.ic_freezer

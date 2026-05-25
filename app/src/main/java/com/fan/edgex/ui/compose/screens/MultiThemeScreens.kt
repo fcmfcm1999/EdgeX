@@ -470,6 +470,8 @@ private fun MultiActionEditorScreen(
 
     StepOptionsSheet(
         step = optionsStepIndex?.let { steps[it] },
+        canMoveUp = optionsStepIndex?.let { it > 0 } == true,
+        canMoveDown = optionsStepIndex?.let { it < steps.lastIndex } == true,
         onDismiss = { optionsStepIndex = null },
         onEditAction = {
             editingStepIndex = optionsStepIndex
@@ -484,6 +486,26 @@ private fun MultiActionEditorScreen(
         onCopy = {
             val index = optionsStepIndex ?: return@StepOptionsSheet
             steps = steps.toMutableList().also { it.add(index + 1, it[index].copy()) }
+            modified = true
+            optionsStepIndex = null
+        },
+        onMoveUp = {
+            val index = optionsStepIndex ?: return@StepOptionsSheet
+            if (index <= 0) return@StepOptionsSheet
+            steps = steps.toMutableList().also {
+                val step = it.removeAt(index)
+                it.add(index - 1, step)
+            }
+            modified = true
+            optionsStepIndex = null
+        },
+        onMoveDown = {
+            val index = optionsStepIndex ?: return@StepOptionsSheet
+            if (index >= steps.lastIndex) return@StepOptionsSheet
+            steps = steps.toMutableList().also {
+                val step = it.removeAt(index)
+                it.add(index + 1, step)
+            }
             modified = true
             optionsStepIndex = null
         },
@@ -944,10 +966,14 @@ private fun MultiStepCard(
 @Composable
 private fun StepOptionsSheet(
     step: MultiActionStep?,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onDismiss: () -> Unit,
     onEditAction: () -> Unit,
     onRename: () -> Unit,
     onCopy: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onExecute: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -958,16 +984,43 @@ private fun StepOptionsSheet(
     ) {
         EdgeXListGroup {
             val rows = listOf(
-                Triple(R.string.action_edit, EdgeXIcons.Edit, onEditAction),
-                Triple(R.string.multi_action_step_edit_icon_name, EdgeXIcons.Info, onRename),
-                Triple(R.string.multi_action_step_duplicate, EdgeXIcons.Duplicate, onCopy),
-                Triple(R.string.action_execute, EdgeXIcons.Execute, onExecute),
-                Triple(R.string.action_delete, EdgeXIcons.ClearBackground, onDelete),
+                StepOptionRow(R.string.action_edit, EdgeXIcons.Edit, true, onEditAction),
+                StepOptionRow(R.string.multi_action_step_edit_icon_name, EdgeXIcons.Info, true, onRename),
+                StepOptionRow(R.string.multi_action_step_duplicate, EdgeXIcons.Duplicate, true, onCopy),
+                StepOptionRow(R.string.multi_action_step_move_up, EdgeXIcons.MoveUp, canMoveUp, onMoveUp),
+                StepOptionRow(R.string.multi_action_step_move_down, EdgeXIcons.MoveDown, canMoveDown, onMoveDown),
+                StepOptionRow(R.string.action_execute, EdgeXIcons.Execute, true, onExecute),
+                StepOptionRow(R.string.action_delete, EdgeXIcons.ClearBackground, true, onDelete),
             )
             rows.forEachIndexed { index, row ->
-                EdgeXRow(title = stringResource(row.first), icon = row.second, onClick = row.third)
+                StepOptionEdgeRow(row)
                 if (index != rows.lastIndex) EdgeXDivider()
             }
+        }
+    }
+}
+
+private data class StepOptionRow(
+    val titleRes: Int,
+    val icon: Int,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun StepOptionEdgeRow(row: StepOptionRow) {
+    val colors = LocalEdgeXColors.current
+    EdgeXRow(
+        title = stringResource(row.titleRes),
+        icon = row.icon,
+        onClick = if (row.enabled) row.onClick else null,
+    ) {
+        if (!row.enabled) {
+            Text(
+                text = "-",
+                color = colors.onSurfaceDim,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }

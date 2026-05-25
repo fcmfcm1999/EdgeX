@@ -374,6 +374,8 @@
     <string name="multi_action_edit_name_hint">Action set name</string>
     <string name="multi_action_step_edit_label_hint">Step name</string>
     <string name="multi_action_step_duplicate">Duplicate</string>
+    <string name="multi_action_step_move_up">Move up</string>
+    <string name="multi_action_step_move_down">Move down</string>
     <string name="multi_action_execute_not_supported">Cannot execute \"%s\" from app context</string>
     <string name="multi_action_step_count">%d step(s)</string>
     <string name="icon_picker_title">Choose Icon</string>
