@@ -2,6 +2,7 @@ package com.fan.edgex.ui.compose
 
 import android.content.Context
 import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -82,6 +83,17 @@ fun EdgeXApp() {
         toast = message
     }
 
+    fun popRoute() {
+        if (stack.size > 1) {
+            stack.removeAt(stack.lastIndex)
+        }
+    }
+
+    fun popRouteAndRefresh() {
+        refresh()
+        popRoute()
+    }
+
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(1800)
@@ -97,6 +109,13 @@ fun EdgeXApp() {
 
     EdgeXTheme(darkTheme = uiState.darkMode, accent = uiState.accent) {
         val colors = LocalEdgeXColors.current
+        BackHandler(enabled = stack.size > 1) {
+            when (stack.last()) {
+                EdgeXRoute.Gestures,
+                EdgeXRoute.Theme -> popRouteAndRefresh()
+                else -> popRoute()
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -125,59 +144,39 @@ fun EdgeXApp() {
                     ),
                 )
                 EdgeXRoute.Gestures -> GesturesScreen(
-                    onBack = {
-                        refresh()
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRouteAndRefresh,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Freezer -> FreezerScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Keys -> KeysScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Pie -> PieScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                 )
                 EdgeXRoute.Multi -> MultiScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Theme -> ThemeScreen(
-                    onBack = {
-                        refresh()
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRouteAndRefresh,
                     onThemeChanged = ::refresh,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.EdgeLighting -> EdgeLightingScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Premium -> PremiumScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.About -> AboutScreen(
-                    onBack = {
-                        if (stack.size > 1) stack.removeAt(stack.lastIndex)
-                    },
+                    onBack = ::popRoute,
                     showToast = ::showToast,
                 )
             }
