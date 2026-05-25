@@ -3,7 +3,7 @@ package com.fan.edgex.ui.compose.screens
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import androidx.core.net.toUri
+import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
@@ -40,52 +38,79 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
-import com.fan.edgex.config.AppConfig
-import com.fan.edgex.config.getConfigBool
-import com.fan.edgex.config.putConfig
 import com.fan.edgex.license.PremiumActivator
-import com.fan.edgex.ui.PremiumActivity
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
-import com.fan.edgex.ui.compose.components.EdgeXIconBox
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
-import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import com.fan.edgex.utils.ActivationDialog
 import com.fan.edgex.utils.DonateDialog
 import com.fan.edgex.utils.UpdateChecker
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.concurrent.thread
 
 @Composable
 fun PremiumScreen(
     onBack: () -> Unit,
+    onOpenEdgeLighting: () -> Unit,
+    onOpenFluidEffect: () -> Unit,
     showToast: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val thanksSupport = stringResource(R.string.compose_thanks_support)
     var status by remember { mutableStateOf(PremiumActivator.status(context)) }
+    var deactivating by remember { mutableStateOf(false) }
+
+    fun refreshStatus() {
+        status = PremiumActivator.status(context)
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
         EdgeXTopBar(title = stringResource(R.string.compose_premium_title), onBack = onBack)
-        PremiumHero(status)
+        SupporterExtrasHero(
+            status = status,
+            deactivating = deactivating,
+            onActivate = {
+                ActivationDialog.show(context) { refreshStatus() }
+            },
+            onDeactivate = {
+                showDeactivateConfirmDialog(context) {
+                    deactivating = true
+                    deactivateSupporterExtras(context) { message ->
+                        deactivating = false
+                        refreshStatus()
+                        showToast(message)
+                    }
+                }
+            },
+        )
         PremiumSectionLabel(stringResource(R.string.compose_premium_features))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
-            premiumRows().forEachIndexed { index, row ->
-                EdgeXRow(title = row.first, subtitle = row.second, icon = EdgeXIcons.Sparkle) {
+            val rows = premiumRows(
+                onOpenEdgeLighting = onOpenEdgeLighting,
+                onOpenFluidEffect = onOpenFluidEffect,
+            )
+            rows.forEachIndexed { index, row ->
+                EdgeXRow(title = row.title, subtitle = row.subtitle, icon = row.icon, onClick = row.onClick) {
                     EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
                 }
-                if (index != premiumRows().lastIndex) EdgeXDivider()
+                if (index != rows.lastIndex) EdgeXDivider()
             }
         }
         PremiumSectionLabel(stringResource(R.string.compose_support_methods))
@@ -100,8 +125,14 @@ fun PremiumScreen(
 }
 
 @Composable
-private fun PremiumHero(status: PremiumActivator.Status) {
+private fun SupporterExtrasHero(
+    status: PremiumActivator.Status,
+    deactivating: Boolean,
+    onActivate: () -> Unit,
+    onDeactivate: () -> Unit,
+) {
     val colors = LocalEdgeXColors.current
+    val activated = status != PremiumActivator.Status.NotActivated
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -120,10 +151,9 @@ private fun PremiumHero(status: PremiumActivator.Status) {
                     ),
                 )
                 .fillMaxWidth()
-                .height(192.dp)
                 .padding(24.dp),
         ) {
-            Column(modifier = Modifier.align(Alignment.CenterStart)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
@@ -132,8 +162,17 @@ private fun PremiumHero(status: PremiumActivator.Status) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    EdgeXIcon(EdgeXIcons.Sparkle, contentDescription = null, tint = colors.accent, modifier = Modifier.size(12.dp))
-                    Text(stringResource(R.string.compose_premium_badge), color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    EdgeXIcon(
+                        imageVector = when (status) {
+                            PremiumActivator.Status.NotActivated -> EdgeXIcons.Info
+                            PremiumActivator.Status.RebootRequired -> EdgeXIcons.Restart
+                            PremiumActivator.Status.Installed -> EdgeXIcons.Sparkle
+                        },
+                        contentDescription = null,
+                        tint = colors.accent,
+                        modifier = Modifier.size(12.dp),
+                    )
+                    Text(premiumStatusText(status), color = colors.accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Text(
                     stringResource(R.string.compose_premium_hero),
@@ -141,19 +180,25 @@ private fun PremiumHero(status: PremiumActivator.Status) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
                     lineHeight = 35.sp,
-                    modifier = Modifier.padding(top = 14.dp),
                 )
                 Text(
-                    text = if (status == PremiumActivator.Status.NotActivated) {
-                        stringResource(R.string.compose_premium_hero_subtitle)
-                    } else {
-                        premiumStatusText(status)
-                    },
+                    text = premiumStatusDescription(status),
                     color = Color(0xFFF4F0E8).copy(alpha = 0.70f),
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
+                premiumDetailText(status)?.let {
+                    Text(it, color = Color(0xFFF4F0E8).copy(alpha = 0.78f), fontSize = 12.sp, lineHeight = 17.sp)
+                }
+                if (activated) {
+                    Button(onClick = onDeactivate, enabled = !deactivating, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (deactivating) R.string.premium_deactivating else R.string.premium_deactivate))
+                    }
+                } else {
+                    Button(onClick = onActivate, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.premium_activate))
+                    }
+                }
             }
         }
     }
@@ -305,12 +350,31 @@ private fun AboutHeader() {
     }
 }
 
+private data class PremiumRow(
+    val title: String,
+    val subtitle: String,
+    val icon: Int,
+    val onClick: () -> Unit,
+)
+
 @Composable
-private fun premiumRows(): List<Pair<String, String>> =
+private fun premiumRows(
+    onOpenEdgeLighting: () -> Unit,
+    onOpenFluidEffect: () -> Unit,
+): List<PremiumRow> =
     listOf(
-        stringResource(R.string.header_edge_lighting) to stringResource(R.string.compose_premium_feature_edge_lighting),
-        stringResource(R.string.compose_premium_feature_pie_title) to stringResource(R.string.compose_premium_feature_pie),
-        stringResource(R.string.compose_premium_feature_multi_title) to stringResource(R.string.compose_premium_feature_multi),
+        PremiumRow(
+            title = stringResource(R.string.header_edge_lighting),
+            subtitle = stringResource(R.string.menu_edge_lighting_desc),
+            icon = EdgeXIcons.EdgeLighting,
+            onClick = onOpenEdgeLighting,
+        ),
+        PremiumRow(
+            title = stringResource(R.string.header_fluid_effect),
+            subtitle = stringResource(R.string.menu_fluid_effect_desc),
+            icon = EdgeXIcons.FluidEffect,
+            onClick = onOpenFluidEffect,
+        ),
     )
 
 @Composable
@@ -327,10 +391,66 @@ private fun PremiumSectionLabel(label: String) {
 @Composable
 private fun premiumStatusText(status: PremiumActivator.Status): String =
     when (status) {
-        PremiumActivator.Status.NotActivated -> stringResource(R.string.compose_premium_unlock)
+        PremiumActivator.Status.NotActivated -> stringResource(R.string.menu_premium_not_activated)
         PremiumActivator.Status.RebootRequired -> stringResource(R.string.compose_premium_status_reboot)
         PremiumActivator.Status.Installed -> stringResource(R.string.compose_premium_status_installed)
     }
+
+@Composable
+private fun premiumStatusDescription(status: PremiumActivator.Status): String =
+    when (status) {
+        PremiumActivator.Status.NotActivated -> stringResource(R.string.compose_premium_hero_subtitle)
+        PremiumActivator.Status.RebootRequired -> stringResource(R.string.premium_desc_reboot)
+        PremiumActivator.Status.Installed -> stringResource(R.string.premium_status_active)
+    }
+
+@Composable
+private fun premiumDetailText(status: PremiumActivator.Status): String? {
+    val context = LocalContext.current
+    return when (status) {
+        PremiumActivator.Status.NotActivated -> stringResource(R.string.premium_desc_not_activated)
+        PremiumActivator.Status.RebootRequired -> PremiumActivator.getActivationCode(context)?.let {
+            stringResource(R.string.premium_code_label, it)
+        }
+        PremiumActivator.Status.Installed -> buildList {
+            PremiumActivator.getActivationCode(context)?.let {
+                add(context.getString(R.string.premium_code_label, it))
+            }
+            PremiumActivator.getDexInfo(context)?.let { info ->
+                val time = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(info.installedAtMs))
+                add(context.getString(R.string.premium_dex_info, info.apiVersion, info.hashPrefix, time))
+            }
+        }.joinToString("\n").takeIf { it.isNotEmpty() }
+    }
+}
+
+private fun showDeactivateConfirmDialog(context: Context, onConfirm: () -> Unit) {
+    AlertDialog.Builder(context)
+        .setTitle(R.string.premium_deactivate_confirm_title)
+        .setMessage(R.string.premium_deactivate_confirm_message)
+        .setPositiveButton(R.string.premium_deactivate) { _, _ -> onConfirm() }
+        .setNegativeButton(android.R.string.cancel, null)
+        .show()
+}
+
+private fun deactivateSupporterExtras(context: Context, onComplete: (String) -> Unit) {
+    val appContext = context.applicationContext
+    thread(name = "EdgeXPremiumComposeDeactivate") {
+        val result = PremiumActivator.deactivate(appContext)
+        context.mainExecutor.execute {
+            val message = result.fold(
+                onSuccess = { context.getString(R.string.premium_deactivate_success) },
+                onFailure = {
+                    context.getString(
+                        R.string.premium_activation_failed,
+                        it.message ?: it.javaClass.simpleName,
+                    )
+                },
+            )
+            onComplete(message)
+        }
+    }
+}
 
 private fun Context.openUrl(url: String) {
     runCatching {

@@ -27,6 +27,7 @@ import com.fan.edgex.config.putConfig
 import com.fan.edgex.ui.compose.components.EdgeXToast
 import com.fan.edgex.ui.compose.screens.AboutScreen
 import com.fan.edgex.ui.compose.screens.EdgeLightingScreen
+import com.fan.edgex.ui.compose.screens.FluidEffectScreen
 import com.fan.edgex.ui.compose.screens.FreezerScreen
 import com.fan.edgex.ui.compose.screens.GesturesScreen
 import com.fan.edgex.ui.compose.screens.HomeCallbacks
@@ -55,7 +56,8 @@ enum class EdgeXRoute(@StringRes val labelRes: Int) {
     Multi(R.string.menu_multi_actions),
     Theme(R.string.header_theme),
     EdgeLighting(R.string.menu_edge_lighting),
-    Premium(R.string.compose_premium_title),
+    FluidEffect(R.string.menu_fluid_effect),
+    Premium(R.string.menu_premium),
     About(R.string.menu_about),
 }
 
@@ -181,8 +183,14 @@ fun EdgeXApp() {
                     onBack = ::popRoute,
                     showToast = ::showToast,
                 )
+                EdgeXRoute.FluidEffect -> FluidEffectScreen(
+                    onBack = ::popRoute,
+                    showToast = ::showToast,
+                )
                 EdgeXRoute.Premium -> PremiumScreen(
                     onBack = ::popRoute,
+                    onOpenEdgeLighting = { stack.add(EdgeXRoute.EdgeLighting) },
+                    onOpenFluidEffect = { stack.add(EdgeXRoute.FluidEffect) },
                     showToast = ::showToast,
                 )
                 EdgeXRoute.About -> AboutScreen(
