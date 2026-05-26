@@ -39,7 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,9 +102,6 @@ fun EdgeLightingScreen(
     var autoColor by remember { mutableStateOf(context.getConfigBool(AppConfig.EDGE_LIGHTING_AUTO_COLOR, default = true)) }
     var selectedEffect by remember { mutableStateOf(context.getConfigString(AppConfig.EDGE_LIGHTING_EFFECT, AppConfig.EDGE_LIGHTING_EFFECT_BASIC)) }
     var color by remember { mutableStateOf(parseColor(context.getConfigString(AppConfig.EDGE_LIGHTING_COLOR, DEFAULT_COLOR))) }
-    var red by remember { mutableIntStateOf(android.graphics.Color.red(color)) }
-    var green by remember { mutableIntStateOf(android.graphics.Color.green(color)) }
-    var blue by remember { mutableIntStateOf(android.graphics.Color.blue(color)) }
     var widthDp by remember { mutableIntStateOf(context.getConfigString(AppConfig.EDGE_LIGHTING_WIDTH_DP, "5").toIntOrNull()?.coerceIn(1, 20) ?: 5) }
     var durationMs by remember { mutableIntStateOf(context.getConfigString(AppConfig.EDGE_LIGHTING_DURATION_MS, "3000").toIntOrNull()?.coerceIn(500, 10000) ?: 3000) }
     var alphaPct by remember {
@@ -174,23 +171,28 @@ fun EdgeLightingScreen(
             },
         )
         EdgeLightingSectionLabel(stringResource(R.string.edge_lighting_section_color))
-        ColorSettings(
-            red = red,
-            green = green,
-            blue = blue,
-            onRed = {
-                red = it
-                color = saveColor(context, red, green, blue)
-            },
-            onGreen = {
-                green = it
-                color = saveColor(context, red, green, blue)
-            },
-            onBlue = {
-                blue = it
-                color = saveColor(context, red, green, blue)
-            },
-        )
+        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+            EdgeXRow(
+                title = "#%06X".format(0xFFFFFF and color),
+                subtitle = stringResource(R.string.edge_lighting_color),
+                icon = EdgeXIcons.Theme,
+                onClick = {
+                    ColorPickerDialog.show(
+                        context = context,
+                        title = context.getString(R.string.edge_lighting_color),
+                        configKey = AppConfig.EDGE_LIGHTING_COLOR,
+                        defaultColor = DEFAULT_COLOR,
+                    ) { picked -> color = picked }
+                },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(color)),
+                )
+            }
+        }
         EdgeLightingSectionLabel(stringResource(R.string.edge_lighting_section_appearance))
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             ConfigSlider(
@@ -440,38 +442,6 @@ private fun GeneralSettings(
 }
 
 @Composable
-private fun ColorSettings(
-    red: Int,
-    green: Int,
-    blue: Int,
-    onRed: (Int) -> Unit,
-    onGreen: (Int) -> Unit,
-    onBlue: (Int) -> Unit,
-) {
-    val color = Color(red, green, blue)
-    EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
-        ConfigSlider("R", red.toString(), red, 0..255, onValue = onRed)
-        EdgeXDivider()
-        ConfigSlider("G", green.toString(), green, 0..255, onValue = onGreen)
-        EdgeXDivider()
-        ConfigSlider("B", blue.toString(), blue, 0..255, onValue = onBlue)
-        EdgeXDivider()
-        EdgeXRow(
-            title = displayColor(color.toArgb()),
-            subtitle = stringResource(R.string.edge_lighting_color),
-            icon = EdgeXIcons.Theme,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color),
-            )
-        }
-    }
-}
-
-@Composable
 private fun ConfigSlider(
     label: String,
     valueText: String,
@@ -513,17 +483,8 @@ private fun EdgeLightingSectionLabel(label: String) {
     )
 }
 
-private fun saveColor(context: Context, red: Int, green: Int, blue: Int): Int {
-    val color = android.graphics.Color.rgb(red.coerceIn(0, 255), green.coerceIn(0, 255), blue.coerceIn(0, 255))
-    context.putConfig(AppConfig.EDGE_LIGHTING_COLOR, displayColor(color))
-    return color
-}
-
 private fun parseColor(value: String): Int =
     runCatching { android.graphics.Color.parseColor(value) }.getOrElse { android.graphics.Color.CYAN }
-
-private fun displayColor(color: Int): String =
-    String.format("#%06X", 0xFFFFFF and color)
 
 private fun parsePackageList(value: String): Set<String> {
     if (value.isBlank()) return emptySet()

@@ -436,9 +436,9 @@ private fun parseFluidColor(value: String): Int {
                 normalized.substring(4, 6).toInt(16),
             )
             8 -> java.lang.Long.parseLong(normalized, 16).toInt()
-            else -> DEFAULT_COLOR.toLong(16).toInt()
+            else -> Color.parseColor("#$DEFAULT_COLOR")
         }
-    }.getOrDefault(DEFAULT_COLOR.toLong(16).toInt())
+    }.getOrDefault(Color.parseColor("#$DEFAULT_COLOR"))
 }
 
 private fun displayFluidColor(color: Int): String =

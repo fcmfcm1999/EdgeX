@@ -870,6 +870,7 @@ private fun PieOptionsPanel(
     onPieColorChange: (Color) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val colors = LocalEdgeXColors.current
     EdgeXListGroup(modifier = modifier) {
         PieSizeRow(sizeScale = sizeScale, onSizeScaleChange = onSizeScaleChange)
@@ -884,28 +885,18 @@ private fun PieOptionsPanel(
         }
         if (!followThemeColor) {
             EdgeXDivider()
-            PieColorRow(
-                label = "R",
-                value = pieColor.redByte,
-                onValueChange = { onPieColorChange(pieColor.copy(red = it / 255f)) },
-            )
-            EdgeXDivider()
-            PieColorRow(
-                label = "G",
-                value = pieColor.greenByte,
-                onValueChange = { onPieColorChange(pieColor.copy(green = it / 255f)) },
-            )
-            EdgeXDivider()
-            PieColorRow(
-                label = "B",
-                value = pieColor.blueByte,
-                onValueChange = { onPieColorChange(pieColor.copy(blue = it / 255f)) },
-            )
-            EdgeXDivider()
             EdgeXRow(
                 title = pieColor.toHexString(),
                 subtitle = stringResource(R.string.compose_pie_color_custom),
                 icon = EdgeXIcons.Pie,
+                onClick = {
+                    ColorPickerDialog.show(
+                        context = context,
+                        title = context.getString(R.string.compose_pie_color_custom),
+                        configKey = AppConfig.PIE_COLOR,
+                        defaultColor = "%08X".format(colors.accent.toArgb().toLong() and 0xFFFFFFFFL),
+                    ) { picked -> onPieColorChange(Color(picked)) }
+                },
             ) {
                 Box(
                     modifier = Modifier
@@ -943,27 +934,6 @@ private fun PieSizeRow(sizeScale: Float, onSizeScaleChange: (Float) -> Unit) {
                 onSizeScaleChange((value * 100).roundToInt() / 100f)
             },
             valueRange = 0.8f..1.2f,
-            colors = SliderDefaults.colors(
-                thumbColor = colors.accent,
-                activeTrackColor = colors.accent,
-                inactiveTrackColor = colors.surface2,
-            ),
-        )
-    }
-}
-
-@Composable
-private fun PieColorRow(label: String, value: Int, onValueChange: (Int) -> Unit) {
-    val colors = LocalEdgeXColors.current
-    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = colors.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(value.toString(), color = colors.onSurfaceDim)
-        }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 255)) },
-            valueRange = 0f..255f,
             colors = SliderDefaults.colors(
                 thumbColor = colors.accent,
                 activeTrackColor = colors.accent,

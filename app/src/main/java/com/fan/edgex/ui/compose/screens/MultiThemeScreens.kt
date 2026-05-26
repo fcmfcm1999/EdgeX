@@ -33,8 +33,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
@@ -1382,10 +1380,7 @@ fun ThemeScreen(
     val context = LocalContext.current
     var accent by remember { mutableStateOf(EdgeXAccent.fromId(context.getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Green.id))) }
     var dark by remember { mutableStateOf(context.getConfigBool(AppConfig.UI_DARK_MODE)) }
-    var red by remember { mutableIntStateOf((accent.lightAccent.toArgb() shr 16) and 0xFF) }
-    var green by remember { mutableIntStateOf((accent.lightAccent.toArgb() shr 8) and 0xFF) }
-    var blue by remember { mutableIntStateOf(accent.lightAccent.toArgb() and 0xFF) }
-    val customColor = Color(red, green, blue)
+    var customColor by remember { mutableStateOf(accent.lightAccent) }
 
     Column(
         modifier = modifier
@@ -1399,9 +1394,7 @@ fun ThemeScreen(
             selected = accent,
             onSelected = {
                 accent = it
-                red = (it.lightAccent.toArgb() shr 16) and 0xFF
-                green = (it.lightAccent.toArgb() shr 8) and 0xFF
-                blue = it.lightAccent.toArgb() and 0xFF
+                customColor = it.lightAccent
                 context.saveUiTheme(it, dark)
                 onThemeChanged()
                 showToast(context.getString(R.string.compose_theme_saved))
@@ -1423,20 +1416,34 @@ fun ThemeScreen(
             )
         }
         ThemeSectionLabel(stringResource(R.string.compose_theme_custom_rgb))
-        RgbSliders(
-            red = red,
-            green = green,
-            blue = blue,
-            onRed = { red = it },
-            onGreen = { green = it },
-            onBlue = { blue = it },
-            onApply = {
-                ThemeManager.saveCustomColor(context, customColor.toArgb())
-                context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
-                onThemeChanged()
-                showToast(context.getString(R.string.compose_theme_custom_saved))
-            },
-        )
+        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
+            EdgeXRow(
+                title = "#%06X".format(customColor.toArgb() and 0xFFFFFF),
+                subtitle = stringResource(R.string.compose_theme_custom_rgb),
+                icon = EdgeXIcons.Theme,
+                onClick = {
+                    ColorPickerDialog.show(
+                        context = context,
+                        title = context.getString(R.string.compose_theme_custom_rgb),
+                        configKey = AppConfig.UI_ACCENT + "_custom_color",
+                        defaultColor = "#%08X".format(customColor.toArgb().toLong() and 0xFFFFFFFFL),
+                    ) { picked ->
+                        customColor = Color(picked)
+                        ThemeManager.saveCustomColor(context, picked)
+                        context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
+                        onThemeChanged()
+                        showToast(context.getString(R.string.compose_theme_custom_saved))
+                    }
+                },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(customColor),
+                )
+            }
+        }
         ThemePreview(color = customColor)
         Spacer(modifier = Modifier.height(28.dp))
     }
@@ -1546,73 +1553,6 @@ private fun accentName(accent: EdgeXAccent): String =
             EdgeXAccent.Amber -> R.string.compose_theme_amber
         },
     )
-
-@Composable
-private fun RgbSliders(
-    red: Int,
-    green: Int,
-    blue: Int,
-    onRed: (Int) -> Unit,
-    onGreen: (Int) -> Unit,
-    onBlue: (Int) -> Unit,
-    onApply: () -> Unit,
-) {
-    val color = Color(red, green, blue)
-    EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
-        RgbRow("R", red, onRed)
-        EdgeXDivider()
-        RgbRow("G", green, onGreen)
-        EdgeXDivider()
-        RgbRow("B", blue, onBlue)
-        EdgeXDivider()
-        EdgeXRow(
-            title = "#%02X%02X%02X".format(red, green, blue),
-            subtitle = stringResource(R.string.compose_theme_custom_rgb),
-            icon = EdgeXIcons.Theme,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(color),
-            )
-        }
-    }
-    Box(
-        modifier = Modifier
-            .testTag("theme_custom_apply")
-            .fillMaxWidth()
-            .padding(16.dp)
-            .height(48.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(LocalEdgeXColors.current.accent)
-            .clickable(onClick = onApply),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(stringResource(R.string.compose_theme_apply_custom), color = LocalEdgeXColors.current.onAccent, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun RgbRow(label: String, value: Int, onValue: (Int) -> Unit) {
-    val colors = LocalEdgeXColors.current
-    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = colors.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(value.toString(), color = colors.onSurfaceDim, fontFamily = FontFamily.Monospace)
-        }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onValue(it.toInt().coerceIn(0, 255)) },
-            valueRange = 0f..255f,
-            colors = SliderDefaults.colors(
-                thumbColor = colors.accent,
-                activeTrackColor = colors.accent,
-                inactiveTrackColor = colors.surface2,
-            ),
-        )
-    }
-}
 
 @Composable
 private fun ThemePreview(color: Color) {
