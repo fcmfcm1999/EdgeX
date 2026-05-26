@@ -508,7 +508,7 @@ private fun PieModelEditor(
                 val iconBoxSize = with(density) {
                     val (innerR, outerR) = geometry.ringRadii(slot.sector.ring)
                     val ringThicknessDp = (outerR - innerR).toDp()
-                    val baseSize = (ringThicknessDp * 0.58f).coerceIn(20.dp * scale, 30.dp * scale)
+                    val baseSize = (ringThicknessDp * 0.58f).coerceIn(12.dp * scale, 30.dp * scale)
                     if (isSelected) baseSize * 1.12f else baseSize
                 }
                 Box(
