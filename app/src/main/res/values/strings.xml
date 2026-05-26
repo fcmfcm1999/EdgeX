@@ -563,13 +563,6 @@
     <string name="compose_theme_saved">Theme saved</string>
     <string name="compose_theme_custom_saved">Custom color saved</string>
     <string name="compose_theme_apply_custom">Apply custom color</string>
-    <string name="compose_theme_preview_title">Live Preview</string>
-    <string name="compose_theme_preview_subtitle">New accent color applies to buttons, switches, and highlights</string>
-    <string name="compose_theme_default">Default</string>
-    <string name="compose_theme_ocean">Ocean</string>
-    <string name="compose_theme_coral">Coral</string>
-    <string name="compose_theme_violet">Violet</string>
-    <string name="compose_theme_amber">Amber</string>
     <string name="compose_edge_lighting_hero">When notifications arrive\nthe screen starts breathing</string>
     <string name="compose_edge_lighting_enabled">Enable Edge Lighting</string>
     <string name="compose_edge_lighting_enabled_desc">Notification listener will show edge lighting effects</string>

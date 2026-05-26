@@ -542,13 +542,6 @@
     <string name="compose_theme_saved">主题已保存</string>
     <string name="compose_theme_custom_saved">自定义颜色已保存</string>
     <string name="compose_theme_apply_custom">应用自定义颜色</string>
-    <string name="compose_theme_preview_title">实时预览</string>
-    <string name="compose_theme_preview_subtitle">新的强调色将用于按钮、开关和高亮区域</string>
-    <string name="compose_theme_default">默认</string>
-    <string name="compose_theme_ocean">海洋</string>
-    <string name="compose_theme_coral">炭火</string>
-    <string name="compose_theme_violet">雪松</string>
-    <string name="compose_theme_amber">琥珀</string>
     <string name="compose_edge_lighting_hero">通知亮起时\n屏幕开始呼吸</string>
     <string name="compose_edge_lighting_enabled">启用 Edge Lighting</string>
     <string name="compose_edge_lighting_enabled_desc">通知监听服务将显示边缘光效</string>

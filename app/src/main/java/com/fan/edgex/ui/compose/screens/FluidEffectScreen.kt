@@ -147,9 +147,7 @@ fun FluidEffectScreen(
             fluidColorRows.forEachIndexed { index, row ->
                 if (index > 0) EdgeXDivider()
                 val stored = context.getConfigString(row.configKey)
-                val usesDefault = row.allowReset && stored.isBlank()
-                val displayColor = if (usesDefault) globalColor else parseFluidColor(stored.ifBlank { DEFAULT_COLOR })
-                val hexText = if (usesDefault) stringResource(R.string.fluid_effect_color_default) else "#${displayFluidColor(displayColor)}"
+                val displayColor = if (row.allowReset && stored.isBlank()) globalColor else parseFluidColor(stored.ifBlank { DEFAULT_COLOR })
                 EdgeXRow(
                     title = stringResource(row.labelRes),
                     icon = EdgeXIcons.Theme,
@@ -160,6 +158,11 @@ fun FluidEffectScreen(
                             configKey = row.configKey,
                             allowReset = row.allowReset,
                             onSaved = {
+                                if (row.configKey == AppConfig.FLUID_EFFECT_COLOR) {
+                                    for (r in fluidColorRows) {
+                                        if (r.allowReset) context.putConfig(r.configKey, "")
+                                    }
+                                }
                                 globalColor = parseFluidColor(context.getConfigString(AppConfig.FLUID_EFFECT_COLOR, DEFAULT_COLOR))
                                 leftColor = readEdgeColor(context, AppConfig.FLUID_EFFECT_COLOR_LEFT)
                                 rightColor = readEdgeColor(context, AppConfig.FLUID_EFFECT_COLOR_RIGHT)
@@ -170,19 +173,12 @@ fun FluidEffectScreen(
                         )
                     },
                 ) {
-                    Text(
-                        text = hexText,
-                        color = LocalEdgeXColors.current.onSurfaceDim,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp,
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
                     Box(
                         modifier = Modifier
                             .size(28.dp)
-                            .alpha(if (usesDefault) 0.45f else 1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(ComposeColor(displayColor)),
+                            .background(ComposeColor(displayColor))
+                            .border(1.dp, LocalEdgeXColors.current.onSurface.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
                     )
                 }
             }

@@ -29,75 +29,75 @@ enum class EdgeXAccent(
     val darkAccentSoft2: Color,
     val darkOnAccentSoft: Color,
 ) {
-    Green(
-        id = "green",
-        lightAccent = Color(0xFF2F8A3E),
-        lightAccentPress = Color(0xFF237030),
-        lightAccentSoft = Color(0xFFC7EFCC),
-        lightAccentSoft2 = Color(0xFFDCF4DE),
-        lightOnAccentSoft = Color(0xFF0B3D14),
-        darkAccent = Color(0xFF8AD995),
-        darkAccentPress = Color(0xFF6FC97D),
-        darkAccentSoft = Color(0xFF1F4A26),
-        darkAccentSoft2 = Color(0xFF143019),
-        darkOnAccentSoft = Color(0xFFBDF0C5),
+    Default(
+        id = "default",
+        lightAccent = Color(0xFF326D32),
+        lightAccentPress = Color(0xFF275A27),
+        lightAccentSoft = Color(0xFFC8E6C9),
+        lightAccentSoft2 = Color(0xFFDCEEDD),
+        lightOnAccentSoft = Color(0xFF0D3B0D),
+        darkAccent = Color(0xFF8BC88B),
+        darkAccentPress = Color(0xFF6FB86F),
+        darkAccentSoft = Color(0xFF1F4A1F),
+        darkAccentSoft2 = Color(0xFF143014),
+        darkOnAccentSoft = Color(0xFFC8E6C9),
     ),
-    Blue(
-        id = "blue",
-        lightAccent = Color(0xFF3B6CE5),
-        lightAccentPress = Color(0xFF2B58C9),
-        lightAccentSoft = Color(0xFFD5E0FB),
-        lightAccentSoft2 = Color(0xFFE7EDFC),
-        lightOnAccentSoft = Color(0xFF0C2774),
-        darkAccent = Color(0xFFA8C2F6),
-        darkAccentPress = Color(0xFF86A8F0),
-        darkAccentSoft = Color(0xFF1B2A55),
-        darkAccentSoft2 = Color(0xFF0F1B3B),
-        darkOnAccentSoft = Color(0xFFD5E0FB),
+    Classic(
+        id = "classic",
+        lightAccent = Color(0xFF00796B),
+        lightAccentPress = Color(0xFF006055),
+        lightAccentSoft = Color(0xFFB2DFDB),
+        lightAccentSoft2 = Color(0xFFCCF0ED),
+        lightOnAccentSoft = Color(0xFF003D35),
+        darkAccent = Color(0xFF80CBC4),
+        darkAccentPress = Color(0xFF66B8B0),
+        darkAccentSoft = Color(0xFF1A4A44),
+        darkAccentSoft2 = Color(0xFF10302C),
+        darkOnAccentSoft = Color(0xFFB2DFDB),
     ),
-    Coral(
-        id = "coral",
-        lightAccent = Color(0xFFDD5A48),
-        lightAccentPress = Color(0xFFC04432),
-        lightAccentSoft = Color(0xFFFBD7CF),
-        lightAccentSoft2 = Color(0xFFFCE8E3),
-        lightOnAccentSoft = Color(0xFF5B1206),
-        darkAccent = Color(0xFFF0978A),
-        darkAccentPress = Color(0xFFE67F70),
-        darkAccentSoft = Color(0xFF5B1206),
-        darkAccentSoft2 = Color(0xFF3B0A04),
-        darkOnAccentSoft = Color(0xFFFBD7CF),
+    Cedar(
+        id = "cedar",
+        lightAccent = Color(0xFF496B3D),
+        lightAccentPress = Color(0xFF3A5830),
+        lightAccentSoft = Color(0xFFD5E6CC),
+        lightAccentSoft2 = Color(0xFFE5F0DF),
+        lightOnAccentSoft = Color(0xFF1A3014),
+        darkAccent = Color(0xFF9DB893),
+        darkAccentPress = Color(0xFF84A87A),
+        darkAccentSoft = Color(0xFF243D1F),
+        darkAccentSoft2 = Color(0xFF182914),
+        darkOnAccentSoft = Color(0xFFD5E6CC),
     ),
-    Violet(
-        id = "violet",
-        lightAccent = Color(0xFF7B4FE0),
-        lightAccentPress = Color(0xFF6238C8),
-        lightAccentSoft = Color(0xFFE1D5FA),
-        lightAccentSoft2 = Color(0xFFEDE5FC),
-        lightOnAccentSoft = Color(0xFF260A6B),
-        darkAccent = Color(0xFFC5AEF6),
-        darkAccentPress = Color(0xFFAD8EF0),
-        darkAccentSoft = Color(0xFF321B6F),
-        darkAccentSoft2 = Color(0xFF1F1148),
-        darkOnAccentSoft = Color(0xFFE1D5FA),
+    Ocean(
+        id = "ocean",
+        lightAccent = Color(0xFF2F6F8F),
+        lightAccentPress = Color(0xFF245A74),
+        lightAccentSoft = Color(0xFFC5DCE8),
+        lightAccentSoft2 = Color(0xFFDAEAF3),
+        lightOnAccentSoft = Color(0xFF0A3045),
+        darkAccent = Color(0xFF8AB8D4),
+        darkAccentPress = Color(0xFF6FA8C8),
+        darkAccentSoft = Color(0xFF1A3D52),
+        darkAccentSoft2 = Color(0xFF102838),
+        darkOnAccentSoft = Color(0xFFC5DCE8),
     ),
-    Amber(
-        id = "amber",
-        lightAccent = Color(0xFFC68A1A),
-        lightAccentPress = Color(0xFFA87311),
-        lightAccentSoft = Color(0xFFF6E2B4),
-        lightAccentSoft2 = Color(0xFFFBEDC9),
-        lightOnAccentSoft = Color(0xFF3B2402),
-        darkAccent = Color(0xFFEFC56D),
-        darkAccentPress = Color(0xFFDFAE48),
-        darkAccentSoft = Color(0xFF4A3408),
-        darkAccentSoft2 = Color(0xFF2D1F04),
-        darkOnAccentSoft = Color(0xFFF6E2B4),
+    Ember(
+        id = "ember",
+        lightAccent = Color(0xFFC56B2A),
+        lightAccentPress = Color(0xFFA8571E),
+        lightAccentSoft = Color(0xFFF5D8BF),
+        lightAccentSoft2 = Color(0xFFF9E6D4),
+        lightOnAccentSoft = Color(0xFF522408),
+        darkAccent = Color(0xFFE8A66A),
+        darkAccentPress = Color(0xFFDD9050),
+        darkAccentSoft = Color(0xFF4A2E10),
+        darkAccentSoft2 = Color(0xFF301D08),
+        darkOnAccentSoft = Color(0xFFF5D8BF),
     );
 
     companion object {
         fun fromId(id: String?): EdgeXAccent =
-            entries.firstOrNull { it.id == id } ?: Green
+            entries.firstOrNull { it.id == id } ?: Default
     }
 }
 
@@ -136,12 +136,12 @@ object EdgeXRadius {
     val xl = 36.dp
 }
 
-val LocalEdgeXColors = staticCompositionLocalOf { lightEdgeXColors(EdgeXAccent.Green) }
+val LocalEdgeXColors = staticCompositionLocalOf { lightEdgeXColors(EdgeXAccent.Default) }
 
 @Composable
 fun EdgeXTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    accent: EdgeXAccent = EdgeXAccent.Green,
+    accent: EdgeXAccent = EdgeXAccent.Default,
     content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) darkEdgeXColors(accent) else lightEdgeXColors(accent)

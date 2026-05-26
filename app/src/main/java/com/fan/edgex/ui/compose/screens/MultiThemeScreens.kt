@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -1378,7 +1379,7 @@ fun ThemeScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var accent by remember { mutableStateOf(EdgeXAccent.fromId(context.getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Green.id))) }
+    var accent by remember { mutableStateOf(EdgeXAccent.fromId(context.getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Default.id))) }
     var dark by remember { mutableStateOf(context.getConfigBool(AppConfig.UI_DARK_MODE)) }
     var customColor by remember { mutableStateOf(accent.lightAccent) }
 
@@ -1411,7 +1412,7 @@ fun ThemeScreen(
                     context.putConfig(AppConfig.UI_DARK_MODE, it)
                     onThemeChanged()
                 },
-                icon = EdgeXIcons.Theme,
+                icon = EdgeXIcons.DarkMode,
                 modifier = Modifier.testTag("theme_dark_mode"),
             )
         }
@@ -1444,7 +1445,6 @@ fun ThemeScreen(
                 )
             }
         }
-        ThemePreview(color = customColor)
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
@@ -1516,13 +1516,14 @@ private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> U
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
             EdgeXAccent.entries.forEach { accent ->
                 Text(
                     text = accentName(accent),
                     color = LocalEdgeXColors.current.onSurfaceDim,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
@@ -1546,46 +1547,13 @@ private fun ThemeSectionLabel(label: String) {
 private fun accentName(accent: EdgeXAccent): String =
     stringResource(
         when (accent) {
-            EdgeXAccent.Green -> R.string.compose_theme_default
-            EdgeXAccent.Blue -> R.string.compose_theme_ocean
-            EdgeXAccent.Coral -> R.string.compose_theme_coral
-            EdgeXAccent.Violet -> R.string.compose_theme_violet
-            EdgeXAccent.Amber -> R.string.compose_theme_amber
+            EdgeXAccent.Default -> R.string.theme_preset_default
+            EdgeXAccent.Classic -> R.string.theme_preset_classic
+            EdgeXAccent.Cedar -> R.string.theme_preset_cedar
+            EdgeXAccent.Ocean -> R.string.theme_preset_ocean
+            EdgeXAccent.Ember -> R.string.theme_preset_ember
         },
     )
-
-@Composable
-private fun ThemePreview(color: Color) {
-    val colors = LocalEdgeXColors.current
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(EdgeXRadius.lg),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, colors.outline),
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(EdgeXRadius.sm))
-                    .background(color),
-                contentAlignment = Alignment.Center,
-            ) {
-                EdgeXIcon(EdgeXIcons.Gesture, contentDescription = null, tint = Color.White)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.compose_theme_preview_title), color = colors.onSurface, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.compose_theme_preview_subtitle), color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
 
 private fun Context.saveUiTheme(accent: EdgeXAccent, dark: Boolean) {
     putConfig(AppConfig.UI_ACCENT, accent.id)

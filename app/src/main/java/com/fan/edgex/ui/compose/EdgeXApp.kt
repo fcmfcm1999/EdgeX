@@ -217,7 +217,7 @@ private fun Context.readHomeUiState(): HomeUiState =
         keysEnabled = getConfigBool(AppConfig.KEYS_ENABLED),
         edgeLighting = getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, default = true),
         moduleActive = ModuleActivationState.isActive(this),
-        accent = EdgeXAccent.fromId(getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Green.id)),
+        accent = EdgeXAccent.fromId(getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Default.id)),
         darkMode = getConfigBool(AppConfig.UI_DARK_MODE),
     )
 
