@@ -49,8 +49,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigString
+import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.ActionSelectionActivity
+import com.fan.edgex.ui.AppSelectionActivity
+import com.fan.edgex.ui.ConditionActionActivity
+import com.fan.edgex.ui.MultiActionsListActivity
+import com.fan.edgex.ui.MusicControlActivity
+import com.fan.edgex.ui.ShellCommandActivity
+import com.fan.edgex.ui.ShortcutSelectionActivity
+import com.fan.edgex.ui.SubGestureActivity
+import com.fan.edgex.ui.compose.components.ActionSelectionItem
+import com.fan.edgex.ui.compose.components.ActionSelectionSheet
 import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIconBox
 import com.fan.edgex.ui.compose.components.EdgeXIcons
@@ -88,6 +98,7 @@ fun CustomPanelScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var refreshTick by remember { mutableStateOf(0) }
     val slots = remember(refreshTick) { context.loadCustomPanelSlots() }
+    var selectedSlot by remember { mutableStateOf<PanelSlotUi?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -112,17 +123,27 @@ fun CustomPanelScreen(
         )
         CustomPanelPreview(
             slots = slots,
-            onSlotClick = { slot ->
-                context.openPanelActionPicker(
-                    prefKey = slot.key,
-                    title = slot.title,
-                    excludedCodes = arrayOf(AppConfig.CUSTOM_PANEL_ACTION, AppConfig.PIE_ACTION, AppConfig.SUB_GESTURE_ACTION),
-                )
-            },
+            onSlotClick = { slot -> selectedSlot = slot },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Spacer(modifier = Modifier.height(28.dp))
     }
+
+    val panelExcluded = remember {
+        setOf(AppConfig.CUSTOM_PANEL_ACTION, AppConfig.PIE_ACTION, AppConfig.SUB_GESTURE_ACTION)
+    }
+    ActionSelectionSheet(
+        open = selectedSlot != null,
+        title = selectedSlot?.title.orEmpty(),
+        onDismiss = { selectedSlot = null },
+        excludedCodes = panelExcluded,
+        onSelect = { action ->
+            val slot = selectedSlot ?: return@ActionSelectionSheet
+            selectedSlot = null
+            context.handlePanelAction(slot.key, slot.title, action)
+            refreshTick++
+        },
+    )
 }
 
 @Composable
@@ -135,12 +156,13 @@ fun SideBarScreen(
     var side by remember { mutableStateOf(SideBarSide.Left) }
     var refreshTick by remember { mutableStateOf(0) }
     val slots = remember(side, refreshTick) { context.loadSideBarSlots(side) }
+    var selectedSlot by remember { mutableStateOf<PanelSlotUi?>(null) }
     val sideLabels = mapOf(
         SideBarSide.Left to stringResource(SideBarSide.Left.labelRes),
         SideBarSide.Right to stringResource(SideBarSide.Right.labelRes),
     )
     val excluded = remember {
-        arrayOf(
+        setOf(
             AppConfig.SIDE_BAR_LEFT_ACTION,
             AppConfig.SIDE_BAR_RIGHT_ACTION,
             AppConfig.PIE_ACTION,
@@ -179,13 +201,24 @@ fun SideBarScreen(
         SideBarPreview(
             side = side,
             slots = slots,
-            onSlotClick = { slot ->
-                context.openPanelActionPicker(slot.key, slot.title, excluded)
-            },
+            onSlotClick = { slot -> selectedSlot = slot },
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
         Spacer(modifier = Modifier.height(28.dp))
     }
+
+    ActionSelectionSheet(
+        open = selectedSlot != null,
+        title = selectedSlot?.title.orEmpty(),
+        onDismiss = { selectedSlot = null },
+        excludedCodes = excluded,
+        onSelect = { action ->
+            val slot = selectedSlot ?: return@ActionSelectionSheet
+            selectedSlot = null
+            context.handlePanelAction(slot.key, slot.title, action)
+            refreshTick++
+        },
+    )
 }
 
 @Composable
@@ -447,13 +480,50 @@ private fun Context.syncPanelSlotTitles(specs: List<Triple<String, String, Strin
     putConfigsSync(*entries)
 }
 
-private fun Context.openPanelActionPicker(prefKey: String, title: String, excludedCodes: Array<String>) {
-    startActivity(
-        Intent(this, ActionSelectionActivity::class.java)
-            .putExtra("pref_key", prefKey)
-            .putExtra("title", title)
-            .putExtra(ActionSelectionActivity.EXTRA_EXCLUDED_CODES, excludedCodes),
-    )
+private fun Context.handlePanelAction(prefKey: String, title: String, action: ActionSelectionItem) {
+    if (action.needsSecondary) {
+        when (action.code) {
+            "app_shortcut" -> startActivity(
+                Intent(this, ShortcutSelectionActivity::class.java).putExtra("pref_key", prefKey),
+            )
+            "shell_command" -> startActivity(
+                Intent(this, ShellCommandActivity::class.java).putExtra("pref_key", prefKey),
+            )
+            "sub_gesture" -> {
+                putConfig(prefKey, "sub_gesture")
+                putConfig("${prefKey}_label", getString(R.string.action_sub_gesture))
+                startActivity(
+                    Intent(this, SubGestureActivity::class.java)
+                        .putExtra("pref_key", prefKey)
+                        .putExtra("title", title),
+                )
+            }
+            "pie" -> {
+                putConfig(prefKey, "pie")
+                putConfig("${prefKey}_label", getString(R.string.action_pie))
+            }
+            "launch_app" -> startActivity(
+                Intent(this, AppSelectionActivity::class.java).putExtra("pref_key", prefKey),
+            )
+            "music_control" -> startActivity(
+                Intent(this, MusicControlActivity::class.java).putExtra("pref_key", prefKey),
+            )
+            "multi_action" -> startActivity(
+                Intent(this, MultiActionsListActivity::class.java)
+                    .putExtra(MultiActionsListActivity.EXTRA_MODE, MultiActionsListActivity.MODE_PICK)
+                    .putExtra(MultiActionsListActivity.EXTRA_PREF_KEY, prefKey)
+                    .putExtra(MultiActionsListActivity.EXTRA_TITLE, title),
+            )
+            "condition" -> startActivity(
+                Intent(this, ConditionActionActivity::class.java)
+                    .putExtra("pref_key", prefKey)
+                    .putExtra("title", title),
+            )
+        }
+    } else {
+        putConfig(prefKey, action.code)
+        putConfig("${prefKey}_label", getString(action.labelRes))
+    }
 }
 
 private fun Context.loadPanelAppIcon(action: String): Drawable? {
