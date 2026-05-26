@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,7 +56,9 @@ import com.fan.edgex.ui.compose.components.EdgeXIconBox
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
+import com.fan.edgex.ui.compose.components.PhoneFrame
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
+import androidx.compose.ui.graphics.Color
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 
 private enum class SideBarSide(val id: String, val labelRes: Int, val icon: Int) {
@@ -72,6 +75,9 @@ private data class PanelSlotUi(
     val icon: Int,
     val appIcon: Drawable?,
 )
+
+private const val PHONE_FRAME_WIDTH_DP = 176f
+private const val PHONE_FRAME_HEIGHT_DP = 320f
 
 @Composable
 fun CustomPanelScreen(
@@ -197,27 +203,48 @@ private fun CustomPanelPreview(
     onSlotClick: (PanelSlotUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalEdgeXColors.current
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(EdgeXRadius.lg))
-            .background(colors.surface)
-            .border(1.dp, colors.outline, RoundedCornerShape(EdgeXRadius.lg))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        repeat(AppConfig.CUSTOM_PANEL_ROWS) { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                repeat(AppConfig.CUSTOM_PANEL_COLUMNS) { column ->
-                    val slot = slots[row * AppConfig.CUSTOM_PANEL_COLUMNS + column]
-                    PreviewSlot(
-                        slot = slot,
-                        onClick = { onSlotClick(slot) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f),
-                    )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val phoneWidth = minOf(maxWidth, 320.dp)
+        val phoneHeight = phoneWidth * (PHONE_FRAME_HEIGHT_DP / PHONE_FRAME_WIDTH_DP)
+        val scale = phoneWidth / PHONE_FRAME_WIDTH_DP.dp
+        PhoneFrame(width = phoneWidth, height = phoneHeight) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = 24.dp * scale,
+                        bottom = 8.dp * scale,
+                        start = 8.dp * scale,
+                        end = 8.dp * scale,
+                    ),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp * scale))
+                        .background(Color(0xF2303644))
+                        .padding(8.dp * scale),
+                    verticalArrangement = Arrangement.spacedBy(6.dp * scale),
+                ) {
+                    repeat(AppConfig.CUSTOM_PANEL_ROWS) { row ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp * scale),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            repeat(AppConfig.CUSTOM_PANEL_COLUMNS) { column ->
+                                val slot = slots[row * AppConfig.CUSTOM_PANEL_COLUMNS + column]
+                                PreviewSlot(
+                                    slot = slot,
+                                    onClick = { onSlotClick(slot) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f),
+                                    useOverlayStyle = true,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -231,35 +258,33 @@ private fun SideBarPreview(
     onSlotClick: (PanelSlotUi) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = LocalEdgeXColors.current
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(500.dp)
-            .clip(RoundedCornerShape(EdgeXRadius.lg))
-            .background(colors.surface)
-            .border(1.dp, colors.outline, RoundedCornerShape(EdgeXRadius.lg))
-            .padding(18.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .align(if (side == SideBarSide.Left) Alignment.CenterStart else Alignment.CenterEnd)
-                .width(96.dp)
-                .clip(RoundedCornerShape(EdgeXRadius.lg))
-                .background(colors.surface2)
-                .border(1.dp, colors.outlineStrong, RoundedCornerShape(EdgeXRadius.lg))
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            slots.forEach { slot ->
-                PreviewSlot(
-                    slot = slot,
-                    onClick = { onSlotClick(slot) },
+    BoxWithConstraints(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val phoneWidth = minOf(maxWidth, 320.dp)
+        val phoneHeight = phoneWidth * (PHONE_FRAME_HEIGHT_DP / PHONE_FRAME_WIDTH_DP)
+        val scale = phoneWidth / PHONE_FRAME_WIDTH_DP.dp
+        PhoneFrame(width = phoneWidth, height = phoneHeight) {
+            Box(modifier = Modifier.fillMaxSize().padding(6.dp * scale)) {
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    compact = true,
-                )
+                        .align(if (side == SideBarSide.Left) Alignment.CenterStart else Alignment.CenterEnd)
+                        .width(48.dp * scale)
+                        .clip(RoundedCornerShape(10.dp * scale))
+                        .background(Color(0xF2303644))
+                        .padding(4.dp * scale),
+                    verticalArrangement = Arrangement.spacedBy(4.dp * scale),
+                ) {
+                    slots.forEach { slot ->
+                        PreviewSlot(
+                            slot = slot,
+                            onClick = { onSlotClick(slot) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp * scale),
+                            compact = true,
+                            useOverlayStyle = true,
+                        )
+                    }
+                }
             }
         }
     }
@@ -271,38 +296,67 @@ private fun PreviewSlot(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    useOverlayStyle: Boolean = false,
 ) {
     val colors = LocalEdgeXColors.current
     val configured = AppConfig.isActiveActionValue(slot.action)
+    val background = when {
+        useOverlayStyle -> Color.Transparent
+        configured -> colors.accentSoft
+        else -> colors.surface1
+    }
+    val borderModifier = if (useOverlayStyle) {
+        Modifier
+    } else {
+        Modifier.border(
+            1.dp,
+            if (configured) colors.accent else colors.outline,
+            RoundedCornerShape(EdgeXRadius.sm),
+        )
+    }
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(EdgeXRadius.sm))
-            .background(if (configured) colors.accentSoft else colors.surface1)
-            .border(1.dp, if (configured) colors.accent else colors.outline, RoundedCornerShape(EdgeXRadius.sm))
+            .background(background)
+            .then(borderModifier)
             .clickable(onClick = onClick)
-            .padding(if (compact) 6.dp else 8.dp),
+            .padding(
+                when {
+                    compact -> 6.dp
+                    useOverlayStyle -> 5.dp
+                    else -> 8.dp
+                },
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        PanelSlotIcon(slot = slot, configured = configured)
+        PanelSlotIcon(slot = slot, configured = configured, useOverlayStyle = useOverlayStyle)
         if (!compact) {
             Text(
                 text = slot.label,
-                color = if (configured) colors.onAccentSoft else colors.onSurfaceDim,
+                color = if (useOverlayStyle) {
+                    Color.White.copy(alpha = if (configured) 0.9f else 0.62f)
+                } else if (configured) {
+                    colors.onAccentSoft
+                } else {
+                    colors.onSurfaceDim
+                },
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier.padding(top = if (useOverlayStyle) 3.dp else 6.dp),
             )
         }
     }
 }
 
 @Composable
-private fun PanelSlotIcon(slot: PanelSlotUi, configured: Boolean) {
+private fun PanelSlotIcon(slot: PanelSlotUi, configured: Boolean, useOverlayStyle: Boolean) {
     val colors = LocalEdgeXColors.current
-    Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+    val iconBoxSize = if (useOverlayStyle) 24.dp else 34.dp
+    val appIconSize = if (useOverlayStyle) 22.dp else 28.dp
+    Box(modifier = Modifier.size(iconBoxSize), contentAlignment = Alignment.Center) {
         if (slot.appIcon != null) {
             AndroidView(
                 factory = { context ->
@@ -312,10 +366,22 @@ private fun PanelSlotIcon(slot: PanelSlotUi, configured: Boolean) {
                     val drawable = slot.appIcon.constantState?.newDrawable()?.mutate() ?: slot.appIcon
                     imageView.setImageDrawable(drawable)
                 },
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(appIconSize),
             )
         } else if (configured) {
-            EdgeXIcon(slot.icon, contentDescription = null, tint = colors.accent, modifier = Modifier.size(20.dp))
+            EdgeXIcon(
+                slot.icon,
+                contentDescription = null,
+                tint = if (useOverlayStyle) Color.White.copy(alpha = 0.9f) else colors.accent,
+                modifier = Modifier.size(20.dp),
+            )
+        } else if (useOverlayStyle) {
+            EdgeXIcon(
+                EdgeXIcons.Plus,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.62f),
+                modifier = Modifier.size(20.dp),
+            )
         } else {
             EdgeXIconBox(
                 imageVector = EdgeXIcons.Plus,

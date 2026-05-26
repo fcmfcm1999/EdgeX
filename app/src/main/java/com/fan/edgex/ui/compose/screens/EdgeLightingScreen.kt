@@ -68,6 +68,7 @@ import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
+import com.fan.edgex.ui.compose.components.PhoneFrame
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import org.json.JSONArray
 import kotlin.math.PI
@@ -278,15 +279,7 @@ private fun EdgeLightingPreview(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .width(176.dp)
-                .height(320.dp)
-                .clip(RoundedCornerShape(30.dp))
-                .background(Color(0xFF1D2018))
-                .border(1.dp, colors.accent.copy(alpha = 0.24f), RoundedCornerShape(30.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
+        PhoneFrame {
             AndroidView(
                 factory = { context ->
                     EdgeLightingView(context).also { previewView = it }
@@ -299,15 +292,6 @@ private fun EdgeLightingPreview(
                     view.effect = effect
                 },
                 modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 11.dp)
-                    .width(24.dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(Color.White.copy(alpha = 0.35f)),
             )
             Row(
                 modifier = Modifier

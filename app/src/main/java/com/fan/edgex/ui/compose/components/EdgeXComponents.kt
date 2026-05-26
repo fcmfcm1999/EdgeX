@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,6 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
@@ -390,3 +392,33 @@ fun Modifier.noRippleClickable(onClick: () -> Unit): Modifier =
         indication = null,
         onClick = onClick,
     )
+
+@Composable
+fun PhoneFrame(
+    modifier: Modifier = Modifier,
+    width: Dp = 176.dp,
+    height: Dp = 320.dp,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    Box(
+        modifier = modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(30.dp))
+            .background(Color(0xFF1D2018))
+            .border(1.dp, colors.accent.copy(alpha = 0.24f), RoundedCornerShape(30.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 11.dp)
+                .width(24.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.35f)),
+        )
+        content()
+    }
+}
