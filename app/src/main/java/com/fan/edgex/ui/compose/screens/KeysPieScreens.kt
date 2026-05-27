@@ -130,6 +130,11 @@ fun KeysScreen(
     var pickingTrigger by remember { mutableStateOf<Pair<KeyUiItem, KeyTrigger>?>(null) }
     var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
 
+    fun setKeyEnabled(key: KeyUiItem, enabled: Boolean) {
+        context.putConfig(AppConfig.keyEnabled(key.keyCode), enabled)
+        refreshTick++
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -160,17 +165,18 @@ fun KeysScreen(
         KeySectionLabel(stringResource(R.string.compose_key_mapping))
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             keyItems.forEachIndexed { index, item ->
+                val keyEnabled = context.keyEnabledState(item.keyCode, refreshTick)
+                val statusLabel = stringResource(if (keyEnabled) R.string.compose_enabled else R.string.compose_disabled)
                 EdgeXRow(
                     title = stringResource(item.titleRes),
-                    subtitle = context.keySubtitle(
-                        keyCode = item.keyCode,
-                        refreshTick = refreshTick,
-                        defaultConfigured = masterEnabled && index < 3,
-                    ),
+                    subtitle = "$statusLabel · ${context.keySubtitle(item.keyCode, refreshTick)}",
                     icon = item.icon,
                     onClick = { selectedKey = item },
                 ) {
-                    EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+                    EdgeXSwitch(
+                        checked = keyEnabled,
+                        onCheckedChange = { setKeyEnabled(item, it) },
+                    )
                 }
                 if (index != keyItems.lastIndex) EdgeXDivider()
             }
@@ -181,6 +187,7 @@ fun KeysScreen(
         key = selectedKey,
         refreshTick = refreshTick,
         onDismiss = { selectedKey = null },
+        onKeyEnabledChange = ::setKeyEnabled,
         onTriggerClick = { key, trigger, _ ->
             pickingTrigger = key to trigger
             selectedKey = null
@@ -242,11 +249,22 @@ private fun KeyDetailSheet(
     key: KeyUiItem?,
     refreshTick: Int,
     onDismiss: () -> Unit,
+    onKeyEnabledChange: (KeyUiItem, Boolean) -> Unit,
     onTriggerClick: (KeyUiItem, KeyTrigger, String) -> Unit,
 ) {
     val context = LocalContext.current
     EdgeXBottomSheet(open = key != null, title = key?.let { stringResource(it.titleRes) }.orEmpty(), onDismissRequest = onDismiss) {
         if (key == null) return@EdgeXBottomSheet
+        EdgeXListGroup {
+            val keyEnabled = context.keyEnabledState(key.keyCode, refreshTick)
+            EdgeXSwitchRow(
+                title = stringResource(R.string.key_enabled),
+                subtitle = stringResource(if (keyEnabled) R.string.compose_enabled else R.string.compose_disabled),
+                checked = keyEnabled,
+                onCheckedChange = { onKeyEnabledChange(key, it) },
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
         EdgeXListGroup {
             keyTriggers.forEachIndexed { index, trigger ->
                 val actionTitle = stringResource(
@@ -805,14 +823,23 @@ private fun KeySectionLabel(label: String) {
     )
 }
 
-private fun Context.keySubtitle(keyCode: Int, refreshTick: Int, defaultConfigured: Boolean): String {
+private fun Context.keyEnabledState(keyCode: Int, refreshTick: Int): Boolean {
+    refreshTick.let { /* participates in Compose recomposition */ }
+    return getConfigBool(AppConfig.keyEnabled(keyCode), default = keyHasConfiguredAction(keyCode))
+}
+
+private fun Context.keySubtitle(keyCode: Int, refreshTick: Int): String {
     val labels = keyTriggers.mapNotNull { trigger ->
         val label = getConfigString(AppConfig.keyActionLabel(keyCode, trigger.id))
         label.takeIf { it.isNotBlank() && it != "None" && it != getString(R.string.action_none) }
             ?.let { getString(R.string.compose_trigger_label, getString(trigger.labelRes), it) }
     }
     return labels.joinToString(" · ").ifEmpty {
-        if (defaultConfigured) getString(R.string.compose_key_configured_default) else getString(R.string.key_not_configured)
+        getString(R.string.key_not_configured)
     } + refreshTick.let { "" }
 }
 
+private fun Context.keyHasConfiguredAction(keyCode: Int): Boolean =
+    keyTriggers.any { trigger ->
+        AppConfig.isActiveActionValue(getConfigString(AppConfig.keyAction(keyCode, trigger.id), "none"))
+    }

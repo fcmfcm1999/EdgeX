@@ -124,7 +124,10 @@ private fun Context.runtimeValuesAfterChange(changedValues: Map<String, String>)
         .map { (keyCode, _) -> keyCode }
         .toSet()
         .forEach { keyCode ->
-            result[AppConfig.keyEnabled(keyCode)] = keyHasConfiguredAction(keyCode, changedValues, prefs).toString()
+            val enabledKey = AppConfig.keyEnabled(keyCode)
+            if (!prefs.contains(enabledKey)) {
+                result[enabledKey] = keyHasConfiguredAction(keyCode, changedValues, prefs).toString()
+            }
         }
 
     return result
