@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.ui.compose.EdgeXRoute
 import com.fan.edgex.ui.compose.HomeUiState
 import com.fan.edgex.ui.compose.components.EdgeXDivider
@@ -90,7 +91,7 @@ fun HomeScreen(
         SectionLabel(stringResource(R.string.menu_advanced))
         AdvancedSettings(state, callbacks)
         SectionLabel(stringResource(R.string.compose_section_about))
-        AboutSettings(callbacks)
+        AboutSettings(callbacks, state.premiumStatus)
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
@@ -273,22 +274,6 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
                 modifier = Modifier.weight(1f),
             )
         }
-        EdgeXTile(
-            title = stringResource(R.string.compose_premium_title),
-            meta = stringResource(R.string.compose_premium_unlock),
-            icon = EdgeXIcons.Sparkle,
-            onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
-            modifier = Modifier
-                .testTag("home_tile_premium")
-                .fillMaxWidth(),
-            trailing = {
-                EdgeXIcon(
-                    imageVector = EdgeXIcons.ChevronRight,
-                    contentDescription = null,
-                    tint = colors.onSurfaceDim,
-                )
-            },
-        )
     }
 }
 
@@ -379,11 +364,11 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
 }
 
 @Composable
-private fun AboutSettings(callbacks: HomeCallbacks) {
+private fun AboutSettings(callbacks: HomeCallbacks, premiumStatus: PremiumActivator.Status) {
     EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
         EdgeXRow(
             title = stringResource(R.string.compose_about_support_author),
-            subtitle = stringResource(R.string.compose_about_support_author_subtitle),
+            subtitle = premiumSubtitleText(premiumStatus),
             icon = EdgeXIcons.Sparkle,
             onClick = { callbacks.openRoute(EdgeXRoute.Premium) },
         ) {
@@ -400,3 +385,14 @@ private fun AboutSettings(callbacks: HomeCallbacks) {
         }
     }
 }
+
+@Composable
+private fun premiumSubtitleText(status: PremiumActivator.Status): String =
+    when (status) {
+        PremiumActivator.Status.NotActivated ->
+            stringResource(R.string.compose_premium_subtitle_inactive)
+        PremiumActivator.Status.RebootRequired ->
+            stringResource(R.string.compose_premium_subtitle_reboot)
+        PremiumActivator.Status.Installed ->
+            stringResource(R.string.compose_premium_subtitle_active)
+    }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -149,10 +150,15 @@ private fun SupporterExtrasHero(
 ) {
     val colors = LocalEdgeXColors.current
     val activated = status != PremiumActivator.Status.NotActivated
-    val statusColor = when (status) {
+    val dotColor = when (status) {
         PremiumActivator.Status.NotActivated -> Color(0xFFEF5350)
         PremiumActivator.Status.RebootRequired -> Color(0xFFFFA726)
-        PremiumActivator.Status.Installed -> Color(0xFF66BB6A)
+        PremiumActivator.Status.Installed -> Color(0xFF4CAF50)
+    }
+    val statusTextColor = when (status) {
+        PremiumActivator.Status.NotActivated -> colors.onSurfaceDim
+        PremiumActivator.Status.RebootRequired -> colors.onSurfaceDim
+        PremiumActivator.Status.Installed -> colors.accentSoft
     }
     Card(
         modifier = Modifier
@@ -178,22 +184,18 @@ private fun SupporterExtrasHero(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(statusColor.copy(alpha = 0.18f))
+                        .background(colors.onAccentSoft)
                         .padding(horizontal = 12.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    EdgeXIcon(
-                        imageVector = when (status) {
-                            PremiumActivator.Status.NotActivated -> EdgeXIcons.Info
-                            PremiumActivator.Status.RebootRequired -> EdgeXIcons.Restart
-                            PremiumActivator.Status.Installed -> EdgeXIcons.Sparkle
-                        },
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(12.dp),
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(dotColor),
                     )
-                    Text(premiumStatusText(status), color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(premiumStatusText(status), color = statusTextColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Text(
                     stringResource(R.string.compose_premium_hero),
@@ -206,7 +208,15 @@ private fun SupporterExtrasHero(
                     Text(it, color = Color(0xFFF4F0E8).copy(alpha = 0.78f), fontSize = 12.sp, lineHeight = 17.sp)
                 }
                 if (activated) {
-                    Button(onClick = onDeactivate, enabled = !deactivating, modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onDeactivate,
+                        enabled = !deactivating,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            disabledContainerColor = colors.accent.copy(alpha = 0.5f),
+                            disabledContentColor = colors.onAccent.copy(alpha = 0.8f),
+                        ),
+                    ) {
                         Text(stringResource(if (deactivating) R.string.premium_deactivating else R.string.premium_deactivate))
                     }
                 } else {
@@ -223,23 +233,27 @@ private fun SupporterExtrasHero(
 private fun SupportGrid(showToast: (String) -> Unit) {
     val context = LocalContext.current
     val thanksSupport = stringResource(R.string.compose_thanks_support)
+    val scanDonate = stringResource(R.string.compose_scan_donate)
+    val clickJump = stringResource(R.string.compose_donate_click_jump)
+    val viewAddress = stringResource(R.string.compose_donate_view_address)
+    data class MethodItem(val title: String, val subtitle: String, val color: Color)
     val methods = listOf(
         listOf(
-            Pair(stringResource(R.string.donate_alipay), Color(0xFFCFE0FA)) to {
+            MethodItem(stringResource(R.string.donate_alipay), scanDonate, Color(0xFFCFE0FA)) to {
                 DonateDialog.showAlipayQr(context)
                 showToast(thanksSupport)
             },
-            Pair(stringResource(R.string.donate_wechat), Color(0xFFC7EFCC)) to {
+            MethodItem(stringResource(R.string.donate_wechat), scanDonate, Color(0xFFC7EFCC)) to {
                 DonateDialog.showWechatQr(context)
                 showToast(thanksSupport)
             },
         ),
         listOf(
-            Pair(stringResource(R.string.donate_kofi), Color(0xFFFBD7CF)) to {
+            MethodItem(stringResource(R.string.donate_kofi), clickJump, Color(0xFFFBD7CF)) to {
                 DonateDialog.openKofi(context)
                 showToast(thanksSupport)
             },
-            Pair(stringResource(R.string.compose_donate_crypto_short), Color(0xFFE1D5FA)) to {
+            MethodItem(stringResource(R.string.compose_donate_crypto_short), viewAddress, Color(0xFFE1D5FA)) to {
                 DonateDialog.showCryptoAddresses(context)
                 showToast(thanksSupport)
             },
@@ -249,7 +263,6 @@ private fun SupportGrid(showToast: (String) -> Unit) {
         methods.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { (item, action) ->
-                    val (title, color) = item
                     Card(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(EdgeXRadius.lg),
@@ -267,11 +280,11 @@ private fun SupportGrid(showToast: (String) -> Unit) {
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(color),
+                                    .background(item.color),
                             )
                             Column {
-                                Text(title, color = LocalEdgeXColors.current.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(stringResource(R.string.compose_scan_donate), color = LocalEdgeXColors.current.onSurfaceDim, fontSize = 11.sp)
+                                Text(item.title, color = LocalEdgeXColors.current.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(item.subtitle, color = LocalEdgeXColors.current.onSurfaceDim, fontSize = 11.sp)
                             }
                         }
                     }

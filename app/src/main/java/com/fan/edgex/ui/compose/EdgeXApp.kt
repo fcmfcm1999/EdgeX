@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.fan.edgex.R
+import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.config.configPrefs
@@ -72,6 +73,7 @@ data class HomeUiState(
     val moduleActive: Boolean,
     val accent: EdgeXAccent,
     val darkMode: Boolean,
+    val premiumStatus: PremiumActivator.Status,
 )
 
 @Composable
@@ -219,6 +221,7 @@ private fun Context.readHomeUiState(): HomeUiState =
         moduleActive = ModuleActivationState.isActive(this),
         accent = EdgeXAccent.fromId(getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Default.id)),
         darkMode = getConfigBool(AppConfig.UI_DARK_MODE),
+        premiumStatus = PremiumActivator.status(this),
     )
 
 private fun Context.readHomeStats(): HomeStats {

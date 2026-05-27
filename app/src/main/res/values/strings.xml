@@ -489,6 +489,9 @@
     <string name="compose_premium_unlock">Not activated</string>
     <string name="compose_section_about">About</string>
     <string name="compose_about_support_author_subtitle">Alipay · WeChat · ETH · SOL</string>
+    <string name="compose_premium_subtitle_active">Supporter Extras active</string>
+    <string name="compose_premium_subtitle_reboot">Supporter Extras · Reboot required</string>
+    <string name="compose_premium_subtitle_inactive">Supporter Extras · Not activated</string>
     <string name="compose_haptic_enabled_light">Enabled · Light</string>
     <string name="compose_arc_drawer_desc">Show apps in right-side arc drawer</string>
     <string name="compose_restart_sysui_desc">Apply some system-level changes</string>
@@ -579,6 +582,8 @@
     <string name="compose_support_methods">Support Methods</string>
     <string name="compose_thanks_support">Thank you for supporting EdgeX</string>
     <string name="compose_scan_donate">Scan to donate</string>
+    <string name="compose_donate_click_jump">Click to jump</string>
+    <string name="compose_donate_view_address">View addresses</string>
     <string name="compose_donate_crypto_short">ETH/SOL</string>
     <string name="compose_premium_feature_edge_lighting">Notification lighting · 9 effects</string>
     <string name="compose_premium_status_reboot">Installed, takes effect after reboot</string>

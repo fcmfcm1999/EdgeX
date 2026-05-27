@@ -468,6 +468,9 @@
     <string name="compose_premium_unlock">未激活</string>
     <string name="compose_section_about">关于</string>
     <string name="compose_about_support_author_subtitle">支付宝 · 微信 · ETH · SOL</string>
+    <string name="compose_premium_subtitle_active">Supporter Extras 已激活</string>
+    <string name="compose_premium_subtitle_reboot">Supporter Extras · 重启后生效</string>
+    <string name="compose_premium_subtitle_inactive">Supporter Extras · 未激活</string>
     <string name="compose_haptic_enabled_light">已启用 · 轻触</string>
     <string name="compose_arc_drawer_desc">右侧弧形抽屉显示应用</string>
     <string name="compose_restart_sysui_desc">应用部分系统级更改</string>
@@ -558,6 +561,8 @@
     <string name="compose_support_methods">支持方式</string>
     <string name="compose_thanks_support">感谢支持 EdgeX</string>
     <string name="compose_scan_donate">扫码捐赠</string>
+    <string name="compose_donate_click_jump">点击跳转</string>
+    <string name="compose_donate_view_address">查看地址</string>
     <string name="compose_donate_crypto_short">ETH/SOL</string>
     <string name="compose_premium_feature_edge_lighting">通知光效 · 9 种特效</string>
     <string name="compose_premium_status_reboot">已安装，重启后生效</string>
