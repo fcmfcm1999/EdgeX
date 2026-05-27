@@ -109,6 +109,7 @@ fun EdgeXIconBox(
     modifier: Modifier = Modifier,
     background: Color = LocalEdgeXColors.current.accentSoft,
     tint: Color = LocalEdgeXColors.current.onAccentSoft,
+    iconSize: androidx.compose.ui.unit.Dp = 22.dp,
 ) {
     Box(
         modifier = modifier
@@ -121,7 +122,7 @@ fun EdgeXIconBox(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(iconSize),
         )
     }
 }
@@ -392,6 +393,15 @@ fun Modifier.noRippleClickable(onClick: () -> Unit): Modifier =
         indication = null,
         onClick = onClick,
     )
+
+@Composable
+fun PreviewSectionHeader(title: String, subtitle: String) {
+    val colors = LocalEdgeXColors.current
+    Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 6.dp)) {
+        Text(title, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(subtitle, color = colors.onSurfaceDim, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+    }
+}
 
 @Composable
 fun PhoneFrame(

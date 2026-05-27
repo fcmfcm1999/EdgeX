@@ -2,22 +2,22 @@ package com.fan.edgex.ui.compose.screens
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,12 +28,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -49,17 +57,19 @@ import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.compose.components.ActionSelectionSheet
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
-import com.fan.edgex.ui.compose.components.EdgeXChip
+
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIconBox
-import com.fan.edgex.ui.compose.components.EdgeXIconButton
+
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
+import com.fan.edgex.ui.compose.components.PhoneFrame
+import com.fan.edgex.ui.compose.components.PreviewSectionHeader
 import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
 import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
@@ -129,6 +139,16 @@ private val baseGestures = listOf(
     GestureOption("long_press", R.string.gesture_long_press, EdgeXIcons.Gesture),
 )
 
+private const val GESTURE_PHONE_FRAME_WIDTH_DP = 176f
+private const val GESTURE_PHONE_FRAME_HEIGHT_DP = 320f
+private const val GESTURE_EDGE_STRIP_DP = 12f
+private const val GESTURE_EDGE_HIT_DP = 16f
+
+private data class GestureZoneGeometry(
+    val stripThicknessPx: Float,
+    val hitThicknessPx: Float,
+)
+
 @Composable
 fun GesturesScreen(
     onBack: () -> Unit,
@@ -146,7 +166,6 @@ fun GesturesScreen(
         GestureFilter.Visual to stringResource(GestureFilter.Visual.labelRes),
         GestureFilter.List to stringResource(GestureFilter.List.labelRes),
     )
-    val importPendingToast = stringResource(R.string.compose_import_pending_toast)
     val removedToast = stringResource(R.string.compose_removed)
     val setActionToastTemplate = stringResource(R.string.compose_set_action_toast, "%s")
 
@@ -162,11 +181,6 @@ fun GesturesScreen(
         EdgeXTopBar(
             title = stringResource(R.string.header_gestures),
             onBack = onBack,
-            trailing = {
-                EdgeXIconButton(onClick = { filter = if (filter == GestureFilter.Visual) GestureFilter.List else GestureFilter.Visual }) {
-                    EdgeXIcon(EdgeXIcons.Search, contentDescription = stringResource(R.string.compose_view_visual), tint = LocalEdgeXColors.current.onSurface)
-                }
-            },
         )
         GestureHeader(state)
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -192,13 +206,16 @@ fun GesturesScreen(
                 onSelected = { filter = it },
                 modifier = Modifier.weight(1f),
             )
-            EdgeXChip(label = stringResource(R.string.compose_import), selected = false, onClick = { showToast(importPendingToast) })
         }
         if (filter == GestureFilter.Visual) {
+            PreviewSectionHeader(
+                title = stringResource(R.string.compose_panel_preview),
+                subtitle = stringResource(R.string.compose_gesture_preview_subtitle),
+            )
             GestureZoneCanvas(
                 state = state,
                 onZoneClick = { selectedZone = it },
-                modifier = Modifier.padding(top = 14.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
             GestureSectionLabel(stringResource(R.string.compose_full_edge_low_priority))
             FullEdgeGrid(
@@ -308,116 +325,161 @@ private fun GestureZoneCanvas(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalEdgeXColors.current
-    Column(
+    val density = LocalDensity.current
+    val accentColor = colors.accent
+    val unconfiguredFill = Color.White.copy(alpha = 0.06f)
+    val unconfiguredStroke = Color.White.copy(alpha = 0.15f)
+    val configuredStroke = accentColor.copy(alpha = 0.80f)
+    val currentState by rememberUpdatedState(state)
+    val currentOnClick by rememberUpdatedState(onZoneClick)
+
+    BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = 216.dp)
-                .aspectRatio(9f / 16f)
-                .clip(RoundedCornerShape(30.dp))
-                .background(colors.surface2)
-                .padding(8.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            EdgeRow(zonesFor("T", full = false), state, onZoneClick)
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                EdgeColumn(zonesFor("L", full = false), state, onZoneClick)
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(8.dp)
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(26.dp))
-                        .background(colors.surface)
-                        .border(1.dp, colors.outline, RoundedCornerShape(26.dp)),
-                )
-                EdgeColumn(zonesFor("R", full = false), state, onZoneClick)
-            }
-            EdgeRow(zonesFor("B", full = false), state, onZoneClick)
-        }
-    }
-}
-
-@Composable
-private fun EdgeRow(
-    rowZones: List<GestureZone>,
-    state: GestureScreenState,
-    onZoneClick: (GestureZone) -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        rowZones.forEach {
-            ZonePill(
-                zone = it,
-                count = state.count(it.id),
-                onClick = { onZoneClick(it) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(24.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EdgeColumn(
-    columnZones: List<GestureZone>,
-    state: GestureScreenState,
-    onZoneClick: (GestureZone) -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.SpaceEvenly,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(32.dp),
-    ) {
-        columnZones.forEach {
-            ZonePill(
-                zone = it,
-                count = state.count(it.id),
-                onClick = { onZoneClick(it) },
-                modifier = Modifier
-                    .height(92.dp)
-                    .width(24.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ZonePill(
-    zone: GestureZone,
-    count: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = LocalEdgeXColors.current
-    val configured = count > 0
-    Box(
-        modifier = modifier
-            .testTag("gesture_zone_${zone.id}")
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (configured) colors.accentSoft else Color.Transparent)
-            .border(
-                width = 1.dp,
-                color = if (configured) Color.Transparent else colors.outlineStrong,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = zone.short,
-            color = if (configured) colors.onAccentSoft else colors.onSurfaceDim,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
+        val phoneWidth = minOf(maxWidth, 320.dp)
+        val phoneHeight = phoneWidth * (GESTURE_PHONE_FRAME_HEIGHT_DP / GESTURE_PHONE_FRAME_WIDTH_DP)
+        val scale = phoneWidth.value / GESTURE_PHONE_FRAME_WIDTH_DP
+        val geometry = remember(phoneWidth, density) {
+            with(density) {
+                GestureZoneGeometry(
+                    stripThicknessPx = GESTURE_EDGE_STRIP_DP.dp.toPx() * scale,
+                    hitThicknessPx = GESTURE_EDGE_HIT_DP.dp.toPx() * scale,
+                )
+            }
+        }
+        PhoneFrame(
+            width = phoneWidth,
+            height = phoneHeight,
+            modifier = Modifier.pointerInput(geometry) {
+                detectTapGestures { offset ->
+                    val w = size.width.toFloat()
+                    val h = size.height.toFloat()
+                    val hitZone = hitTestEdgeZone(offset, w, h, geometry)
+                    if (hitZone != null) {
+                        val zone = zones.firstOrNull { it.id == hitZone }
+                        if (zone != null) currentOnClick(zone)
+                    }
+                }
+            },
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+
+                drawEdgeStrips(
+                    w = w, h = h,
+                    stripThickness = geometry.stripThicknessPx,
+                    state = state,
+                    accentColor = accentColor,
+                    unconfiguredFill = unconfiguredFill,
+                    unconfiguredStroke = unconfiguredStroke,
+                    configuredStroke = configuredStroke,
+                )
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawEdgeStrips(
+    w: Float, h: Float,
+    stripThickness: Float,
+    state: GestureScreenState,
+    accentColor: Color,
+    unconfiguredFill: Color,
+    unconfiguredStroke: Color,
+    configuredStroke: Color,
+) {
+    val leftZones = listOf("left_top", "left_mid", "left_bottom")
+    val rightZones = listOf("right_top", "right_mid", "right_bottom")
+    val topZones = listOf("top_left", "top_mid", "top_right")
+    val bottomZones = listOf("bottom_left", "bottom_mid", "bottom_right")
+    val cornerR = CornerRadius(2.dp.toPx())
+    val strokeW = 1.dp.toPx()
+
+    // Left/Right edge segments: avoid corners, range is stripThickness .. h - stripThickness
+    val vSegmentH = (h - 2 * stripThickness) / 3f
+    // Top/Bottom edge segments: avoid corners, range is stripThickness .. w - stripThickness
+    val hSegmentW = (w - 2 * stripThickness) / 3f
+
+    fun drawSegment(x: Float, y: Float, segW: Float, segH: Float, configured: Boolean) {
+        drawRoundRect(
+            color = if (configured) accentColor.copy(alpha = 0.55f) else unconfiguredFill,
+            topLeft = Offset(x, y),
+            size = Size(segW, segH),
+            cornerRadius = cornerR,
+        )
+        drawRoundRect(
+            color = if (configured) configuredStroke else unconfiguredStroke,
+            topLeft = Offset(x, y),
+            size = Size(segW, segH),
+            cornerRadius = cornerR,
+            style = Stroke(width = strokeW),
         )
     }
+
+    // Left edge
+    val leftFull = state.count("left") > 0
+    for (i in 0..2) {
+        val configured = leftFull || state.count(leftZones[i]) > 0
+        drawSegment(0f, stripThickness + i * vSegmentH, stripThickness, vSegmentH, configured)
+    }
+
+    // Right edge
+    val rightFull = state.count("right") > 0
+    for (i in 0..2) {
+        val configured = rightFull || state.count(rightZones[i]) > 0
+        drawSegment(w - stripThickness, stripThickness + i * vSegmentH, stripThickness, vSegmentH, configured)
+    }
+
+    // Top edge
+    val topFull = state.count("top") > 0
+    for (i in 0..2) {
+        val configured = topFull || state.count(topZones[i]) > 0
+        drawSegment(stripThickness + i * hSegmentW, 0f, hSegmentW, stripThickness, configured)
+    }
+
+    // Bottom edge
+    val bottomFull = state.count("bottom") > 0
+    for (i in 0..2) {
+        val configured = bottomFull || state.count(bottomZones[i]) > 0
+        drawSegment(stripThickness + i * hSegmentW, h - stripThickness, hSegmentW, stripThickness, configured)
+    }
+}
+
+private fun hitTestEdgeZone(offset: Offset, w: Float, h: Float, geometry: GestureZoneGeometry): String? {
+    val stripThickness = geometry.stripThicknessPx
+    val hitThickness = geometry.hitThicknessPx
+    val x = offset.x
+    val y = offset.y
+
+    val vSegmentH = (h - 2 * stripThickness) / 3f
+    val hSegmentW = (w - 2 * stripThickness) / 3f
+    val suffixesHV = listOf("top", "mid", "bottom")
+    val suffixesVH = listOf("left", "mid", "right")
+
+    // Left edge
+    if (x in 0f..hitThickness && y in 0f..h) {
+        val seg = ((y - stripThickness) / vSegmentH).toInt().coerceIn(0, 2)
+        return "left_${suffixesHV[seg]}"
+    }
+    // Right edge
+    if (x in (w - hitThickness)..w && y in 0f..h) {
+        val seg = ((y - stripThickness) / vSegmentH).toInt().coerceIn(0, 2)
+        return "right_${suffixesHV[seg]}"
+    }
+    // Top edge
+    if (y in 0f..hitThickness && x in 0f..w) {
+        val seg = ((x - stripThickness) / hSegmentW).toInt().coerceIn(0, 2)
+        return "top_${suffixesVH[seg]}"
+    }
+    // Bottom edge
+    if (y in (h - hitThickness)..h && x in 0f..w) {
+        val seg = ((x - stripThickness) / hSegmentW).toInt().coerceIn(0, 2)
+        return "bottom_${suffixesVH[seg]}"
+    }
+
+    return null
 }
 
 @Composable
@@ -566,4 +628,3 @@ private fun Context.readGestureScreenState(): GestureScreenState {
     }
     return GestureScreenState(actionsByZone, labelsByZone)
 }
-
