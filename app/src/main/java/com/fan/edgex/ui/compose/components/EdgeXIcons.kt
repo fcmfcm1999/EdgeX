@@ -75,6 +75,10 @@ object EdgeXIcons {
     @DrawableRes val GameMode = R.drawable.ic_game_mode
     @DrawableRes val Refreeze = R.drawable.ic_refreeze
     @DrawableRes val PartialScreenshot = R.drawable.ic_partial_screenshot
+    @DrawableRes val Alipay = R.drawable.ic_alipay
+    @DrawableRes val WechatPay = R.drawable.ic_wechat_pay
+    @DrawableRes val KoFi = R.drawable.ic_ko_fi
+    @DrawableRes val Eth = R.drawable.ic_eth
 }
 
 @Composable

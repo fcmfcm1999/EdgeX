@@ -202,15 +202,6 @@ fun MultiScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             EdgeXTopBar(title = stringResource(R.string.action_multi_action), onBack = onBack)
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                Text(
-                    text = stringResource(R.string.compose_multi_hero),
-                    color = LocalEdgeXColors.current.onSurface,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 30.sp,
-                    lineHeight = 32.sp,
-                )
-            }
             if (items.isEmpty()) {
                 EmptyMultiState(onCreate = {
                     create()

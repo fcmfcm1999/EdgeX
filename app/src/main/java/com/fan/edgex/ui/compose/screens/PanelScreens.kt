@@ -59,6 +59,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.components.PhoneFrame
+import com.fan.edgex.ui.compose.components.PreviewSectionHeader
 import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
 import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
@@ -254,15 +255,6 @@ fun SideBarScreen(
                 refreshTick++
             },
         )
-    }
-}
-
-@Composable
-private fun PreviewSectionHeader(title: String, subtitle: String) {
-    val colors = LocalEdgeXColors.current
-    Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 6.dp)) {
-        Text(title, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(subtitle, color = colors.onSurfaceDim, fontWeight = FontWeight.Medium, fontSize = 13.sp)
     }
 }
 
