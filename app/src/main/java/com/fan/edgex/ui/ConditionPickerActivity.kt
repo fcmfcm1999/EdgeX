@@ -13,6 +13,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.putConfig
 
+@Deprecated("Use Compose ConditionPickerSheet instead")
 class ConditionPickerActivity : AppCompatActivity() {
 
     data class ConditionItem(val label: String, val code: String, val iconRes: Int)

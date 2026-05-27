@@ -1,6 +1,5 @@
 package com.fan.edgex.ui.compose.screens
 
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,9 +11,8 @@ import com.fan.edgex.R
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
-import com.fan.edgex.ui.ConditionPickerActivity
-import com.fan.edgex.ui.compose.components.ActionSelectionItem
 import com.fan.edgex.ui.compose.components.ActionSelectionSheet
+import com.fan.edgex.ui.compose.components.ConditionPickerSheet
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
@@ -40,6 +38,7 @@ fun ConditionSheet(
     var condId by remember { mutableStateOf("") }
     var pickingBranch by remember { mutableStateOf<String?>(null) } // "then" or "else"
     var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
+    var showConditionPicker by remember { mutableStateOf(false) }
 
     // Resolve or create condition ID when sheet opens
     if (open && condId.isBlank()) {
@@ -63,18 +62,12 @@ fun ConditionSheet(
         val elseLabel = context.getConfigString(ConditionStore.condElseLabelKey(condId), none)
 
         EdgeXListGroup {
-            // If row - still uses ConditionPickerActivity
+            // If row - opens Compose ConditionPickerSheet
             EdgeXRow(
                 title = stringResource(R.string.cond_label_if),
                 subtitle = ifLabel + refreshTick.let { "" },
                 icon = EdgeXIcons.Condition,
-                onClick = {
-                    context.startActivity(
-                        Intent(context, ConditionPickerActivity::class.java)
-                            .putExtra(ConditionPickerActivity.EXTRA_COND_ID, condId)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                },
+                onClick = { showConditionPicker = true },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)
             }
@@ -102,6 +95,17 @@ fun ConditionSheet(
             }
         }
     }
+
+    ConditionPickerSheet(
+        open = showConditionPicker,
+        onDismiss = { showConditionPicker = false },
+        onSelect = { item ->
+            context.putConfig(ConditionStore.condIfKey(condId), item.code)
+            context.putConfig(ConditionStore.condIfLabelKey(condId), context.getString(item.labelRes))
+            showConditionPicker = false
+            refreshTick++
+        },
+    )
 
     val activeBranch = pickingBranch
     if (activeBranch != null) {
