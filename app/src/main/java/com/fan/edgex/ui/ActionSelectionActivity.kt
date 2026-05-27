@@ -21,6 +21,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.putConfig
 
+@Deprecated("Use Compose ActionSelectionSheet instead")
 class ActionSelectionActivity : AppCompatActivity() {
 
     companion object {

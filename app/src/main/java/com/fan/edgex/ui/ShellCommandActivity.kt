@@ -14,6 +14,7 @@ import com.fan.edgex.config.putConfigsSync
  * Activity for configuring a shell command action.
  * User can enter a shell command and optionally choose to run as root (su).
  */
+@Deprecated("Use Compose ShellCommandSheet instead")
 class ShellCommandActivity : AppCompatActivity() {
 
     private lateinit var editCommand: EditText

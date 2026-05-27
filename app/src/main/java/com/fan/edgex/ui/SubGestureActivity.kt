@@ -9,6 +9,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigString
 
+@Deprecated("Use Compose SubGestureSheet instead")
 class SubGestureActivity : AppCompatActivity() {
 
     private data class SlotSpec(

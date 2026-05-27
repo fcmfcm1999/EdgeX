@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
 import com.fan.edgex.config.putConfig
 
+@Deprecated("Use Compose MusicControlSheet instead")
 class MusicControlActivity : AppCompatActivity() {
 
     data class MusicOption(

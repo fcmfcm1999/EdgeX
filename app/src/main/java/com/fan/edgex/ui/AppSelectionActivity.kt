@@ -19,6 +19,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.putConfigsSync
 import java.util.Locale
 
+@Deprecated("Use Compose AppPickerSheet instead")
 class AppSelectionActivity : AppCompatActivity() {
 
     data class AppItem(

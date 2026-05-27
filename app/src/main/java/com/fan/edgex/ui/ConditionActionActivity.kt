@@ -10,6 +10,7 @@ import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 
+@Deprecated("Use Compose ConditionSheet instead")
 class ConditionActionActivity : AppCompatActivity() {
 
     private lateinit var prefKey: String

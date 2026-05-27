@@ -1,7 +1,6 @@
 package com.fan.edgex.ui.compose.screens
 
 import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,8 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,7 +47,7 @@ import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
-import com.fan.edgex.ui.ActionSelectionActivity
+import com.fan.edgex.ui.compose.components.ActionSelectionSheet
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXChip
 import com.fan.edgex.ui.compose.components.EdgeXDivider
@@ -63,6 +60,8 @@ import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
+import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
+import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 
@@ -83,13 +82,6 @@ private data class GestureOption(
     val id: String,
     val labelRes: Int,
     val icon: Int,
-)
-
-private data class GestureAction(
-    val code: String,
-    val labelRes: Int,
-    val icon: Int,
-    val needsSecondary: Boolean = false,
 )
 
 private data class GestureScreenState(
@@ -137,44 +129,6 @@ private val baseGestures = listOf(
     GestureOption("long_press", R.string.gesture_long_press, EdgeXIcons.Gesture),
 )
 
-private val directActions = listOf(
-    GestureAction("none", R.string.action_none, EdgeXIcons.Check),
-    GestureAction("back", R.string.action_back, EdgeXIcons.Back),
-    GestureAction("home", R.string.action_home, EdgeXIcons.Home),
-    GestureAction("recents", R.string.action_recents, EdgeXIcons.Recents),
-    GestureAction("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
-    GestureAction("lock_screen", R.string.action_lock_screen, EdgeXIcons.Lock),
-    GestureAction("screenshot", R.string.action_screenshot, EdgeXIcons.Screenshot),
-    GestureAction(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.PartialScreenshot),
-    GestureAction("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
-    GestureAction("brightness_up", R.string.action_brightness_up, EdgeXIcons.BrightnessUp),
-    GestureAction("brightness_down", R.string.action_brightness_down, EdgeXIcons.BrightnessDown),
-    GestureAction("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
-    GestureAction("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
-    GestureAction("freezer_drawer", R.string.action_freezer_drawer, EdgeXIcons.Freeze),
-    GestureAction("refreeze", R.string.action_refreeze, EdgeXIcons.Refreeze),
-    GestureAction("clear_background", R.string.action_clear_background, EdgeXIcons.ClearBackground),
-    GestureAction("kill_app", R.string.action_kill_app, EdgeXIcons.KillApp),
-    GestureAction("prev_app", R.string.action_prev_app, EdgeXIcons.PrevApp),
-    GestureAction("next_app", R.string.action_next_app, EdgeXIcons.NextApp),
-    GestureAction("clipboard", R.string.action_clipboard, EdgeXIcons.Clipboard),
-    GestureAction("universal_copy", R.string.action_universal_copy, EdgeXIcons.UniversalCopy),
-    GestureAction("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
-    GestureAction("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
-    GestureAction("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
-    GestureAction("pie", R.string.action_pie, EdgeXIcons.Pie),
-    GestureAction(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
-    GestureAction(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
-    GestureAction(AppConfig.SIDE_BAR_RIGHT_ACTION, R.string.action_right_side_bar, EdgeXIcons.SideBarRight),
-    GestureAction("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsSecondary = true),
-    GestureAction("condition", R.string.action_condition, EdgeXIcons.Condition, needsSecondary = true),
-    GestureAction("shell_command", R.string.action_shell_command, EdgeXIcons.Terminal, needsSecondary = true),
-    GestureAction("sub_gesture", R.string.action_sub_gesture, EdgeXIcons.SubGesture, needsSecondary = true),
-    GestureAction("launch_app", R.string.action_launch_app, EdgeXIcons.LaunchApp, needsSecondary = true),
-    GestureAction("app_shortcut", R.string.action_app_shortcut, EdgeXIcons.AppShortcut, needsSecondary = true),
-    GestureAction("music_control", R.string.action_music_control, EdgeXIcons.Music, needsSecondary = true),
-)
-
 @Composable
 fun GesturesScreen(
     onBack: () -> Unit,
@@ -187,6 +141,7 @@ fun GesturesScreen(
     var filter by remember { mutableStateOf(GestureFilter.Visual) }
     var selectedZone by remember { mutableStateOf<GestureZone?>(null) }
     var pickingActionFor by remember { mutableStateOf<GestureOption?>(null) }
+    var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
     val filterLabels = mapOf(
         GestureFilter.Visual to stringResource(GestureFilter.Visual.labelRes),
         GestureFilter.List to stringResource(GestureFilter.List.labelRes),
@@ -271,24 +226,58 @@ fun GesturesScreen(
         onPickAction = { pickingActionFor = it },
     )
 
-    ActionSheet(
-        zone = selectedZone,
-        gesture = pickingActionFor,
-        state = state,
-        onDismiss = { pickingActionFor = null },
-        onAction = { zone, gesture, action ->
-            context.saveGestureAction(zone.id, gesture.id, action)
-            refresh()
-            pickingActionFor = null
-            val actionLabel = context.getString(action.labelRes)
-            showToast(if (action.code == "none") removedToast else setActionToastTemplate.format(actionLabel))
-        },
-        onOpenLegacy = { zone, gesture ->
-            context.openLegacyActionPicker(zone, gesture)
-            selectedZone = null
-            pickingActionFor = null
-        },
-    )
+    val activeZone = selectedZone
+    val activeGesture = pickingActionFor
+    if (activeZone != null && activeGesture != null && secondarySheet == null) {
+        val prefKey = AppConfig.gestureAction(activeZone.id, activeGesture.id)
+        val gestureTitle = stringResource(
+            R.string.compose_title_pair,
+            stringResource(activeZone.labelRes),
+            stringResource(activeGesture.labelRes),
+        )
+        ActionSelectionSheet(
+            open = true,
+            title = gestureTitle,
+            onDismiss = {
+                pickingActionFor = null
+            },
+            excludedCodes = emptySet(),
+            onSelect = { action ->
+                if (action.needsSecondary) {
+                    secondarySheet = SecondaryType.fromCode(action.code)
+                } else {
+                    context.putConfigsSync(
+                        prefKey to action.code,
+                        AppConfig.gestureActionLabel(activeZone.id, activeGesture.id) to context.getString(action.labelRes),
+                    )
+                    refresh()
+                    pickingActionFor = null
+                    val actionLabel = context.getString(action.labelRes)
+                    showToast(if (action.code == "none") removedToast else setActionToastTemplate.format(actionLabel))
+                }
+            },
+        )
+    }
+
+    if (activeZone != null && activeGesture != null && secondarySheet != null) {
+        val prefKey = AppConfig.gestureAction(activeZone.id, activeGesture.id)
+        val gestureTitle = stringResource(
+            R.string.compose_title_pair,
+            stringResource(activeZone.labelRes),
+            stringResource(activeGesture.labelRes),
+        )
+        SecondaryActionDispatcher(
+            type = secondarySheet,
+            prefKey = prefKey,
+            title = gestureTitle,
+            onDismiss = { secondarySheet = null },
+            onSaved = {
+                secondarySheet = null
+                pickingActionFor = null
+                refresh()
+            },
+        )
+    }
 }
 
 @Composable
@@ -541,79 +530,6 @@ private fun ZoneSheet(
     }
 }
 
-@Composable
-private fun ActionSheet(
-    zone: GestureZone?,
-    gesture: GestureOption?,
-    state: GestureScreenState,
-    onDismiss: () -> Unit,
-    onAction: (GestureZone, GestureOption, GestureAction) -> Unit,
-    onOpenLegacy: (GestureZone, GestureOption) -> Unit,
-) {
-    val colors = LocalEdgeXColors.current
-    var searchQuery by remember { mutableStateOf("") }
-    EdgeXBottomSheet(
-        open = zone != null && gesture != null,
-        title = gesture?.let { stringResource(it.labelRes) }.orEmpty(),
-        onDismissRequest = {
-            searchQuery = ""
-            onDismiss()
-        },
-    ) {
-        if (zone == null || gesture == null) return@EdgeXBottomSheet
-        val selected = state.actionCode(zone.id, gesture.id)
-        val query = searchQuery.trim()
-        val filtered = if (query.isBlank()) directActions else directActions.filter { action ->
-            val label = stringResource(action.labelRes)
-            label.contains(query, ignoreCase = true) || action.code.contains(query, ignoreCase = true)
-        }
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
-            singleLine = true,
-            shape = RoundedCornerShape(EdgeXRadius.sm),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colors.accent,
-                unfocusedBorderColor = colors.outline,
-                cursorColor = colors.accent,
-            ),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            EdgeXListGroup {
-                filtered.forEachIndexed { index, action ->
-                    EdgeXRow(
-                        title = stringResource(action.labelRes),
-                        subtitle = action.code,
-                        icon = action.icon,
-                        modifier = Modifier.testTag("gesture_action_${action.code}"),
-                        onClick = {
-                            if (action.needsSecondary) {
-                                onOpenLegacy(zone, gesture)
-                            } else {
-                                onAction(zone, gesture, action)
-                            }
-                        },
-                    ) {
-                        if (selected == action.code) {
-                            EdgeXIcon(EdgeXIcons.Check, contentDescription = null, tint = colors.accent)
-                        }
-                    }
-                    if (index != filtered.lastIndex) EdgeXDivider()
-                }
-            }
-        }
-    }
-}
-
 private fun gesturesFor(edge: String): List<GestureOption> {
     val mainSwipe = when (edge) {
         "L" -> GestureOption("swipe_right", R.string.gesture_swipe_right, EdgeXIcons.ChevronRight)
@@ -651,20 +567,3 @@ private fun Context.readGestureScreenState(): GestureScreenState {
     return GestureScreenState(actionsByZone, labelsByZone)
 }
 
-private fun Context.saveGestureAction(zoneId: String, gestureId: String, action: GestureAction) {
-    val key = AppConfig.gestureAction(zoneId, gestureId)
-    putConfigsSync(
-        key to action.code,
-        AppConfig.gestureActionLabel(zoneId, gestureId) to getString(action.labelRes),
-    )
-}
-
-private fun Context.openLegacyActionPicker(zone: GestureZone, gesture: GestureOption) {
-    val key = AppConfig.gestureAction(zone.id, gesture.id)
-    startActivity(
-        Intent(this, ActionSelectionActivity::class.java)
-            .putExtra("title", getString(R.string.compose_title_pair, getString(zone.labelRes), getString(gesture.labelRes)))
-            .putExtra("pref_key", key)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-    )
-}
