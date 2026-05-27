@@ -503,6 +503,7 @@
     <string name="compose_gestures_enabled_desc">Intercept screen edge touches to trigger actions</string>
     <string name="compose_gestures_enabled_toast">Gestures enabled</string>
     <string name="compose_gestures_disabled_toast">Gestures disabled</string>
+    <string name="compose_zone_enabled">Enable this zone</string>
     <string name="compose_gesture_preview_subtitle">Tap an edge zone to configure its gestures.</string>
     <string name="compose_view_visual">Visual</string>
     <string name="compose_view_list">List</string>

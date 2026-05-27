@@ -66,6 +66,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
+import com.fan.edgex.ui.compose.components.EdgeXSwitch
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.components.PhoneFrame
@@ -97,6 +98,7 @@ private data class GestureOption(
 private data class GestureScreenState(
     val zones: Map<String, Map<String, String>>,
     val labels: Map<String, Map<String, String>>,
+    val enabled: Map<String, Boolean>,
 ) {
     fun count(zoneId: String): Int =
         zones[zoneId].orEmpty().values.count { it.isNotBlank() && it != "none" }
@@ -105,13 +107,16 @@ private data class GestureScreenState(
         zones.keys.sumOf(::count)
 
     fun activeZones(): Int =
-        zones.keys.count { count(it) > 0 }
+        enabled.values.count { it }
 
     fun actionCode(zoneId: String, gestureId: String): String =
         zones[zoneId]?.get(gestureId).orEmpty().ifBlank { "none" }
 
     fun actionLabel(zoneId: String, gestureId: String): String =
         labels[zoneId]?.get(gestureId).orEmpty()
+
+    fun zoneEnabled(zoneId: String): Boolean =
+        enabled[zoneId] == true
 }
 
 private val zones = listOf(
@@ -173,6 +178,11 @@ fun GesturesScreen(
         state = context.readGestureScreenState()
     }
 
+    fun setZoneEnabled(zone: GestureZone, enabled: Boolean) {
+        context.putConfig(AppConfig.zoneEnabled(zone.id), enabled)
+        refresh()
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -221,12 +231,14 @@ fun GesturesScreen(
             FullEdgeGrid(
                 state = state,
                 onZoneClick = { selectedZone = it },
+                onZoneEnabledChange = ::setZoneEnabled,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         } else {
             AllZoneList(
                 state = state,
                 onZoneClick = { selectedZone = it },
+                onZoneEnabledChange = ::setZoneEnabled,
                 modifier = Modifier.padding(top = 12.dp, bottom = 28.dp),
             )
         }
@@ -240,6 +252,7 @@ fun GesturesScreen(
             selectedZone = null
             pickingActionFor = null
         },
+        onZoneEnabledChange = ::setZoneEnabled,
         onPickAction = { pickingActionFor = it },
     )
 
@@ -402,15 +415,15 @@ private fun DrawScope.drawEdgeStrips(
     // Top/Bottom edge segments: avoid corners, range is stripThickness .. w - stripThickness
     val hSegmentW = (w - 2 * stripThickness) / 3f
 
-    fun drawSegment(x: Float, y: Float, segW: Float, segH: Float, configured: Boolean) {
+    fun drawSegment(x: Float, y: Float, segW: Float, segH: Float, active: Boolean) {
         drawRoundRect(
-            color = if (configured) accentColor.copy(alpha = 0.55f) else unconfiguredFill,
+            color = if (active) accentColor.copy(alpha = 0.55f) else unconfiguredFill,
             topLeft = Offset(x, y),
             size = Size(segW, segH),
             cornerRadius = cornerR,
         )
         drawRoundRect(
-            color = if (configured) configuredStroke else unconfiguredStroke,
+            color = if (active) configuredStroke else unconfiguredStroke,
             topLeft = Offset(x, y),
             size = Size(segW, segH),
             cornerRadius = cornerR,
@@ -418,32 +431,24 @@ private fun DrawScope.drawEdgeStrips(
         )
     }
 
-    // Left edge
-    val leftFull = state.count("left") > 0
     for (i in 0..2) {
-        val configured = leftFull || state.count(leftZones[i]) > 0
-        drawSegment(0f, stripThickness + i * vSegmentH, stripThickness, vSegmentH, configured)
+        val active = state.zoneEnabled("left") || state.zoneEnabled(leftZones[i])
+        drawSegment(0f, stripThickness + i * vSegmentH, stripThickness, vSegmentH, active)
     }
 
-    // Right edge
-    val rightFull = state.count("right") > 0
     for (i in 0..2) {
-        val configured = rightFull || state.count(rightZones[i]) > 0
-        drawSegment(w - stripThickness, stripThickness + i * vSegmentH, stripThickness, vSegmentH, configured)
+        val active = state.zoneEnabled("right") || state.zoneEnabled(rightZones[i])
+        drawSegment(w - stripThickness, stripThickness + i * vSegmentH, stripThickness, vSegmentH, active)
     }
 
-    // Top edge
-    val topFull = state.count("top") > 0
     for (i in 0..2) {
-        val configured = topFull || state.count(topZones[i]) > 0
-        drawSegment(stripThickness + i * hSegmentW, 0f, hSegmentW, stripThickness, configured)
+        val active = state.zoneEnabled("top") || state.zoneEnabled(topZones[i])
+        drawSegment(stripThickness + i * hSegmentW, 0f, hSegmentW, stripThickness, active)
     }
 
-    // Bottom edge
-    val bottomFull = state.count("bottom") > 0
     for (i in 0..2) {
-        val configured = bottomFull || state.count(bottomZones[i]) > 0
-        drawSegment(stripThickness + i * hSegmentW, h - stripThickness, hSegmentW, stripThickness, configured)
+        val active = state.zoneEnabled("bottom") || state.zoneEnabled(bottomZones[i])
+        drawSegment(stripThickness + i * hSegmentW, h - stripThickness, hSegmentW, stripThickness, active)
     }
 }
 
@@ -486,13 +491,21 @@ private fun hitTestEdgeZone(offset: Offset, w: Float, h: Float, geometry: Gestur
 private fun FullEdgeGrid(
     state: GestureScreenState,
     onZoneClick: (GestureZone) -> Unit,
+    onZoneEnabledChange: (GestureZone, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         zones.filter { it.lowPriority }.chunked(2).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 row.forEach { zone ->
-                    ZoneCard(zone, state.count(zone.id), onClick = { onZoneClick(zone) }, modifier = Modifier.weight(1f))
+                    ZoneCard(
+                        zone = zone,
+                        count = state.count(zone.id),
+                        enabled = state.zoneEnabled(zone.id),
+                        onClick = { onZoneClick(zone) },
+                        onEnabledChange = { onZoneEnabledChange(zone, it) },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 if (row.size == 1) {
                     Spacer(modifier = Modifier.weight(1f))
@@ -506,6 +519,7 @@ private fun FullEdgeGrid(
 private fun AllZoneList(
     state: GestureScreenState,
     onZoneClick: (GestureZone) -> Unit,
+    onZoneEnabledChange: (GestureZone, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -513,7 +527,9 @@ private fun AllZoneList(
             ZoneCard(
                 zone = zone,
                 count = state.count(zone.id),
+                enabled = state.zoneEnabled(zone.id),
                 onClick = { onZoneClick(zone) },
+                onEnabledChange = { onZoneEnabledChange(zone, it) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -535,10 +551,18 @@ private fun GestureSectionLabel(label: String) {
 private fun ZoneCard(
     zone: GestureZone,
     count: Int,
+    enabled: Boolean,
     onClick: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalEdgeXColors.current
+    val countLabel = if (count == 0) {
+        stringResource(R.string.key_not_configured)
+    } else {
+        stringResource(R.string.compose_action_count, count)
+    }
+    val statusLabel = stringResource(if (enabled) R.string.compose_enabled else R.string.compose_disabled)
     Card(
         modifier = modifier
             .testTag("gesture_zone_${zone.id}")
@@ -556,8 +580,12 @@ private fun ZoneCard(
             EdgeXIconBox(EdgeXIcons.Gesture, contentDescription = null, modifier = Modifier.size(36.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(zone.labelRes), color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(if (count == 0) stringResource(R.string.key_not_configured) else stringResource(R.string.compose_action_count, count), color = colors.onSurfaceDim, fontSize = 11.sp)
+                Text("$statusLabel · $countLabel", color = colors.onSurfaceDim, fontSize = 11.sp)
             }
+            EdgeXSwitch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+            )
         }
     }
 }
@@ -567,6 +595,7 @@ private fun ZoneSheet(
     zone: GestureZone?,
     state: GestureScreenState,
     onDismiss: () -> Unit,
+    onZoneEnabledChange: (GestureZone, Boolean) -> Unit,
     onPickAction: (GestureOption) -> Unit,
 ) {
     EdgeXBottomSheet(
@@ -575,6 +604,15 @@ private fun ZoneSheet(
         onDismissRequest = onDismiss,
     ) {
         if (zone == null) return@EdgeXBottomSheet
+        EdgeXListGroup {
+            EdgeXSwitchRow(
+                title = stringResource(R.string.compose_zone_enabled),
+                subtitle = stringResource(if (state.zoneEnabled(zone.id)) R.string.compose_enabled else R.string.compose_disabled),
+                checked = state.zoneEnabled(zone.id),
+                onCheckedChange = { onZoneEnabledChange(zone, it) },
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
         EdgeXListGroup {
             val gestures = gesturesFor(zone.edge)
             gestures.forEachIndexed { index, gesture ->
@@ -626,5 +664,11 @@ private fun Context.readGestureScreenState(): GestureScreenState {
             gesture.id to getConfigString(AppConfig.gestureActionLabel(zone.id, gesture.id), getString(R.string.action_none))
         }
     }
-    return GestureScreenState(actionsByZone, labelsByZone)
+    val enabledByZone = zones.associate { zone ->
+        zone.id to getConfigBool(AppConfig.zoneEnabled(zone.id), default = zoneHasConfiguredAction(zone.id, actionsByZone))
+    }
+    return GestureScreenState(actionsByZone, labelsByZone, enabledByZone)
 }
+
+private fun zoneHasConfiguredAction(zoneId: String, actionsByZone: Map<String, Map<String, String>>): Boolean =
+    actionsByZone[zoneId].orEmpty().values.any(AppConfig::isActiveActionValue)

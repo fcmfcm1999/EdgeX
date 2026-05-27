@@ -114,7 +114,10 @@ private fun Context.runtimeValuesAfterChange(changedValues: Map<String, String>)
         .map { (zone, _) -> zone }
         .toSet()
         .forEach { zone ->
-            result[AppConfig.zoneEnabled(zone)] = zoneHasConfiguredAction(zone, changedValues, prefs).toString()
+            val enabledKey = AppConfig.zoneEnabled(zone)
+            if (!prefs.contains(enabledKey)) {
+                result[enabledKey] = zoneHasConfiguredAction(zone, changedValues, prefs).toString()
+            }
         }
 
     changedValues.keys.mapNotNull(AppConfig::keyActionParts)
