@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -54,6 +55,7 @@ import com.fan.edgex.R
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
+import com.fan.edgex.ui.compose.components.EdgeXIconBox
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
@@ -236,29 +238,30 @@ private fun SupportGrid(showToast: (String) -> Unit) {
     val scanDonate = stringResource(R.string.compose_scan_donate)
     val clickJump = stringResource(R.string.compose_donate_click_jump)
     val viewAddress = stringResource(R.string.compose_donate_view_address)
-    data class MethodItem(val title: String, val subtitle: String, val color: Color)
+    data class MethodItem(val title: String, val subtitle: String, val icon: Int, val iconSize: Dp = 22.dp)
     val methods = listOf(
         listOf(
-            MethodItem(stringResource(R.string.donate_alipay), scanDonate, Color(0xFFCFE0FA)) to {
+            MethodItem(stringResource(R.string.donate_alipay), scanDonate, EdgeXIcons.Alipay) to {
                 DonateDialog.showAlipayQr(context)
                 showToast(thanksSupport)
             },
-            MethodItem(stringResource(R.string.donate_wechat), scanDonate, Color(0xFFC7EFCC)) to {
+            MethodItem(stringResource(R.string.donate_wechat), scanDonate, EdgeXIcons.WechatPay) to {
                 DonateDialog.showWechatQr(context)
                 showToast(thanksSupport)
             },
         ),
         listOf(
-            MethodItem(stringResource(R.string.donate_kofi), clickJump, Color(0xFFFBD7CF)) to {
+            MethodItem(stringResource(R.string.donate_kofi), clickJump, EdgeXIcons.KoFi) to {
                 DonateDialog.openKofi(context)
                 showToast(thanksSupport)
             },
-            MethodItem(stringResource(R.string.compose_donate_crypto_short), viewAddress, Color(0xFFE1D5FA)) to {
+            MethodItem(stringResource(R.string.compose_donate_crypto_short), viewAddress, EdgeXIcons.Eth, 33.dp) to {
                 DonateDialog.showCryptoAddresses(context)
                 showToast(thanksSupport)
             },
         ),
     )
+    val colors = LocalEdgeXColors.current
     Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         methods.forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -266,8 +269,8 @@ private fun SupportGrid(showToast: (String) -> Unit) {
                     Card(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(EdgeXRadius.lg),
-                        colors = CardDefaults.cardColors(containerColor = LocalEdgeXColors.current.surface),
-                        border = BorderStroke(1.dp, LocalEdgeXColors.current.outline),
+                        colors = CardDefaults.cardColors(containerColor = colors.surface),
+                        border = BorderStroke(1.dp, colors.outline),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         onClick = action,
                     ) {
@@ -276,15 +279,15 @@ private fun SupportGrid(showToast: (String) -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(item.color),
+                            EdgeXIconBox(
+                                imageVector = item.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                iconSize = item.iconSize,
                             )
                             Column {
-                                Text(item.title, color = LocalEdgeXColors.current.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(item.subtitle, color = LocalEdgeXColors.current.onSurfaceDim, fontSize = 11.sp)
+                                Text(item.title, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(item.subtitle, color = colors.onSurfaceDim, fontSize = 11.sp)
                             }
                         }
                     }

@@ -482,6 +482,7 @@
     <string name="compose_gestures_enabled_desc">拦截屏幕边缘触摸来触发动作</string>
     <string name="compose_gestures_enabled_toast">手势已启用</string>
     <string name="compose_gestures_disabled_toast">手势已停用</string>
+    <string name="compose_gesture_preview_subtitle">点击边缘区域配置手势。</string>
     <string name="compose_view_visual">可视化</string>
     <string name="compose_view_list">列表</string>
     <string name="compose_import">导入</string>
