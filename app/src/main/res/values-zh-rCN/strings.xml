@@ -453,10 +453,11 @@
     <string name="compose_home_hero_title">你的手势\n掌控一切</string>
     <string name="compose_home_hero_subtitle">已配置 %1$d 个手势动作 · %2$d/16 区域已启用</string>
     <string name="compose_stat_gestures">手势</string>
-    <string name="compose_stat_frozen">已冻结</string>
+    <string name="compose_stat_frozen">冻结抽屉</string>
     <string name="compose_stat_keys">按键</string>
-    <string name="compose_home_gesture_meta">%d 区域已配置</string>
-    <string name="compose_home_freezer_meta">%d 个已冻结</string>
+    <string name="compose_home_gesture_meta">%d 区域已启用</string>
+    <string name="compose_home_key_meta">%d 按键已启用</string>
+    <string name="compose_home_freezer_meta">%d 个应用在冻结抽屉里</string>
     <string name="compose_enabled">已启用</string>
     <string name="compose_disabled">未启用</string>
     <string name="compose_home_pie_meta">4 边缘 · 2 环</string>

@@ -156,11 +156,11 @@ fun EdgeXApp() {
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Freezer -> FreezerScreen(
-                    onBack = ::popRoute,
+                    onBack = ::popRouteAndRefresh,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Keys -> KeysScreen(
-                    onBack = ::popRoute,
+                    onBack = ::popRouteAndRefresh,
                     showToast = ::showToast,
                 )
                 EdgeXRoute.Pie -> PieScreen(
@@ -231,24 +231,33 @@ private fun Context.readHomeStats(): HomeStats {
             value.isNotBlank() && value != "none"
         }
     }
+    val prefs = configPrefs()
     val activeZones = AppConfig.ZONES.count { zone ->
-        AppConfig.GESTURES.any { gesture ->
-            val value = getConfigString(AppConfig.gestureAction(zone, gesture), "none")
-            value.isNotBlank() && value != "none"
+        val enabledKey = AppConfig.zoneEnabled(zone)
+        if (prefs.contains(enabledKey)) {
+            getConfigBool(enabledKey)
+        } else {
+            AppConfig.GESTURES.any { gesture ->
+                AppConfig.isActiveActionValue(getConfigString(AppConfig.gestureAction(zone, gesture), "none"))
+            }
         }
     }
-    val frozenCount = configPrefs()
+    val frozenCount = prefs
         .getString(AppConfig.FREEZER_APP_LIST, null)
         ?.split(',')
         ?.count { it.isNotBlank() }
         ?: 0
     val keyCount = if (getConfigBool(AppConfig.KEYS_ENABLED)) {
-        AppConfig.KEY_TRIGGERS.count { trigger ->
-            listOf(24, 25, 26).any { keyCode ->
-                val value = getConfigString(AppConfig.keyAction(keyCode, trigger), "none")
-                value.isNotBlank() && value != "none"
+        listOf(24, 25, 26).count { keyCode ->
+            val enabledKey = AppConfig.keyEnabled(keyCode)
+            if (prefs.contains(enabledKey)) {
+                getConfigBool(enabledKey)
+            } else {
+                AppConfig.KEY_TRIGGERS.any { trigger ->
+                    AppConfig.isActiveActionValue(getConfigString(AppConfig.keyAction(keyCode, trigger), "none"))
+                }
             }
-        }.coerceAtLeast(3)
+        }
     } else {
         0
     }

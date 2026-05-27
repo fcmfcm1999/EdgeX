@@ -213,7 +213,7 @@ private fun HomeTiles(state: HomeUiState, callbacks: HomeCallbacks) {
             )
             FeatureTile(
                 title = stringResource(R.string.menu_keys),
-                meta = if (state.keysEnabled) stringResource(R.string.compose_enabled) else stringResource(R.string.compose_disabled),
+                meta = if (state.keysEnabled) stringResource(R.string.compose_home_key_meta, state.stats.keyCount) else stringResource(R.string.compose_disabled),
                 icon = EdgeXIcons.Keys,
                 onClick = { callbacks.openRoute(EdgeXRoute.Keys) },
                 tag = "home_tile_keys",

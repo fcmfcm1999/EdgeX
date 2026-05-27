@@ -474,10 +474,11 @@
     <string name="compose_home_hero_title">Your Gestures\nControl Everything</string>
     <string name="compose_home_hero_subtitle">%1$d gesture actions configured · %2$d/16 zones active</string>
     <string name="compose_stat_gestures">Gestures</string>
-    <string name="compose_stat_frozen">Frozen</string>
+    <string name="compose_stat_frozen">Freezer Drawer</string>
     <string name="compose_stat_keys">Keys</string>
-    <string name="compose_home_gesture_meta">%d zones configured</string>
-    <string name="compose_home_freezer_meta">%d frozen</string>
+    <string name="compose_home_gesture_meta">%d zones enabled</string>
+    <string name="compose_home_key_meta">%d keys enabled</string>
+    <string name="compose_home_freezer_meta">%d apps in freezer drawer</string>
     <string name="compose_enabled">Enabled</string>
     <string name="compose_disabled">Disabled</string>
     <string name="compose_home_pie_meta">4 edges · 2 rings</string>
