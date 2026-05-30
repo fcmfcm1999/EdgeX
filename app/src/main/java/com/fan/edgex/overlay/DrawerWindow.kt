@@ -277,10 +277,20 @@ class DrawerWindow(
                         setMargins(gap, gap, gap, gap)
                     }
                     
-                    // Translucent ripple background feedback without explicit card background
+                    background = GradientDrawable().apply {
+                        setColor(if (dark) Color.argb(22, 255, 255, 255) else Color.argb(145, 255, 255, 255))
+                        cornerRadius = cardCorner
+                        // Delicate reflection edge stroke for glassmorphism
+                        setStroke(
+                            (1 * dp).toInt(),
+                            if (dark) Color.argb(40, 255, 255, 255) else Color.argb(80, 255, 255, 255)
+                        )
+                    }
+
+                    // Frosted card click ripple feedback using foreground
                     val outValue = android.util.TypedValue()
                     context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
-                    setBackgroundResource(outValue.resourceId)
+                    foreground = context.getDrawable(outValue.resourceId)
                     
                     outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
