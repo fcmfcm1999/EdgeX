@@ -276,17 +276,18 @@ class DrawerWindow(
                     layoutParams = LinearLayout.LayoutParams(0, cardHeight, 1f).apply {
                         setMargins(gap, gap, gap, gap)
                     }
-                    background = GradientDrawable().apply {
-                        setColor(cardBg)
-                        cornerRadius = cardCorner
-                    }
+                    
+                    // Translucent ripple background feedback without explicit card background
+                    val outValue = android.util.TypedValue()
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+                    setBackgroundResource(outValue.resourceId)
+                    
                     outlineProvider = object : ViewOutlineProvider() {
                         override fun getOutline(view: View, outline: Outline) {
                             outline.setRoundRect(0, 0, view.width, view.height, cardCorner)
                         }
                     }
                     clipToOutline = true
-                    elevation = 3f * dp
                     isClickable = true
                     isFocusable = true
                     setOnClickListener {
