@@ -599,4 +599,13 @@
     <string name="compose_about_description">Edge gesture control module based on Xposed framework</string>
     <string name="compose_version_info">v%1$s · 2026</string>
     <string name="compose_build_info">Build %1$d · %2$s</string>
+
+    <!-- Action Selection Redesign Categories -->
+    <string name="action_cat_all">All</string>
+    <string name="action_cat_navigation">Navigation</string>
+    <string name="action_cat_system">System</string>
+    <string name="action_cat_advanced">Advanced</string>
+    <string name="action_cat_apps">Apps &amp; Tools</string>
+    <string name="compose_action_needs_config">Configure</string>
 </resources>
+

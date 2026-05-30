@@ -1,22 +1,22 @@
 package com.fan.edgex.ui.compose.components
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
@@ -77,13 +77,19 @@ fun ActionSelectionSheet(
 ) {
     val colors = LocalEdgeXColors.current
     var searchQuery by remember { mutableStateOf("") }
+
     val items = remember(excludedCodes) {
         allActionSelectionItems.filter { it.code !in excludedCodes }
     }
+
     val query = searchQuery.trim()
-    val filtered = if (query.isBlank()) items else items.filter {
-        stringResource(it.labelRes).contains(query, ignoreCase = true)
+    val filtered = items.filter { item ->
+        query.isBlank() || stringResource(item.labelRes).contains(query, ignoreCase = true)
     }
+
+    val shellItem = filtered.find { it.code == "shell_command" }
+    val musicItem = filtered.find { it.code == "music_control" }
+    val others = filtered.filter { it.code != "shell_command" && it.code != "music_control" }
 
     EdgeXBottomSheet(
         open = open,
@@ -102,30 +108,143 @@ fun ActionSelectionSheet(
             placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
             singleLine = true,
             shape = RoundedCornerShape(EdgeXRadius.sm),
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        EdgeXIcon(EdgeXIcons.Back, contentDescription = "Clear", tint = colors.onSurfaceDim)
+                    }
+                }
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = colors.accent,
                 unfocusedBorderColor = colors.outline,
                 cursorColor = colors.accent,
             ),
         )
+
+        // Action Grid List
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f, fill = false)
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            EdgeXListGroup {
-                filtered.forEachIndexed { index, action ->
-                    EdgeXRow(
-                        title = stringResource(action.labelRes),
-                        icon = action.icon,
+            if (musicItem != null || shellItem != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (musicItem != null) {
+                        ActionGridItem(
+                            action = musicItem,
+                            onClick = {
+                                searchQuery = ""
+                                onSelect(musicItem)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    if (shellItem != null) {
+                        ActionGridItem(
+                            action = shellItem,
+                            onClick = {
+                                searchQuery = ""
+                                onSelect(shellItem)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            val chunked = others.chunked(2)
+            chunked.forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ActionGridItem(
+                        action = pair[0],
                         onClick = {
                             searchQuery = ""
-                            onSelect(action)
+                            onSelect(pair[0])
                         },
+                        modifier = Modifier.weight(1f)
                     )
-                    if (index != filtered.lastIndex) EdgeXDivider()
+                    if (pair.size > 1) {
+                        ActionGridItem(
+                            action = pair[1],
+                            onClick = {
+                                searchQuery = ""
+                                onSelect(pair[1])
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ActionGridItem(
+    action: ActionSelectionItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalEdgeXColors.current
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(EdgeXRadius.sm))
+            .background(colors.surface1)
+            .border(1.dp, colors.outline, RoundedCornerShape(EdgeXRadius.sm))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(EdgeXRadius.xs))
+                    .background(colors.accentSoft),
+                contentAlignment = Alignment.Center
+            ) {
+                EdgeXIcon(
+                    imageVector = action.icon,
+                    contentDescription = null,
+                    tint = colors.onAccentSoft,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Text(
+                text = stringResource(action.labelRes),
+                color = colors.onSurface,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (action.needsSecondary) {
+                EdgeXIcon(
+                    imageVector = EdgeXIcons.ChevronRight,
+                    contentDescription = null,
+                    tint = colors.onSurfaceDim,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
     }

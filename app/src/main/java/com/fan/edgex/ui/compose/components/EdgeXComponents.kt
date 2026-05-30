@@ -314,13 +314,18 @@ fun EdgeXBottomSheet(
     title: String,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    skipPartiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = LocalEdgeXColors.current
     if (open) {
+        val sheetState = androidx.compose.material3.rememberModalBottomSheetState(
+            skipPartiallyExpanded = skipPartiallyExpanded
+        )
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
             modifier = modifier,
+            sheetState = sheetState,
             containerColor = colors.surface,
             contentColor = colors.onSurface,
             shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
@@ -347,6 +352,7 @@ fun EdgeXBottomSheet(
         }
     }
 }
+
 
 @Composable
 fun EdgeXToast(

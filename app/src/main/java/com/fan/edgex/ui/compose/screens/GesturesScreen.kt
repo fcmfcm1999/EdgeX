@@ -75,6 +75,10 @@ import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
 import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.ImageView
+import androidx.compose.runtime.LaunchedEffect
+
 
 private enum class GestureFilter(val labelRes: Int) {
     Visual(R.string.compose_view_visual),
@@ -495,22 +499,15 @@ private fun FullEdgeGrid(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        zones.filter { it.lowPriority }.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { zone ->
-                    ZoneCard(
-                        zone = zone,
-                        count = state.count(zone.id),
-                        enabled = state.zoneEnabled(zone.id),
-                        onClick = { onZoneClick(zone) },
-                        onEnabledChange = { onZoneEnabledChange(zone, it) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (row.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
+        zones.filter { it.lowPriority }.forEach { zone ->
+            ZoneCard(
+                zone = zone,
+                count = state.count(zone.id),
+                enabled = state.zoneEnabled(zone.id),
+                onClick = { onZoneClick(zone) },
+                onEnabledChange = { onZoneEnabledChange(zone, it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -616,17 +613,99 @@ private fun ZoneSheet(
         EdgeXListGroup {
             val gestures = gesturesFor(zone.edge)
             gestures.forEachIndexed { index, gesture ->
-                EdgeXRow(
+                val actionCode = state.actionCode(zone.id, gesture.id)
+                GestureRow(
                     title = stringResource(gesture.labelRes),
                     subtitle = state.actionLabel(zone.id, gesture.id),
-                    icon = gesture.icon,
+                    actionCode = actionCode,
                     onClick = { onPickAction(gesture) },
-                ) {
-                    EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
-                }
+                )
                 if (index != gestures.lastIndex) EdgeXDivider()
             }
         }
+    }
+}
+
+@Composable
+private fun GestureRow(
+    title: String,
+    subtitle: String?,
+    actionCode: String,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = LocalEdgeXColors.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val isApp = actionCode.startsWith("launch_app:")
+            val isShortcut = actionCode.startsWith("app_shortcut:")
+
+            var appDrawable by remember(actionCode) { mutableStateOf<android.graphics.drawable.Drawable?>(null) }
+
+            if (isApp || isShortcut) {
+                val pkg = if (isApp) {
+                    actionCode.removePrefix("launch_app:")
+                } else {
+                    actionCode.removePrefix("app_shortcut:").substringBefore(":")
+                }
+
+                LaunchedEffect(pkg) {
+                    appDrawable = runCatching {
+                        context.packageManager.getApplicationIcon(pkg)
+                    }.getOrNull()
+                }
+            }
+
+            if (appDrawable != null) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(EdgeXRadius.sm))
+                        .background(colors.accentSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            ImageView(ctx).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }
+                        },
+                        update = { imageView ->
+                            imageView.setImageDrawable(appDrawable)
+                        },
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            } else {
+                val iconRes = com.fan.edgex.ui.ActionSelectionActivity.actionIconRes(actionCode)
+                EdgeXIconBox(
+                    imageVector = iconRes,
+                    contentDescription = null,
+                    background = colors.accentSoft,
+                    tint = colors.onAccentSoft
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = colors.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, color = colors.onSurfaceDim, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)
     }
 }
 

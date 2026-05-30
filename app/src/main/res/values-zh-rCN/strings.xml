@@ -574,8 +574,16 @@
     <string name="compose_about_support_author_crypto">支付宝 · 微信 · 加密货币</string>
     <string name="compose_developer">开发者</string>
     <string name="compose_debug_logs">调试日志</string>
-    <string name="compose_export_config">导出配置</string>
     <string name="compose_about_description">基于 Xposed 框架的边缘手势控制模块</string>
     <string name="compose_version_info">v%1$s · 2026</string>
     <string name="compose_build_info">Build %1$d · %2$s</string>
+
+    <!-- Action Selection Redesign Categories -->
+    <string name="action_cat_all">全部</string>
+    <string name="action_cat_navigation">导航</string>
+    <string name="action_cat_system">系统与开关</string>
+    <string name="action_cat_advanced">高级面板</string>
+    <string name="action_cat_apps">应用与工具</string>
+    <string name="compose_action_needs_config">配置</string>
 </resources>
+
