@@ -220,7 +220,17 @@ private fun Context.readHomeUiState(): HomeUiState =
         edgeLighting = getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, default = true),
         moduleActive = ModuleActivationState.isActive(this),
         accent = EdgeXAccent.fromId(getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Default.id)),
-        darkMode = getConfigBool(AppConfig.UI_DARK_MODE),
+        darkMode = run {
+            val darkSetting = getConfigString(AppConfig.UI_DARK_MODE, "system")
+            when (darkSetting) {
+                "dark" -> true
+                "light" -> false
+                "system" -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+                else -> darkSetting.toBooleanStrictOrNull() ?: ((resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES)
+            }
+        },
         premiumStatus = PremiumActivator.status(this),
     )
 

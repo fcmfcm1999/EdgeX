@@ -89,6 +89,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIconButton
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
+import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
@@ -1371,7 +1372,15 @@ fun ThemeScreen(
 ) {
     val context = LocalContext.current
     var accent by remember { mutableStateOf(EdgeXAccent.fromId(context.getConfigString(AppConfig.UI_ACCENT, EdgeXAccent.Default.id))) }
-    var dark by remember { mutableStateOf(context.getConfigBool(AppConfig.UI_DARK_MODE)) }
+    var darkSetting by remember {
+        val raw = context.getConfigString(AppConfig.UI_DARK_MODE, "system")
+        val normalized = when (raw) {
+            "true", "dark" -> "dark"
+            "false", "light" -> "light"
+            else -> "system"
+        }
+        mutableStateOf(DarkModeOption.fromId(normalized))
+    }
     var customColor by remember { mutableStateOf(accent.lightAccent) }
 
     Column(
@@ -1387,25 +1396,43 @@ fun ThemeScreen(
             onSelected = {
                 accent = it
                 customColor = it.lightAccent
-                context.saveUiTheme(it, dark)
+                context.saveUiTheme(it, darkSetting.id)
                 onThemeChanged()
                 showToast(context.getString(R.string.compose_theme_saved))
             },
         )
         ThemeSectionLabel(stringResource(R.string.compose_theme_dark))
         EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
-            EdgeXSwitchRow(
-                title = stringResource(R.string.compose_theme_dark),
-                subtitle = stringResource(R.string.compose_theme_dark_desc),
-                checked = dark,
-                onCheckedChange = {
-                    dark = it
-                    context.putConfig(AppConfig.UI_DARK_MODE, it)
-                    onThemeChanged()
-                },
-                icon = EdgeXIcons.DarkMode,
-                modifier = Modifier.testTag("theme_dark_mode"),
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    EdgeXIcon(EdgeXIcons.DarkMode, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim, modifier = Modifier.size(20.dp))
+                    Text(
+                        text = stringResource(R.string.compose_theme_dark_desc),
+                        color = LocalEdgeXColors.current.onSurfaceDim,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                EdgeXSegmentedControl(
+                    options = DarkModeOption.entries,
+                    selected = darkSetting,
+                    label = { context.getString(it.labelRes) },
+                    onSelected = { option ->
+                        darkSetting = option
+                        context.putConfig(AppConfig.UI_DARK_MODE, option.id)
+                        onThemeChanged()
+                    },
+                    modifier = Modifier.testTag("theme_dark_mode"),
+                )
+            }
         }
         ThemeSectionLabel(stringResource(R.string.compose_theme_custom_rgb))
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -1546,8 +1573,19 @@ private fun accentName(accent: EdgeXAccent): String =
         },
     )
 
-private fun Context.saveUiTheme(accent: EdgeXAccent, dark: Boolean) {
+private fun Context.saveUiTheme(accent: EdgeXAccent, darkSetting: String) {
     putConfig(AppConfig.UI_ACCENT, accent.id)
-    putConfig(AppConfig.UI_DARK_MODE, dark)
+    putConfig(AppConfig.UI_DARK_MODE, darkSetting)
     ThemeManager.saveCustomColor(this, accent.lightAccent.toArgb())
+}
+
+private enum class DarkModeOption(val id: String, val labelRes: Int) {
+    System("system", R.string.compose_theme_dark_system),
+    Light("light", R.string.compose_theme_dark_light),
+    Dark("dark", R.string.compose_theme_dark_dark);
+    
+    companion object {
+        fun fromId(id: String): DarkModeOption =
+            entries.firstOrNull { it.id == id } ?: System
+    }
 }

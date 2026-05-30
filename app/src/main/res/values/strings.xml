@@ -565,6 +565,9 @@
     <string name="compose_theme_preset">Preset Themes</string>
     <string name="compose_theme_dark">Dark Mode</string>
     <string name="compose_theme_dark_desc">Follow system or toggle manually</string>
+    <string name="compose_theme_dark_system">System</string>
+    <string name="compose_theme_dark_light">Light</string>
+    <string name="compose_theme_dark_dark">Dark</string>
     <string name="compose_theme_custom_rgb">Custom RGB</string>
     <string name="compose_theme_saved">Theme saved</string>
     <string name="compose_theme_custom_saved">Custom color saved</string>

@@ -544,6 +544,9 @@
     <string name="compose_theme_preset">预设主题</string>
     <string name="compose_theme_dark">深色模式</string>
     <string name="compose_theme_dark_desc">跟随系统或手动切换</string>
+    <string name="compose_theme_dark_system">跟随系统</string>
+    <string name="compose_theme_dark_light">浅色模式</string>
+    <string name="compose_theme_dark_dark">深色模式</string>
     <string name="compose_theme_custom_rgb">自定义 RGB</string>
     <string name="compose_theme_saved">主题已保存</string>
     <string name="compose_theme_custom_saved">自定义颜色已保存</string>
