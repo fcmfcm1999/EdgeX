@@ -119,9 +119,10 @@ object ClipboardOverlay {
 
     // ── Theme (mirrors DrawerWindow) ───────────────────────────────────────────
 
-    private fun isDark(context: Context) =
-        (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-                Configuration.UI_MODE_NIGHT_YES
+    private fun isDark(context: Context): Boolean {
+        val snapshot = HookConfigSnapshot.readFromHookFile()
+        return snapshot[AppConfig.UI_DARK_MODE]?.toBoolean() ?: false
+    }
 
     private fun readAccentColor(): Int {
         val snapshot = HookConfigSnapshot.readFromHookFile()
