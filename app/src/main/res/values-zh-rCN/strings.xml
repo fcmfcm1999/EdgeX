@@ -267,6 +267,7 @@
     <string name="theme_preset_cedar">雪松</string>
     <string name="theme_preset_ocean">海洋</string>
     <string name="theme_preset_ember">炭火</string>
+    <string name="theme_preset_custom">自定义</string>
     <string name="header_theme">主题</string>
     <string name="menu_theme">主题</string>
     <string name="menu_theme_desc">选择一个主题色</string>

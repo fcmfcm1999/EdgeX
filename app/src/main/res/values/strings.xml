@@ -291,6 +291,7 @@
     <string name="theme_preset_cedar">Cedar</string>
     <string name="theme_preset_ocean">Ocean</string>
     <string name="theme_preset_ember">Ember</string>
+    <string name="theme_preset_custom">Custom</string>
     <string name="label_frozen">FROZEN</string>
     <string name="freezer_drawer_title">Freezer</string>
     <string name="freezer_drawer_summary">%1$d apps · %2$d frozen</string>

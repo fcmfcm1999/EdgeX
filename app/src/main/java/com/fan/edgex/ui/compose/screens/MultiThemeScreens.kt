@@ -1381,7 +1381,11 @@ fun ThemeScreen(
         }
         mutableStateOf(DarkModeOption.fromId(normalized))
     }
-    var customColor by remember { mutableStateOf(accent.lightAccent) }
+    var customColor by remember {
+        val savedHex = context.getConfigString(AppConfig.THEME_CUSTOM_COLOR, "#326D32")
+        val colorInt = runCatching { android.graphics.Color.parseColor(savedHex) }.getOrDefault(android.graphics.Color.parseColor("#326D32"))
+        mutableStateOf(Color(colorInt))
+    }
 
     Column(
         modifier = modifier
@@ -1444,12 +1448,13 @@ fun ThemeScreen(
                     ColorPickerDialog.show(
                         context = context,
                         title = context.getString(R.string.compose_theme_custom_rgb),
-                        configKey = AppConfig.UI_ACCENT + "_custom_color",
+                        configKey = AppConfig.THEME_CUSTOM_COLOR,
                         defaultColor = "#%08X".format(customColor.toArgb().toLong() and 0xFFFFFFFFL),
                     ) { picked ->
                         customColor = Color(picked)
                         ThemeManager.saveCustomColor(context, picked)
                         context.putConfigsSync(AppConfig.UI_ACCENT to "custom")
+                        accent = EdgeXAccent.Custom
                         onThemeChanged()
                         showToast(context.getString(R.string.compose_theme_custom_saved))
                     }
@@ -1469,12 +1474,17 @@ fun ThemeScreen(
 
 @Composable
 private fun ThemeHero(accent: EdgeXAccent) {
+    val themeAccentColor = if (accent == EdgeXAccent.Custom) {
+        LocalEdgeXColors.current.accent
+    } else {
+        accent.lightAccent
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 20.dp),
         shape = RoundedCornerShape(EdgeXRadius.xl),
-        colors = CardDefaults.cardColors(containerColor = accent.lightAccent),
+        colors = CardDefaults.cardColors(containerColor = themeAccentColor),
         border = BorderStroke(0.dp, Color.Transparent),
     ) {
         Box(
@@ -1500,13 +1510,6 @@ private fun ThemeHero(accent: EdgeXAccent) {
                     lineHeight = 36.sp,
                     modifier = Modifier.padding(top = 8.dp),
                 )
-                Text(
-                    "#%06X".format(accent.lightAccent.toArgb() and 0xFFFFFF),
-                    color = Color.White.copy(alpha = 0.86f),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
             }
         }
     }
@@ -1514,9 +1517,10 @@ private fun ThemeHero(accent: EdgeXAccent) {
 
 @Composable
 private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> Unit) {
+    val presets = remember { EdgeXAccent.entries.filter { it != EdgeXAccent.Custom } }
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            EdgeXAccent.entries.forEach { accent ->
+            presets.forEach { accent ->
                 val isSelected = selected == accent
                 Box(
                     modifier = Modifier
@@ -1535,7 +1539,7 @@ private fun AccentSwatches(selected: EdgeXAccent, onSelected: (EdgeXAccent) -> U
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-            EdgeXAccent.entries.forEach { accent ->
+            presets.forEach { accent ->
                 Text(
                     text = accentName(accent),
                     color = LocalEdgeXColors.current.onSurfaceDim,
@@ -1570,6 +1574,7 @@ private fun accentName(accent: EdgeXAccent): String =
             EdgeXAccent.Cedar -> R.string.theme_preset_cedar
             EdgeXAccent.Ocean -> R.string.theme_preset_ocean
             EdgeXAccent.Ember -> R.string.theme_preset_ember
+            EdgeXAccent.Custom -> R.string.theme_preset_custom
         },
     )
 
