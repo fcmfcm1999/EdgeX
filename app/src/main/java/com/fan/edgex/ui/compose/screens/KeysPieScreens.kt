@@ -29,6 +29,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -272,20 +273,103 @@ private fun KeyDetailSheet(
                     stringResource(key.titleRes),
                     stringResource(trigger.labelRes),
                 )
-                EdgeXRow(
+                val actionCode = context.getConfigString(AppConfig.keyAction(key.keyCode, trigger.id), "none")
+                val subtitle = context.getConfigString(
+                    AppConfig.keyActionLabel(key.keyCode, trigger.id),
+                    stringResource(R.string.action_none),
+                ) + refreshTick.let { "" }
+                KeyTriggerRow(
                     title = stringResource(trigger.labelRes),
-                    subtitle = context.getConfigString(
-                        AppConfig.keyActionLabel(key.keyCode, trigger.id),
-                        stringResource(R.string.action_none),
-                    ) + refreshTick.let { "" },
-                    icon = EdgeXIcons.Gesture,
+                    subtitle = subtitle,
+                    actionCode = actionCode,
                     onClick = { onTriggerClick(key, trigger, actionTitle) },
-                ) {
-                    EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
-                }
+                )
                 if (index != keyTriggers.lastIndex) EdgeXDivider()
             }
         }
+    }
+}
+
+@Composable
+private fun KeyTriggerRow(
+    title: String,
+    subtitle: String?,
+    actionCode: String,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val colors = LocalEdgeXColors.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val isApp = actionCode.startsWith("launch_app:")
+            val isShortcut = actionCode.startsWith("app_shortcut:")
+
+            var appDrawable by remember(actionCode) { mutableStateOf<android.graphics.drawable.Drawable?>(null) }
+
+            if (isApp || isShortcut) {
+                val pkg = if (isApp) {
+                    actionCode.removePrefix("launch_app:")
+                } else {
+                    actionCode.removePrefix("app_shortcut:").substringBefore(":")
+                }
+
+                LaunchedEffect(pkg) {
+                    appDrawable = runCatching {
+                        context.packageManager.getApplicationIcon(pkg)
+                    }.getOrNull()
+                }
+            }
+
+            if (appDrawable != null) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(EdgeXRadius.sm))
+                        .background(colors.accentSoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            ImageView(ctx).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                            }
+                        },
+                        update = { imageView ->
+                            imageView.setImageDrawable(appDrawable)
+                        },
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            } else {
+                val iconRes = com.fan.edgex.ui.ActionSelectionActivity.actionIconRes(actionCode)
+                EdgeXIconBox(
+                    imageVector = iconRes,
+                    contentDescription = null,
+                    background = colors.accentSoft,
+                    tint = colors.onAccentSoft
+                )
+            }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = colors.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, color = colors.onSurfaceDim, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+
+        EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)
     }
 }
 
