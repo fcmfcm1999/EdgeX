@@ -1444,6 +1444,7 @@ fun ThemeScreen(
                 title = "#%06X".format(customColor.toArgb() and 0xFFFFFF),
                 subtitle = stringResource(R.string.compose_theme_custom_rgb),
                 icon = EdgeXIcons.Theme,
+                modifier = Modifier.testTag("theme_custom_apply"),
                 onClick = {
                     ColorPickerDialog.show(
                         context = context,

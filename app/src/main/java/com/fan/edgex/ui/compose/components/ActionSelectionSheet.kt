@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -204,6 +205,7 @@ fun ActionGridItem(
     val colors = LocalEdgeXColors.current
     Box(
         modifier = modifier
+            .testTag("gesture_action_${action.code}")
             .clip(RoundedCornerShape(EdgeXRadius.sm))
             .background(colors.surface1)
             .border(1.dp, colors.outline, RoundedCornerShape(EdgeXRadius.sm))

@@ -274,9 +274,13 @@ private fun KeyDetailSheet(
                     stringResource(trigger.labelRes),
                 )
                 val actionCode = context.getConfigString(AppConfig.keyAction(key.keyCode, trigger.id), "none")
-                val subtitle = context.getConfigString(
-                    AppConfig.keyActionLabel(key.keyCode, trigger.id),
-                    stringResource(R.string.action_none),
+                val subtitle = ActionSelectionActivity.resolveActionLabel(
+                    context,
+                    actionCode,
+                    context.getConfigString(
+                        AppConfig.keyActionLabel(key.keyCode, trigger.id),
+                        stringResource(R.string.action_none),
+                    )
                 ) + refreshTick.let { "" }
                 KeyTriggerRow(
                     title = stringResource(trigger.labelRes),
@@ -914,7 +918,9 @@ private fun Context.keyEnabledState(keyCode: Int, refreshTick: Int): Boolean {
 
 private fun Context.keySubtitle(keyCode: Int, refreshTick: Int): String {
     val labels = keyTriggers.mapNotNull { trigger ->
-        val label = getConfigString(AppConfig.keyActionLabel(keyCode, trigger.id))
+        val action = getConfigString(AppConfig.keyAction(keyCode, trigger.id), "none")
+        val rawLabel = getConfigString(AppConfig.keyActionLabel(keyCode, trigger.id))
+        val label = ActionSelectionActivity.resolveActionLabel(this, action, rawLabel)
         label.takeIf { it.isNotBlank() && it != "None" && it != getString(R.string.action_none) }
             ?.let { getString(R.string.compose_trigger_label, getString(trigger.labelRes), it) }
     }

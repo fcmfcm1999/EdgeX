@@ -146,10 +146,15 @@ class PieSettingsActivity : AppCompatActivity() {
 
     private fun refreshLabels() {
         for (info in rows) {
-            val label = getConfigString(
+            val action = getConfigString(
+                AppConfig.pieSlot(info.edge, info.ring, info.slot),
+                "none"
+            )
+            val rawLabel = getConfigString(
                 AppConfig.pieSlotLabel(info.edge, info.ring, info.slot),
                 getString(R.string.action_none),
             )
+            val label = ActionSelectionActivity.resolveActionLabel(this, action, rawLabel)
             info.view.findViewById<TextView>(R.id.action_subtitle)?.text = label
         }
     }

@@ -63,7 +63,9 @@ fun SubGestureSheet(
         EdgeXListGroup {
             subGestureDirections.forEachIndexed { index, dir ->
                 val childKey = AppConfig.subGestureChildKey(prefKey, dir.direction)
-                val label = context.getConfigString("${childKey}_label", context.getString(R.string.action_none))
+                val action = context.getConfigString(childKey, "none")
+                val rawLabel = context.getConfigString("${childKey}_label", context.getString(R.string.action_none))
+                val label = com.fan.edgex.ui.ActionSelectionActivity.resolveActionLabel(context, action, rawLabel)
                 EdgeXRow(
                     title = stringResource(dir.labelRes),
                     subtitle = label + refreshTick.let { "" },

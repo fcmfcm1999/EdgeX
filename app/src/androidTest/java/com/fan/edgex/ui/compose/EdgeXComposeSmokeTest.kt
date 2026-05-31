@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.platform.app.InstrumentationRegistry
+import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.configPrefs
 import com.fan.edgex.ui.MainActivity
@@ -41,40 +42,41 @@ class EdgeXComposeSmokeTest {
     @Test
     fun homeShowsPrimaryEntryPoints() {
         composeRule.onNodeWithText("EdgeX").assertIsDisplayed()
-        composeRule.onNodeWithText("你的手势\n掌控一切").assertIsDisplayed()
-        composeRule.onNodeWithText("Pie 菜单").assertIsDisplayed()
-        composeRule.onNodeWithText("Premium").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_home_hero_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.header_pie_settings)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_about_support_author)).performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun homeTilesNavigateThroughComposeStack() {
         composeRule.onNodeWithTag("home_tile_theme").performScrollTo().performClick()
-        composeRule.onNodeWithText("当前主题").assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.header_theme)).assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription("返回").assert(hasClickAction()).performClick()
+        composeRule.onNodeWithContentDescription(appContext.getString(R.string.compose_back)).assert(hasClickAction()).performClick()
         composeRule.onNodeWithText("EdgeX").assertIsDisplayed()
 
         composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
-        composeRule.onNodeWithText("点击屏幕\n边缘配置手势").assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_gestures_hero)).assertIsDisplayed()
     }
 
     @Test
     fun gestureSheetWritesDirectAction() {
         composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_view_list)).performClick()
         composeRule.onNodeWithTag("gesture_zone_right_mid").performScrollTo().performClick()
-        composeRule.onNodeWithText("左划").performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.gesture_swipe_left)).performClick()
         composeRule.onNodeWithTag("gesture_action_back").performClick()
 
         val prefs = appContext.configPrefs()
         assertEquals("back", prefs.getString(AppConfig.gestureAction("right_mid", "swipe_left"), null))
-        assertEquals("返回", prefs.getString(AppConfig.gestureActionLabel("right_mid", "swipe_left"), null))
+        assertEquals(appContext.getString(R.string.action_back), prefs.getString(AppConfig.gestureActionLabel("right_mid", "swipe_left"), null))
     }
 
     @Test
     fun themeControlsPersistAccentDarkModeAndCustomColor() {
         composeRule.onNodeWithTag("home_tile_theme").performScrollTo().performClick()
 
-        listOf("green", "blue", "coral", "violet", "amber").forEach { accent ->
+        listOf("default", "classic", "cedar", "ocean", "ember").forEach { accent ->
             composeRule.onNodeWithTag("theme_accent_$accent").performClick()
             assertEquals(accent, appContext.configPrefs().getString(AppConfig.UI_ACCENT, null))
         }
@@ -88,13 +90,13 @@ class EdgeXComposeSmokeTest {
     @Test
     fun freezerTabsAndSearchRenderEmptyState() {
         composeRule.onNodeWithTag("home_tile_freezer").performScrollTo().performClick()
-        composeRule.onNodeWithText("全部").assertIsDisplayed()
-        composeRule.onNodeWithText("已冻结").performClick()
-        composeRule.onNodeWithText("使用中").performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_filter_all)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_app_frozen)).performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_filter_active)).performClick()
 
         composeRule.onNodeWithTag("freezer_search").performTextInput("zzzz-no-such-package")
-        waitUntilTextExists("没有匹配的应用")
-        composeRule.onNodeWithText("没有匹配的应用").assertIsDisplayed()
+        waitUntilTextExists(appContext.getString(R.string.compose_no_matching_apps))
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_no_matching_apps)).assertIsDisplayed()
     }
 
     private fun waitUntilTextExists(text: String) {

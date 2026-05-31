@@ -740,7 +740,9 @@ private fun Context.readGestureScreenState(): GestureScreenState {
     }
     val labelsByZone = zones.associate { zone ->
         zone.id to gesturesFor(zone.edge).associate { gesture ->
-            gesture.id to getConfigString(AppConfig.gestureActionLabel(zone.id, gesture.id), getString(R.string.action_none))
+            val action = actionsByZone[zone.id]?.get(gesture.id).orEmpty()
+            val rawLabel = getConfigString(AppConfig.gestureActionLabel(zone.id, gesture.id), getString(R.string.action_none))
+            gesture.id to com.fan.edgex.ui.ActionSelectionActivity.resolveActionLabel(this, action, rawLabel)
         }
     }
     val enabledByZone = zones.associate { zone ->

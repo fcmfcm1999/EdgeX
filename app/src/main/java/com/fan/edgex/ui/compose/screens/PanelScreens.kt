@@ -540,7 +540,10 @@ private fun Context.displayPanelTitleForAction(action: String, savedLabel: Strin
             appLabel(packageName) ?: getString(R.string.action_app_shortcut)
         }
         action.startsWith("shell:") -> shellCommandTitle(action, savedLabel)
-        else -> savedLabel.ifBlank { action }
+        else -> {
+            val resolved = ActionSelectionActivity.resolveActionLabel(this, action, savedLabel)
+            resolved.ifBlank { action }
+        }
     }
 }
 

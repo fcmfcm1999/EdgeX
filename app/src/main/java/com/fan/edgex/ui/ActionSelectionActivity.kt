@@ -81,6 +81,58 @@ class ActionSelectionActivity : AppCompatActivity() {
             imageView.setImageResource(actionIconRes(code))
             imageView.imageTintList = ColorStateList.valueOf(Color.WHITE)
         }
+
+        fun resolveActionLabel(context: Context, code: String, fallbackLabel: String): String {
+            if (code.isEmpty() || code == "none") {
+                return context.getString(R.string.action_none)
+            }
+            if (code.startsWith("music_control:")) {
+                val subCode = code.removePrefix("music_control:")
+                val resId = when (subCode) {
+                    "play_pause" -> R.string.action_music_play_pause
+                    "stop" -> R.string.action_music_stop
+                    "previous" -> R.string.action_music_previous
+                    "next" -> R.string.action_music_next
+                    else -> R.string.action_music_control
+                }
+                return context.getString(R.string.label_music_prefix, context.getString(resId))
+            }
+            val resId = when (code) {
+                "back" -> R.string.action_back
+                "home" -> R.string.action_home
+                "recents" -> R.string.action_recents
+                "expand_notifications" -> R.string.action_expand_notifications
+                "clear_background" -> R.string.action_clear_background
+                "freezer_drawer" -> R.string.action_freezer_drawer
+                "refreeze" -> R.string.action_refreeze
+                "screenshot" -> R.string.action_screenshot
+                AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.string.action_partial_screenshot
+                "clipboard" -> R.string.action_clipboard
+                "universal_copy" -> R.string.action_universal_copy
+                "lock_screen" -> R.string.action_lock_screen
+                "kill_app" -> R.string.action_kill_app
+                "prev_app" -> R.string.action_prev_app
+                "next_app" -> R.string.action_next_app
+                "brightness_up" -> R.string.action_brightness_up
+                "brightness_down" -> R.string.action_brightness_down
+                "volume_up" -> R.string.action_volume_up
+                "volume_down" -> R.string.action_volume_down
+                "toggle_flashlight" -> R.string.action_toggle_flashlight
+                "toggle_wifi" -> R.string.action_toggle_wifi
+                "toggle_mobile_data" -> R.string.action_toggle_mobile_data
+                "game_mode" -> R.string.action_game_mode
+                "sub_gesture" -> R.string.action_sub_gesture
+                "pie" -> R.string.action_pie
+                AppConfig.CUSTOM_PANEL_ACTION -> R.string.action_custom_panel
+                AppConfig.SIDE_BAR_LEFT_ACTION -> R.string.action_left_side_bar
+                AppConfig.SIDE_BAR_RIGHT_ACTION -> R.string.action_right_side_bar
+                else -> 0
+            }
+            if (resId != 0) {
+                return context.getString(resId)
+            }
+            return fallbackLabel
+        }
     }
 
     data class ActionItem(val label: String, val code: String, val iconRes: Int)
