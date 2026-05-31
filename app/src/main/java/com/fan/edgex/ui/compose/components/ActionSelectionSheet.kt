@@ -131,59 +131,41 @@ fun ActionSelectionSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (musicItem != null || shellItem != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    if (musicItem != null) {
-                        ActionGridItem(
-                            action = musicItem,
-                            onClick = {
-                                searchQuery = ""
-                                onSelect(musicItem)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+            val baseRows = others.chunked(2)
+            val specialRow = listOfNotNull(musicItem, shellItem)
 
-                    if (shellItem != null) {
-                        ActionGridItem(
-                            action = shellItem,
-                            onClick = {
-                                searchQuery = ""
-                                onSelect(shellItem)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
+            val finalRows = mutableListOf<List<ActionSelectionItem>>()
+            var inserted = false
+            baseRows.forEach { row ->
+                finalRows.add(row)
+                if (!inserted && specialRow.isNotEmpty() && row.any { it.code == "expand_notifications" || it.code == "sub_gesture" }) {
+                    finalRows.add(specialRow)
+                    inserted = true
                 }
             }
+            if (!inserted && specialRow.isNotEmpty()) {
+                finalRows.add(specialRow)
+            }
 
-            val chunked = others.chunked(2)
-            chunked.forEach { pair ->
+            finalRows.forEach { rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ActionGridItem(
-                        action = pair[0],
+                        action = rowItems[0],
                         onClick = {
                             searchQuery = ""
-                            onSelect(pair[0])
+                            onSelect(rowItems[0])
                         },
                         modifier = Modifier.weight(1f)
                     )
-                    if (pair.size > 1) {
+                    if (rowItems.size > 1) {
                         ActionGridItem(
-                            action = pair[1],
+                            action = rowItems[1],
                             onClick = {
                                 searchQuery = ""
-                                onSelect(pair[1])
+                                onSelect(rowItems[1])
                             },
                             modifier = Modifier.weight(1f)
                         )
