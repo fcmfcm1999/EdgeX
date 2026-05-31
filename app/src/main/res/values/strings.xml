@@ -524,6 +524,7 @@
     <string name="compose_refreezing">Refreezing</string>
     <string name="compose_refrozen">Refrozen</string>
     <string name="compose_filter_all">All</string>
+    <string name="compose_app_frozen">Frozen</string>
     <string name="compose_filter_active">Active</string>
     <string name="compose_freeze_success">Frozen: %s</string>
     <string name="compose_unfreeze_success">Unfrozen: %s</string>

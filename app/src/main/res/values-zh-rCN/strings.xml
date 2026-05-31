@@ -526,6 +526,7 @@
     <string name="compose_refreezing">正在重新冻结</string>
     <string name="compose_refrozen">已重新冻结</string>
     <string name="compose_filter_all">全部</string>
+    <string name="compose_app_frozen">已冻结</string>
     <string name="compose_filter_active">使用中</string>
     <string name="compose_freeze_success">已冻结: %s</string>
     <string name="compose_unfreeze_success">已解冻: %s</string>

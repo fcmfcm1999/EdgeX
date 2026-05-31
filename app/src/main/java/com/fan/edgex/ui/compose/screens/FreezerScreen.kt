@@ -301,7 +301,7 @@ private fun FilterTabs(
 private fun freezerFilterLabel(filter: FreezerFilter): Int =
     when (filter) {
         FreezerFilter.All -> R.string.compose_filter_all
-        FreezerFilter.Frozen -> R.string.compose_stat_frozen
+        FreezerFilter.Frozen -> R.string.compose_app_frozen
         FreezerFilter.Active -> R.string.compose_filter_active
     }
 
@@ -333,7 +333,7 @@ private fun FreezerAppRow(
                 )
                 if (app.frozen) {
                     Text(
-                        text = stringResource(R.string.compose_stat_frozen),
+                        text = stringResource(R.string.compose_app_frozen),
                         color = colors.info,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
