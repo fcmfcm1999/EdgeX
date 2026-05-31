@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -80,6 +81,7 @@ data class HomeUiState(
 fun EdgeXApp() {
     val context = LocalContext.current
     val stack = remember { mutableStateListOf(EdgeXRoute.Home) }
+    val saveableStateHolder = rememberSaveableStateHolder()
     var uiState by remember { mutableStateOf(context.readHomeUiState()) }
     var toast by remember { mutableStateOf<String?>(null) }
 
@@ -93,7 +95,8 @@ fun EdgeXApp() {
 
     fun popRoute() {
         if (stack.size > 1) {
-            stack.removeAt(stack.lastIndex)
+            val popped = stack.removeAt(stack.lastIndex)
+            saveableStateHolder.removeState(popped)
         }
     }
 
@@ -131,74 +134,77 @@ fun EdgeXApp() {
                 .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            when (val route = stack.last()) {
-                EdgeXRoute.Home -> HomeScreen(
-                    state = uiState,
-                    callbacks = HomeCallbacks(
-                        openRoute = { stack.add(it) },
+            val route = stack.last()
+            saveableStateHolder.SaveableStateProvider(key = route) {
+                when (route) {
+                    EdgeXRoute.Home -> HomeScreen(
+                        state = uiState,
+                        callbacks = HomeCallbacks(
+                            openRoute = { stack.add(it) },
+                            showToast = ::showToast,
+                            setDebug = {
+                                context.putConfig(AppConfig.DEBUG_MATRIX, it)
+                                refresh()
+                            },
+                            setHaptic = {
+                                context.putConfig(AppConfig.HAPTIC_FEEDBACK, it)
+                                refresh()
+                            },
+                            setArcDrawer = {
+                                context.putConfig(AppConfig.FREEZER_ARC_DRAWER, it)
+                                refresh()
+                            },
+                        ),
+                    )
+                    EdgeXRoute.Gestures -> GesturesScreen(
+                        onBack = ::popRouteAndRefresh,
                         showToast = ::showToast,
-                        setDebug = {
-                            context.putConfig(AppConfig.DEBUG_MATRIX, it)
-                            refresh()
-                        },
-                        setHaptic = {
-                            context.putConfig(AppConfig.HAPTIC_FEEDBACK, it)
-                            refresh()
-                        },
-                        setArcDrawer = {
-                            context.putConfig(AppConfig.FREEZER_ARC_DRAWER, it)
-                            refresh()
-                        },
-                    ),
-                )
-                EdgeXRoute.Gestures -> GesturesScreen(
-                    onBack = ::popRouteAndRefresh,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.Freezer -> FreezerScreen(
-                    onBack = ::popRouteAndRefresh,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.Keys -> KeysScreen(
-                    onBack = ::popRouteAndRefresh,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.Pie -> PieScreen(
-                    onBack = ::popRoute,
-                )
-                EdgeXRoute.CustomPanel -> CustomPanelScreen(
-                    onBack = ::popRoute,
-                )
-                EdgeXRoute.SideBar -> SideBarScreen(
-                    onBack = ::popRoute,
-                )
-                EdgeXRoute.Multi -> MultiScreen(
-                    onBack = ::popRoute,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.Theme -> ThemeScreen(
-                    onBack = ::popRouteAndRefresh,
-                    onThemeChanged = ::refresh,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.EdgeLighting -> EdgeLightingScreen(
-                    onBack = ::popRoute,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.FluidEffect -> FluidEffectScreen(
-                    onBack = ::popRoute,
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.Premium -> PremiumScreen(
-                    onBack = ::popRoute,
-                    onOpenEdgeLighting = { stack.add(EdgeXRoute.EdgeLighting) },
-                    onOpenFluidEffect = { stack.add(EdgeXRoute.FluidEffect) },
-                    showToast = ::showToast,
-                )
-                EdgeXRoute.About -> AboutScreen(
-                    onBack = ::popRoute,
-                    showToast = ::showToast,
-                )
+                    )
+                    EdgeXRoute.Freezer -> FreezerScreen(
+                        onBack = ::popRouteAndRefresh,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.Keys -> KeysScreen(
+                        onBack = ::popRouteAndRefresh,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.Pie -> PieScreen(
+                        onBack = ::popRoute,
+                    )
+                    EdgeXRoute.CustomPanel -> CustomPanelScreen(
+                        onBack = ::popRoute,
+                    )
+                    EdgeXRoute.SideBar -> SideBarScreen(
+                        onBack = ::popRoute,
+                    )
+                    EdgeXRoute.Multi -> MultiScreen(
+                        onBack = ::popRoute,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.Theme -> ThemeScreen(
+                        onBack = ::popRouteAndRefresh,
+                        onThemeChanged = ::refresh,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.EdgeLighting -> EdgeLightingScreen(
+                        onBack = ::popRoute,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.FluidEffect -> FluidEffectScreen(
+                        onBack = ::popRoute,
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.Premium -> PremiumScreen(
+                        onBack = ::popRoute,
+                        onOpenEdgeLighting = { stack.add(EdgeXRoute.EdgeLighting) },
+                        onOpenFluidEffect = { stack.add(EdgeXRoute.FluidEffect) },
+                        showToast = ::showToast,
+                    )
+                    EdgeXRoute.About -> AboutScreen(
+                        onBack = ::popRoute,
+                        showToast = ::showToast,
+                    )
+                }
             }
 
             EdgeXToast(

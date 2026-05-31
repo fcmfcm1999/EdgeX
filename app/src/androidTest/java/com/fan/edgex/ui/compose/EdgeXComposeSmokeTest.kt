@@ -53,7 +53,7 @@ class EdgeXComposeSmokeTest {
         composeRule.onNodeWithText(appContext.getString(R.string.header_theme)).assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription(appContext.getString(R.string.compose_back)).assert(hasClickAction()).performClick()
-        composeRule.onNodeWithText("EdgeX").assertIsDisplayed()
+        composeRule.onNodeWithText("EdgeX").performScrollTo().assertIsDisplayed()
 
         composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
         composeRule.onNodeWithText(appContext.getString(R.string.compose_gestures_hero)).assertIsDisplayed()
