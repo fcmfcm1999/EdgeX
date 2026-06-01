@@ -176,6 +176,10 @@
     <string name="action_clear_background">Clear Background Apps</string>
     <string name="action_launch_app">Launch App</string>
     <string name="action_music_control">Music Control</string>
+    <string name="action_fast_scroll">Fast Scroll</string>
+    <string name="action_scroll_to_top">Scroll to Top</string>
+    <string name="action_scroll_to_bottom">Scroll to Bottom</string>
+    <string name="header_fast_scroll">Fast Scroll</string>
     <string name="action_pie">Pie Menu</string>
     <string name="header_pie_settings">Pie Menu</string>
     <string name="menu_pie">Pie</string>

@@ -69,6 +69,7 @@ object EdgeXIcons {
     @DrawableRes val Clipboard = R.drawable.ic_paste
     @DrawableRes val UniversalCopy = R.drawable.ic_content_copy
     @DrawableRes val Music = R.drawable.ic_music
+    @DrawableRes val FastScroll = R.drawable.ic_fast_scroll
     @DrawableRes val Condition = R.drawable.ic_condition
     @DrawableRes val Wifi = R.drawable.ic_wifi
     @DrawableRes val MobileData = R.drawable.ic_mobile_data

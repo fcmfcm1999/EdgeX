@@ -175,6 +175,10 @@
     <string name="action_clear_background">清除后台应用</string>
     <string name="action_launch_app">启动应用</string>
     <string name="action_music_control">音乐控制</string>
+    <string name="action_fast_scroll">快速滚动</string>
+    <string name="action_scroll_to_top">滚动到顶部</string>
+    <string name="action_scroll_to_bottom">滚动到底部</string>
+    <string name="header_fast_scroll">快速滚动</string>
     <string name="action_pie">Pie 菜单</string>
     <string name="header_pie_settings">Pie 菜单</string>
     <string name="menu_pie">Pie</string>

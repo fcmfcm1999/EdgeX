@@ -54,6 +54,11 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == "volume_up" -> R.drawable.ic_volume_up
             code == "volume_down" -> R.drawable.ic_volume_down
             code.startsWith("music_control:") -> R.drawable.ic_music
+            code.startsWith("fast_scroll:") -> when (code.removePrefix("fast_scroll:")) {
+                "to_top" -> R.drawable.ic_scroll_to_top
+                "to_bottom" -> R.drawable.ic_scroll_to_bottom
+                else -> R.drawable.ic_fast_scroll
+            }
             code.startsWith("multi_action:") -> R.drawable.ic_multi_action
             code.startsWith("condition:") -> R.drawable.ic_condition
             code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
@@ -96,6 +101,15 @@ class ActionSelectionActivity : AppCompatActivity() {
                     else -> R.string.action_music_control
                 }
                 return context.getString(R.string.label_music_prefix, context.getString(resId))
+            }
+            if (code.startsWith("fast_scroll:")) {
+                val subCode = code.removePrefix("fast_scroll:")
+                val resId = when (subCode) {
+                    "to_top" -> R.string.action_scroll_to_top
+                    "to_bottom" -> R.string.action_scroll_to_bottom
+                    else -> R.string.action_fast_scroll
+                }
+                return context.getString(resId)
             }
             val resId = when (code) {
                 "back" -> R.string.action_back
@@ -164,6 +178,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_volume_up), "volume_up", R.drawable.ic_volume_up),
         ActionItem(getString(R.string.action_volume_down), "volume_down", R.drawable.ic_volume_down),
         ActionItem(getString(R.string.action_music_control), "music_control", R.drawable.ic_music),
+        ActionItem(getString(R.string.action_fast_scroll), "fast_scroll", R.drawable.ic_fast_scroll),
         ActionItem(getString(R.string.action_multi_action), "multi_action", R.drawable.ic_multi_action),
         ActionItem(getString(R.string.action_condition), "condition", R.drawable.ic_condition),
         ActionItem(getString(R.string.action_custom_panel), AppConfig.CUSTOM_PANEL_ACTION, R.drawable.ic_apps),
@@ -232,6 +247,11 @@ class ActionSelectionActivity : AppCompatActivity() {
                 }
                 "music_control" -> {
                     startActivity(Intent(this, MusicControlActivity::class.java)
+                        .putExtra("pref_key", prefKey))
+                    finish()
+                }
+                "fast_scroll" -> {
+                    startActivity(Intent(this, FastScrollActivity::class.java)
                         .putExtra("pref_key", prefKey))
                     finish()
                 }

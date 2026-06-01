@@ -201,6 +201,9 @@ internal class GestureActionDispatcher(
             action.startsWith("music_control:") -> {
                 com.fan.edgex.action.AppActionExecutor.dispatchMusicControl(context, action)
             }
+            action.startsWith("fast_scroll:") -> {
+                injectScrollEvent(context, action == "fast_scroll:to_top", touchX, touchY)
+            }
             action == "brightness_up" || action == "brightness_down" -> {
                 adjustBrightness(context, action == "brightness_up")
             }
@@ -421,6 +424,11 @@ internal class GestureActionDispatcher(
             "next"       -> R.drawable.ic_music_next
             else         -> R.drawable.ic_music
         }
+        action.startsWith("fast_scroll:")  -> when (action.substringAfter("fast_scroll:")) {
+            "to_top"    -> R.drawable.ic_scroll_to_top
+            "to_bottom" -> R.drawable.ic_scroll_to_bottom
+            else        -> R.drawable.ic_fast_scroll
+        }
         action.startsWith("shell:")          -> R.drawable.ic_terminal
         action.startsWith("app_shortcut:")   -> R.drawable.ic_app_shortcut
         action.startsWith("launch_app:")     -> R.drawable.ic_launch_app
@@ -459,6 +467,11 @@ internal class GestureActionDispatcher(
         action == "volume_down"       -> "Vol-"
         action == "clear_background"  -> "Clear"
         action.startsWith("music_control:") -> "Music"
+        action.startsWith("fast_scroll:") -> when (action.substringAfter("fast_scroll:")) {
+            "to_top" -> "Scroll Up"
+            "to_bottom" -> "Scroll Down"
+            else -> "Scroll"
+        }
         action.startsWith("shell:")   -> "Shell"
         action.startsWith("launch_app:") -> "Launch"
         action.startsWith("app_shortcut:") -> "Shortcut"
@@ -941,6 +954,65 @@ internal class GestureActionDispatcher(
         } catch (t: Throwable) {
             errors.add("screenshot chord: ${t.message}")
             false
+        }
+    }
+
+    private fun injectScrollEvent(context: Context, toTop: Boolean, touchX: Float, touchY: Float) {
+        var targetX = touchX
+        var targetY = touchY
+        if (targetX == 0f && targetY == 0f) {
+            val metrics = context.resources.displayMetrics
+            targetX = metrics.widthPixels / 2f
+            targetY = metrics.heightPixels / 2f
+        }
+
+        val now = SystemClock.uptimeMillis()
+        val properties = arrayOf(android.view.MotionEvent.PointerProperties().apply {
+            id = 0
+            toolType = android.view.MotionEvent.TOOL_TYPE_MOUSE
+        })
+        val coords = arrayOf(android.view.MotionEvent.PointerCoords().apply {
+            x = targetX
+            y = targetY
+            setAxisValue(android.view.MotionEvent.AXIS_VSCROLL, if (toTop) 100000.0f else -100000.0f)
+        })
+        val event = android.view.MotionEvent.obtain(
+            now, now,
+            android.view.MotionEvent.ACTION_SCROLL,
+            1,
+            properties, coords,
+            0, 0, 0f, 0f, 0, 0,
+            8194, // InputDevice.SOURCE_MOUSE
+            0
+        )
+
+        try {
+            val inputManager = context.getSystemService(Context.INPUT_SERVICE)
+            if (inputManager != null) {
+                val injectMethod = inputManager.javaClass.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType,
+                )
+                injectMethod.invoke(inputManager, event, 0)
+                return
+            }
+        } catch (t: Throwable) {
+            log("injectScroll INPUT_SERVICE: ${t.message}")
+        }
+
+        try {
+            val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
+            val getInstance = globalCls.getMethod("getInstance")
+            val global = getInstance.invoke(null)
+            val injectMethod = globalCls.getMethod(
+                "injectInputEvent",
+                Class.forName("android.view.InputEvent"),
+                Int::class.javaPrimitiveType,
+            )
+            injectMethod.invoke(global, event, 0)
+        } catch (t: Throwable) {
+            log("injectScroll InputManagerGlobal: ${t.message}")
         }
     }
 }
