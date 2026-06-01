@@ -57,6 +57,7 @@ val allActionSelectionItems = listOf(
     ActionSelectionItem("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
     ActionSelectionItem("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
     ActionSelectionItem("music_control", R.string.action_music_control, EdgeXIcons.Music, needsSecondary = true),
+    ActionSelectionItem("fast_scroll", R.string.action_fast_scroll, EdgeXIcons.FastScroll, needsSecondary = true),
     ActionSelectionItem("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsSecondary = true),
     ActionSelectionItem("condition", R.string.action_condition, EdgeXIcons.Condition, needsSecondary = true),
     ActionSelectionItem(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),

@@ -18,6 +18,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
         ModuleRes.init(startupParam.modulePath)
+        ScrollHook.install()
     }
 
     companion object {

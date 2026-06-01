@@ -12,6 +12,7 @@ import com.fan.edgex.ui.compose.screens.SubGestureSheet
 enum class SecondaryType {
     AppPicker,
     MusicControl,
+    FastScroll,
     ShellCommand,
     AppShortcut,
     SubGesture,
@@ -23,6 +24,7 @@ enum class SecondaryType {
         fun fromCode(code: String): SecondaryType? = when (code) {
             "launch_app" -> AppPicker
             "music_control" -> MusicControl
+            "fast_scroll" -> FastScroll
             "shell_command" -> ShellCommand
             "app_shortcut" -> AppShortcut
             "sub_gesture" -> SubGesture
@@ -67,6 +69,21 @@ fun SecondaryActionDispatcher(
                 onPick = { code, label ->
                     context.putConfigsSync(
                         prefKey to "music_control:$code",
+                        "${prefKey}_label" to label,
+                        "${prefKey}_title" to "",
+                    )
+                    onSaved()
+                },
+            )
+        }
+
+        SecondaryType.FastScroll -> {
+            FastScrollSheet(
+                open = true,
+                onDismiss = onDismiss,
+                onPick = { code, label ->
+                    context.putConfigsSync(
+                        prefKey to "fast_scroll:$code",
                         "${prefKey}_label" to label,
                         "${prefKey}_title" to "",
                     )

@@ -367,6 +367,11 @@ private class PanelOverlayWindow(
         action.startsWith("app_shortcut:") -> "Shortcut"
         action.startsWith("shell:") -> "Shell"
         action.startsWith("music_control:") -> "Music"
+        action.startsWith("fast_scroll:") -> when (action.removePrefix("fast_scroll:")) {
+            "to_top" -> "Scroll Up"
+            "to_bottom" -> "Scroll Down"
+            else -> "Scroll"
+        }
         action.startsWith("multi_action:") -> "Multi"
         else -> action
     }
@@ -465,6 +470,11 @@ private class PanelOverlayWindow(
         action == "volume_up" -> R.drawable.ic_volume_up
         action == "volume_down" -> R.drawable.ic_volume_down
         action.startsWith("music_control:") -> R.drawable.ic_music
+        action.startsWith("fast_scroll:") -> when (action.removePrefix("fast_scroll:")) {
+            "to_top" -> R.drawable.ic_scroll_to_top
+            "to_bottom" -> R.drawable.ic_scroll_to_bottom
+            else -> R.drawable.ic_fast_scroll
+        }
         action.startsWith("multi_action:") -> R.drawable.ic_multi_action
         action == "toggle_flashlight" -> R.drawable.ic_flashlight
         action == "toggle_wifi" -> R.drawable.ic_wifi
