@@ -99,6 +99,27 @@ class EdgeXComposeSmokeTest {
         composeRule.onNodeWithText(appContext.getString(R.string.compose_no_matching_apps)).assertIsDisplayed()
     }
 
+    @Test
+    fun conditionPickerDisplaysAndSaves() {
+        composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_view_list)).performClick()
+        composeRule.onNodeWithTag("gesture_zone_right_mid").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.gesture_swipe_left)).performClick()
+        composeRule.onNodeWithTag("gesture_action_condition").performScrollTo().performClick()
+
+        // Tap the IF row
+        composeRule.onNodeWithText(appContext.getString(R.string.cond_label_if)).performClick()
+
+        // Scroll to and tap on a condition at the bottom (e.g. Screen landscape) to verify scrolling works
+        composeRule.onNodeWithText(appContext.getString(R.string.cond_screen_landscape))
+            .performScrollTo()
+            .performClick()
+
+        // Verify the condition label was updated in the ConditionSheet
+        composeRule.onNodeWithText(appContext.getString(R.string.cond_screen_landscape))
+            .assertIsDisplayed()
+    }
+
     private fun waitUntilTextExists(text: String) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()

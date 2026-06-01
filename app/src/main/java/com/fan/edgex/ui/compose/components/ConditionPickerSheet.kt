@@ -1,6 +1,11 @@
 package com.fan.edgex.ui.compose.components
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.fan.edgex.R
 
@@ -37,14 +42,21 @@ fun ConditionPickerSheet(
         title = stringResource(R.string.header_condition_if),
         onDismissRequest = onDismiss,
     ) {
-        EdgeXListGroup {
-            allConditionItems.forEachIndexed { index, item ->
-                EdgeXRow(
-                    title = stringResource(item.labelRes),
-                    icon = item.iconRes,
-                    onClick = { onSelect(item) },
-                )
-                if (index != allConditionItems.lastIndex) EdgeXDivider()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            EdgeXListGroup {
+                allConditionItems.forEachIndexed { index, item ->
+                    EdgeXRow(
+                        title = stringResource(item.labelRes),
+                        icon = item.iconRes,
+                        onClick = { onSelect(item) },
+                    )
+                    if (index != allConditionItems.lastIndex) EdgeXDivider()
+                }
             }
         }
     }
