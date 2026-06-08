@@ -1,6 +1,7 @@
 package com.fan.edgex.ui.compose.screens
 
 import com.fan.edgex.BuildConfig
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,9 +36,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.ui.compose.EdgeXRoute
 import com.fan.edgex.ui.compose.HomeUiState
+import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXDivider
 import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIconBox
@@ -41,6 +48,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIconButton
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
+import com.fan.edgex.ui.compose.components.EdgeXSwitch
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTile
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
@@ -59,7 +67,20 @@ data class HomeCallbacks(
     val showToast: (String) -> Unit,
     val setDebug: (Boolean) -> Unit,
     val setHaptic: (Boolean) -> Unit,
+    val setHapticType: (String) -> Unit,
     val setArcDrawer: (Boolean) -> Unit,
+)
+
+private data class HapticFeedbackType(
+    val value: String,
+    @StringRes val labelRes: Int,
+)
+
+private val hapticFeedbackTypes = listOf(
+    HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK, R.string.haptic_feedback_type_click),
+    HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_TICK, R.string.haptic_feedback_type_tick),
+    HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_HEAVY_CLICK, R.string.haptic_feedback_type_heavy_click),
+    HapticFeedbackType(AppConfig.HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK, R.string.haptic_feedback_type_double_click),
 )
 
 @Composable
@@ -327,6 +348,21 @@ private fun SectionLabel(label: String) {
 @Composable
 private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
     val restartToast = stringResource(R.string.compose_restart_sysui_toast)
+    var showHapticTypeSheet by remember { mutableStateOf(false) }
+    val hapticType = hapticFeedbackTypes.firstOrNull { it.value == state.hapticType }
+        ?: hapticFeedbackTypes.first()
+    val hapticTypeLabel = stringResource(hapticType.labelRes)
+
+    HapticFeedbackTypeSheet(
+        open = showHapticTypeSheet,
+        selectedType = hapticType.value,
+        onSelect = {
+            callbacks.setHapticType(it)
+            showHapticTypeSheet = false
+        },
+        onDismiss = { showHapticTypeSheet = false },
+    )
+
     EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
         EdgeXSwitchRow(
             title = stringResource(R.string.menu_debug_matrix),
@@ -336,13 +372,27 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             icon = EdgeXIcons.DeveloperMode,
         )
         EdgeXDivider()
-        EdgeXSwitchRow(
+        EdgeXRow(
             title = stringResource(R.string.menu_haptic_feedback),
-            subtitle = if (state.haptic) stringResource(R.string.compose_haptic_enabled_light) else stringResource(R.string.menu_haptic_feedback_desc),
-            checked = state.haptic,
-            onCheckedChange = callbacks.setHaptic,
+            subtitle = if (state.haptic) hapticTypeLabel else stringResource(R.string.menu_haptic_feedback_desc),
             icon = EdgeXIcons.Vibration,
-        )
+            onClick = {
+                if (!state.haptic) {
+                    callbacks.setHaptic(true)
+                }
+                showHapticTypeSheet = true
+            },
+        ) {
+            EdgeXSwitch(
+                checked = state.haptic,
+                onCheckedChange = { enabled ->
+                    callbacks.setHaptic(enabled)
+                    if (enabled) {
+                        showHapticTypeSheet = true
+                    }
+                },
+            )
+        }
         EdgeXDivider()
         EdgeXSwitchRow(
             title = stringResource(R.string.menu_arc_drawer),
@@ -359,6 +409,41 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             onClick = { callbacks.showToast(restartToast) },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+        }
+    }
+}
+
+@Composable
+private fun HapticFeedbackTypeSheet(
+    open: Boolean,
+    selectedType: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    EdgeXBottomSheet(
+        open = open,
+        title = stringResource(R.string.haptic_feedback_type_dialog_title),
+        onDismissRequest = onDismiss,
+    ) {
+        EdgeXListGroup {
+            hapticFeedbackTypes.forEachIndexed { index, type ->
+                EdgeXRow(
+                    title = stringResource(type.labelRes),
+                    icon = EdgeXIcons.Vibration,
+                    onClick = { onSelect(type.value) },
+                ) {
+                    if (type.value == selectedType) {
+                        EdgeXIcon(
+                            EdgeXIcons.Check,
+                            contentDescription = null,
+                            tint = LocalEdgeXColors.current.accent,
+                        )
+                    }
+                }
+                if (index != hapticFeedbackTypes.lastIndex) {
+                    EdgeXDivider()
+                }
+            }
         }
     }
 }

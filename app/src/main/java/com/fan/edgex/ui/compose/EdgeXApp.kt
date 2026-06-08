@@ -68,6 +68,7 @@ data class HomeUiState(
     val gesturesEnabled: Boolean,
     val debug: Boolean,
     val haptic: Boolean,
+    val hapticType: String,
     val arcDrawer: Boolean,
     val keysEnabled: Boolean,
     val edgeLighting: Boolean,
@@ -150,6 +151,10 @@ fun EdgeXApp() {
                                 context.putConfig(AppConfig.HAPTIC_FEEDBACK, it)
                                 refresh()
                             },
+                            setHapticType = {
+                                context.putConfig(AppConfig.HAPTIC_FEEDBACK_TYPE, it)
+                                refresh()
+                            },
                             setArcDrawer = {
                                 context.putConfig(AppConfig.FREEZER_ARC_DRAWER, it)
                                 refresh()
@@ -221,6 +226,10 @@ private fun Context.readHomeUiState(): HomeUiState =
         gesturesEnabled = getConfigBool(AppConfig.GESTURES_ENABLED),
         debug = getConfigBool(AppConfig.DEBUG_MATRIX),
         haptic = getConfigBool(AppConfig.HAPTIC_FEEDBACK, default = true),
+        hapticType = getConfigString(
+            AppConfig.HAPTIC_FEEDBACK_TYPE,
+            AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK,
+        ),
         arcDrawer = getConfigBool(AppConfig.FREEZER_ARC_DRAWER),
         keysEnabled = getConfigBool(AppConfig.KEYS_ENABLED),
         edgeLighting = getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, default = true),
