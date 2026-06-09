@@ -7,26 +7,22 @@ import android.content.ServiceConnection
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.IKeystoreVerifier
 import com.fan.edgex.premium.IPremiumPlugin
 import com.fan.edgex.premium.PremiumInstall
 import dalvik.system.DexClassLoader
 import de.robv.android.xposed.XposedBridge
 import java.io.File
-import java.io.FileInputStream
 import java.security.KeyFactory
 import java.security.SecureRandom
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
-import java.util.Base64
-import java.util.Properties
 
 object PremiumPluginLoader {
     private const val PLUGIN_CLASS = "com.fan.edgex.premium.PremiumPluginImpl"
     private const val VERIFIER_PKG = "com.fan.edgex"
     private const val VERIFIER_SVC = "com.fan.edgex.license.KeystoreVerifierService"
-    private val SHA256_PATTERN = Regex("^[0-9a-fA-F]{64}$")
-
     private const val INITIAL_DELAY_MS = 15_000L
     private const val RETRY_DELAY_MS = 10_000L
     private const val MAX_ATTEMPTS = 8
@@ -54,16 +50,16 @@ object PremiumPluginLoader {
         if (!dex.isFile || !meta.isFile) return
 
         runCatching {
-            val installMeta = verifyMeta(dex, meta)
-            require(
-                PremiumSignatureVerifier.verifyInstallationSignature(
+            val installMeta = PremiumInstallMetadata.verify(dex, meta, BuildConfig.DEBUG)
+            if (!installMeta.localDebug) {
+                require(PremiumSignatureVerifier.verifyInstallationSignature(
                     dex = dex,
                     expectedDexHash = installMeta.sha256,
                     devicePubkeyHex = installMeta.devicePubkeyHex,
                     sigBytes = installMeta.deviceSigBytes,
-                ),
-            ) {
-                "installation signature invalid"
+                )) {
+                    "installation signature invalid"
+                }
             }
             storedPubKeyBytes = installMeta.devicePubkeyHex.hexToByteArray()
             val parent = IPremiumPlugin::class.java.classLoader
@@ -89,6 +85,7 @@ object PremiumPluginLoader {
                     dexPath = dex.absolutePath,
                     devicePubkeyHex = installMeta.devicePubkeyHex,
                     sigBytes = installMeta.deviceSigBytes,
+                    localDebug = installMeta.localDebug,
                 ),
             ) {
                 "plugin installation verification failed"
@@ -228,50 +225,6 @@ object PremiumPluginLoader {
             }
         }.getOrDefault(false)
 
-    private fun verifyMeta(dex: File, meta: File): InstallMeta {
-        val properties = Properties()
-        FileInputStream(meta).use(properties::load)
-
-        val expectedVersion = properties.getProperty("version")?.toIntOrNull()
-            ?: error("missing version")
-        require(expectedVersion == PremiumInstall.SUPPORTED_API_VERSION) {
-            "unsupported version=$expectedVersion"
-        }
-
-        val expectedSize = properties.getProperty("size")?.toLongOrNull()
-            ?: error("missing size")
-        require(dex.length() == expectedSize) {
-            "size mismatch expected=$expectedSize actual=${dex.length()}"
-        }
-
-        val expectedHash = properties.getProperty("sha256")?.trim()
-            ?: error("missing sha256")
-        require(SHA256_PATTERN.matches(expectedHash)) {
-            "invalid sha256"
-        }
-
-        val actualHash = PremiumSignatureVerifier.sha256Hex(dex)
-        require(actualHash.equals(expectedHash, ignoreCase = true)) {
-            "sha256 mismatch"
-        }
-
-        val devicePubkeyHex = properties.getProperty("device_pubkey")?.trim()
-            ?: error("missing device_pubkey")
-        require(devicePubkeyHex.length >= 100 && devicePubkeyHex.length % 2 == 0) {
-            "invalid device_pubkey"
-        }
-
-        val sigBase64 = properties.getProperty("device_sig")?.trim()
-            ?: error("missing device_sig")
-        val sigBytes = Base64.getDecoder().decode(sigBase64)
-
-        return InstallMeta(
-            sha256 = expectedHash.lowercase(),
-            devicePubkeyHex = devicePubkeyHex,
-            deviceSigBytes = sigBytes,
-        )
-    }
-
     private fun markBad(dex: File, meta: File) {
         val suffix = ".bad.${System.currentTimeMillis()}"
         runCatching {
@@ -281,12 +234,6 @@ object PremiumPluginLoader {
             XposedBridge.log("EdgeX: failed to mark premium dex bad: ${it.message}")
         }
     }
-
-    private data class InstallMeta(
-        val sha256: String,
-        val devicePubkeyHex: String,
-        val deviceSigBytes: ByteArray,
-    )
 
     private fun String.hexToByteArray(): ByteArray =
         chunked(2).map { it.toInt(16).toByte() }.toByteArray()

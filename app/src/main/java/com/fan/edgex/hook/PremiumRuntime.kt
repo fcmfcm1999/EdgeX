@@ -85,7 +85,7 @@ object PremiumRuntime {
     fun dismissEdgeLighting() {
         val plugin = PremiumPluginLoader.plugin ?: return
         runCatching {
-            plugin.onScreenOff()
+            plugin.onEdgeLightingDismiss()
         }.onFailure {
             PremiumPluginLoader.disableForCurrentProcess(it)
         }

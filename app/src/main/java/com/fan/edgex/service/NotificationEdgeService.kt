@@ -35,10 +35,12 @@ class NotificationEdgeService : NotificationListenerService() {
     // Stopped when the call notification is removed (answered / rejected / ended).
     private val handler = Handler(Looper.getMainLooper())
     private var ringingKey: String? = null
+    private var drivingNotificationKey: String? = null
     private var ringingColor: Int = 0
     private val ringingPulse = object : Runnable {
         override fun run() {
-            fireLighting(ringingColor, CALL_DURATION_MS.toInt())
+            val key = ringingKey ?: return
+            fireLighting(key, ringingColor, CALL_DURATION_MS.toInt())
             handler.postDelayed(this, RINGING_PULSE_INTERVAL_MS)
         }
     }
@@ -47,7 +49,7 @@ class NotificationEdgeService : NotificationListenerService() {
         if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED)) return
         if (!isScreenInteractive()) return
         if (!isAllowedPackage(sbn.packageName)) return
-        if (isSilentNotification(sbn)) return
+        if (!shouldAlert(sbn.key, currentRanking)) return
 
         val isCall = sbn.notification.category == Notification.CATEGORY_CALL
 
@@ -59,6 +61,7 @@ class NotificationEdgeService : NotificationListenerService() {
             // long-ringing calls only.
             val color = resolveColor(sbn)
             seenNotificationKeys.add(sbn.key)
+            if (ringingKey != sbn.key) handler.removeCallbacks(ringingPulse)
             ringingKey = sbn.key
             ringingColor = color
             handler.removeCallbacks(ringingPulse)
@@ -69,12 +72,22 @@ class NotificationEdgeService : NotificationListenerService() {
         // Non-call notification: fire once, deduplicate rotation re-posts.
         if (sbn.key == ringingKey) stopRingingPulse()
         if (!seenNotificationKeys.add(sbn.key)) return
-        fireLighting(resolveColor(sbn))
+        fireLighting(sbn.key, resolveColor(sbn))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         seenNotificationKeys.remove(sbn.key)
         if (sbn.key == ringingKey) stopRingingPulse()
+        dismissIfDriving(sbn.key)
+    }
+
+    override fun onNotificationRankingUpdate(rankingMap: RankingMap) {
+        super.onNotificationRankingUpdate(rankingMap)
+        val key = drivingNotificationKey ?: return
+        if (!shouldAlert(key, rankingMap)) {
+            if (key == ringingKey) stopRingingPulse()
+            dismissIfDriving(key)
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -82,26 +95,45 @@ class NotificationEdgeService : NotificationListenerService() {
         iconColorCache.clear()
         seenNotificationKeys.clear()
         stopRingingPulse()
+        drivingNotificationKey?.let(::dismissIfDriving)
     }
 
     private fun stopRingingPulse() {
         handler.removeCallbacks(ringingPulse)
         ringingKey = null
-        sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS))
     }
 
-    private fun fireLighting(color: Int, durationMs: Int = getConfigString(AppConfig.EDGE_LIGHTING_DURATION_MS, "3000").toIntOrNull() ?: 3000) {
+    private fun fireLighting(
+        notificationKey: String,
+        color: Int,
+        durationMs: Int = getConfigString(AppConfig.EDGE_LIGHTING_DURATION_MS, "3000").toIntOrNull() ?: 3000,
+    ) {
+        drivingNotificationKey = notificationKey
         sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING).apply {
+            putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_NOTIFICATION_KEY, notificationKey)
             putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_COLOR, color)
             putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_DURATION_MS, durationMs)
         })
     }
 
-    private fun isSilentNotification(sbn: StatusBarNotification): Boolean {
+    private fun dismissIfDriving(notificationKey: String) {
+        if (drivingNotificationKey != notificationKey) return
+        drivingNotificationKey = null
+        sendBroadcast(Intent(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS).apply {
+            putExtra(HookConfigSnapshot.EXTRA_EDGE_LIGHTING_NOTIFICATION_KEY, notificationKey)
+        })
+    }
+
+    private fun shouldAlert(notificationKey: String, rankingMap: RankingMap): Boolean {
         val ranking = Ranking()
         return runCatching {
-            currentRanking.getRanking(sbn.key, ranking) &&
-                ranking.importance in NotificationManager.IMPORTANCE_NONE until NotificationManager.IMPORTANCE_DEFAULT
+            if (!rankingMap.getRanking(notificationKey, ranking)) return@runCatching false
+            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR or
+                NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST
+            ranking.matchesInterruptionFilter() &&
+                ranking.importance >= NotificationManager.IMPORTANCE_DEFAULT &&
+                !ranking.isSuspended &&
+                ranking.suppressedVisualEffects and hiddenEffects == 0
         }.getOrDefault(false)
     }
 

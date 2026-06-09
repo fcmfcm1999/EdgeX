@@ -16,8 +16,8 @@ import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.ModuleActivationState
-import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.PanelOverlayManager
+import com.fan.edgex.overlay.PieManager
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -40,6 +40,7 @@ object GestureManager {
     private var fluidEffectMovePosted = false
     private var pendingFluidEffectMoveX = 0f
     private var pendingFluidEffectMoveY = 0f
+    private var activeEdgeLightingNotificationKey: String? = null
 
     private var mHandler: Handler? = null
 
@@ -412,12 +413,25 @@ object GestureManager {
                             AppConfig.EDGE_LIGHTING_EFFECT,
                             AppConfig.EDGE_LIGHTING_EFFECT_BASIC,
                         )
+                        val notificationKey = intent.getStringExtra(
+                            HookConfigSnapshot.EXTRA_EDGE_LIGHTING_NOTIFICATION_KEY,
+                        ) ?: return
                         mainHandler().post {
-                            PremiumRuntime.showEdgeLighting(sysCtx, effect, color, durationMs, widthDp, alpha)
+                            if (PremiumRuntime.showEdgeLighting(sysCtx, effect, color, durationMs, widthDp, alpha)) {
+                                activeEdgeLightingNotificationKey = notificationKey
+                            }
                         }
                     }
                     HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS -> {
-                        mainHandler().post { PremiumRuntime.dismissEdgeLighting() }
+                        val notificationKey = intent.getStringExtra(
+                            HookConfigSnapshot.EXTRA_EDGE_LIGHTING_NOTIFICATION_KEY,
+                        ) ?: return
+                        mainHandler().post {
+                            if (notificationKey == activeEdgeLightingNotificationKey) {
+                                activeEdgeLightingNotificationKey = null
+                                PremiumRuntime.dismissEdgeLighting()
+                            }
+                        }
                     }
                     GameModeManager.ACTION_DISABLE -> {
                         val sysCtx = systemContext ?: ctx

@@ -13,8 +13,14 @@ interface IPremiumPlugin {
      * @param dexPath absolute path to the installed DEX file (used to compute its hash)
      * @param devicePubkeyHex hex X.509 encoding of the device's Keystore EC public key
      * @param sigBytes raw RSA/SHA-256 signature over sha256hex(dex)+"|"+devicePubkeyHex
+     * @param localDebug true only for a debug host that already verified local_debug metadata
      */
-    fun verifyInstallation(dexPath: String, devicePubkeyHex: String, sigBytes: ByteArray): Boolean
+    fun verifyInstallation(
+        dexPath: String,
+        devicePubkeyHex: String,
+        sigBytes: ByteArray,
+        localDebug: Boolean,
+    ): Boolean
 
     fun onEdgeLightingShow(
         context: Context,
@@ -24,6 +30,8 @@ interface IPremiumPlugin {
         widthDp: Int,
         alpha: Float,
     ): Boolean
+
+    fun onEdgeLightingDismiss()
 
     fun onFluidEffectDown(
         context: Context,

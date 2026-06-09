@@ -15,6 +15,7 @@ object HookConfigSnapshot {
     val ACTION_HOOK_STATUS_RESPONSE = "${BuildConfig.APPLICATION_ID}.ACTION_HOOK_STATUS_RESPONSE"
     val ACTION_EDGE_LIGHTING = "${BuildConfig.APPLICATION_ID}.ACTION_EDGE_LIGHTING"
     val ACTION_EDGE_LIGHTING_DISMISS = "${BuildConfig.APPLICATION_ID}.ACTION_EDGE_LIGHTING_DISMISS"
+    const val EXTRA_EDGE_LIGHTING_NOTIFICATION_KEY = "edge_lighting_notification_key"
     const val EXTRA_KEYS = "keys"
     const val EXTRA_VALUES = "values"
     const val EXTRA_FULL_SNAPSHOT = "full_snapshot"
