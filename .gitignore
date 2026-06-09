@@ -37,3 +37,4 @@ scripts
 # Local Netlify folder
 .netlify
 .codegraph
+.antigravitycli
