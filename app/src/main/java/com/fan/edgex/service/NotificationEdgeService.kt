@@ -16,6 +16,7 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
+import com.fan.edgex.utils.Xlog
 import org.json.JSONArray
 
 class NotificationEdgeService : NotificationListenerService() {
@@ -23,11 +24,7 @@ class NotificationEdgeService : NotificationListenerService() {
     // Cache extracted icon colors per package; null means no colorful color was found
     private val iconColorCache = HashMap<String, Int?>()
 
-    // Keys of notifications we've already shown Edge Lighting for.
-    // Cleared when the notification is dismissed, so re-posting after removal triggers again.
-    // Using key alone (not postTime) because apps like LSPosed re-post with a fresh postTime on
-    // rotation, which would defeat any (key, postTime) comparison.
-    private val seenNotificationKeys = HashSet<String>()
+    private val lifecycleManager = NotificationLifecycleManager()
 
     // Repeating pulse for incoming calls (CATEGORY_CALL).
     // The system only calls onNotificationPosted once per call, so we drive repetition ourselves.
@@ -49,7 +46,39 @@ class NotificationEdgeService : NotificationListenerService() {
         if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED)) return
         if (!isScreenInteractive()) return
         if (!isAllowedPackage(sbn.packageName)) return
-        if (!shouldAlert(sbn.key, currentRanking)) return
+
+        val ranking = Ranking()
+        val hasRanking = currentRanking?.getRanking(sbn.key, ranking) == true
+        val alertInfo = if (hasRanking) {
+            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR or
+                NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST
+            ranking.matchesInterruptionFilter() &&
+                ranking.importance >= NotificationManager.IMPORTANCE_DEFAULT &&
+                !ranking.isSuspended &&
+                ranking.suppressedVisualEffects and hiddenEffects == 0
+        } else {
+            false
+        }
+
+        val isGroupSummary = (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+        val lastAudiblyAlerted = if (hasRanking) ranking.lastAudiblyAlertedMillis else 0L
+
+        val decision = lifecycleManager.onNotificationPosted(
+            key = sbn.key,
+            isOngoing = sbn.isOngoing,
+            isGroupSummary = isGroupSummary,
+            groupAlertBehavior = sbn.notification.groupAlertBehavior,
+            postTime = sbn.postTime,
+            lastAudiblyAlertedMillis = lastAudiblyAlerted,
+            shouldAlert = alertInfo
+        )
+
+        Xlog.d(TAG, "onNotificationPosted: key=${sbn.key}, pkg=${sbn.packageName}, isOngoing=${sbn.isOngoing}, " +
+                "isGroupSummary=$isGroupSummary, groupAlertBehavior=${sbn.notification.groupAlertBehavior}, " +
+                "postTime=${sbn.postTime}, lastAudiblyAlerted=$lastAudiblyAlerted, shouldAlert=$alertInfo, " +
+                "decision=$decision")
+
+        if (decision == NotificationLifecycleManager.Decision.IGNORE) return
 
         val isCall = sbn.notification.category == Notification.CATEGORY_CALL
 
@@ -60,7 +89,6 @@ class NotificationEdgeService : NotificationListenerService() {
             // the typical ringing period. The pulse loop is a fallback for unusually
             // long-ringing calls only.
             val color = resolveColor(sbn)
-            seenNotificationKeys.add(sbn.key)
             if (ringingKey != sbn.key) handler.removeCallbacks(ringingPulse)
             ringingKey = sbn.key
             ringingColor = color
@@ -69,14 +97,22 @@ class NotificationEdgeService : NotificationListenerService() {
             return
         }
 
-        // Non-call notification: fire once, deduplicate rotation re-posts.
+        // Non-call notification: fire once
         if (sbn.key == ringingKey) stopRingingPulse()
-        if (!seenNotificationKeys.add(sbn.key)) return
         fireLighting(sbn.key, resolveColor(sbn))
     }
 
+    override fun onNotificationRemoved(sbn: StatusBarNotification, rankingMap: RankingMap, reason: Int) {
+        handleNotificationRemoved(sbn, reason)
+    }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        seenNotificationKeys.remove(sbn.key)
+        handleNotificationRemoved(sbn, 2) // Default to REASON_CANCEL (2) if reason is unknown
+    }
+
+    private fun handleNotificationRemoved(sbn: StatusBarNotification, reason: Int) {
+        Xlog.d(TAG, "handleNotificationRemoved: key=${sbn.key}, reason=$reason, isOngoing=${sbn.isOngoing}")
+        lifecycleManager.onNotificationRemoved(sbn.key, reason)
         if (sbn.key == ringingKey) stopRingingPulse()
         dismissIfDriving(sbn.key)
     }
@@ -90,10 +126,22 @@ class NotificationEdgeService : NotificationListenerService() {
         }
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Xlog.d(TAG, "onListenerConnected")
+        runCatching {
+            activeNotifications?.forEach { sbn ->
+                lifecycleManager.prewarmNotification(sbn.key, sbn.postTime)
+            }
+        }.onFailure { e ->
+            Xlog.e(TAG, "Failed to prewarm active notifications", e)
+        }
+    }
+
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        Xlog.d(TAG, "onListenerDisconnected")
         iconColorCache.clear()
-        seenNotificationKeys.clear()
         stopRingingPulse()
         drivingNotificationKey?.let(::dismissIfDriving)
     }
@@ -220,6 +268,7 @@ class NotificationEdgeService : NotificationListenerService() {
         runCatching { value.toColorInt() }.getOrElse { DEFAULT_COLOR.toColorInt() }
 
     private companion object {
+        const val TAG = "NotificationEdgeService"
         const val DEFAULT_COLOR = "#00FFFF"
         // Each ringing pulse sends a 30-second animation so directional effects (comet, flow, etc.)
         // run continuously without restarting. 29 s interval ensures a fresh pulse fires before
