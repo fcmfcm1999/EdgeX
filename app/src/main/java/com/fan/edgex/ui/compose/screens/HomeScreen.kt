@@ -65,6 +65,7 @@ data class HomeStats(
 data class HomeCallbacks(
     val openRoute: (EdgeXRoute) -> Unit,
     val showToast: (String) -> Unit,
+    val restartSystemUi: () -> Unit,
     val setDebug: (Boolean) -> Unit,
     val setHaptic: (Boolean) -> Unit,
     val setHapticType: (String) -> Unit,
@@ -406,7 +407,10 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             title = stringResource(R.string.menu_restart_sysui),
             subtitle = stringResource(R.string.compose_restart_sysui_desc),
             icon = EdgeXIcons.Restart,
-            onClick = { callbacks.showToast(restartToast) },
+            onClick = {
+                callbacks.showToast(restartToast)
+                callbacks.restartSystemUi()
+            },
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
         }

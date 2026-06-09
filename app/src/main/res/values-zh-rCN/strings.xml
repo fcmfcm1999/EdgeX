@@ -309,6 +309,7 @@
 
     <!-- Toast 提示 -->
     <string name="toast_restarting_sysui">正在重启 SystemUI…</string>
+    <string name="toast_restart_sysui_failed">重启 SystemUI 失败，需要 Root 权限。</string>
     <string name="toast_restart_failed">重启失败: %s</string>
     <string name="toast_cannot_open_browser">无法打开浏览器</string>
     <string name="toast_star_reminder">如果你有 GitHub 账号，记得帮我点个 star 哦 ⭐</string>
@@ -618,4 +619,3 @@
     <string name="action_cat_apps">应用与工具</string>
     <string name="compose_action_needs_config">配置</string>
 </resources>
-

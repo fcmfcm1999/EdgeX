@@ -1,6 +1,8 @@
 package com.fan.edgex.ui.compose
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -18,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import com.fan.edgex.R
 import com.fan.edgex.license.PremiumActivator
 import com.fan.edgex.config.AppConfig
@@ -45,6 +48,7 @@ import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.delay
 
 enum class EdgeXRoute(@StringRes val labelRes: Int) {
@@ -81,6 +85,7 @@ data class HomeUiState(
 @Composable
 fun EdgeXApp() {
     val context = LocalContext.current
+    val restartSystemUiFailed = stringResource(R.string.toast_restart_sysui_failed)
     val stack = remember { mutableStateListOf(EdgeXRoute.Home) }
     val saveableStateHolder = rememberSaveableStateHolder()
     var uiState by remember { mutableStateOf(context.readHomeUiState()) }
@@ -143,6 +148,11 @@ fun EdgeXApp() {
                         callbacks = HomeCallbacks(
                             openRoute = { stack.add(it) },
                             showToast = ::showToast,
+                            restartSystemUi = {
+                                restartSystemUi {
+                                    showToast(restartSystemUiFailed)
+                                }
+                            },
                             setDebug = {
                                 context.putConfig(AppConfig.DEBUG_MATRIX, it)
                                 refresh()
@@ -218,6 +228,17 @@ fun EdgeXApp() {
             )
         }
     }
+}
+
+private fun restartSystemUi(onFailure: () -> Unit) {
+    Thread {
+        val succeeded = runCatching {
+            Shell.cmd("killall com.android.systemui").exec().isSuccess
+        }.getOrDefault(false)
+        if (!succeeded) {
+            Handler(Looper.getMainLooper()).post(onFailure)
+        }
+    }.start()
 }
 
 private fun Context.readHomeUiState(): HomeUiState =

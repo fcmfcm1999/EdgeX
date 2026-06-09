@@ -305,6 +305,7 @@
 
     <!-- Toast Messages -->
     <string name="toast_restarting_sysui">Restarting SystemUI…</string>
+    <string name="toast_restart_sysui_failed">Failed to restart SystemUI. Root access is required.</string>
     <string name="toast_restart_failed">Restart failed: %s</string>
     <string name="toast_cannot_open_browser">Cannot open browser</string>
     <string name="toast_star_reminder">If you use GitHub, don\'t forget to give me a star ⭐</string>
@@ -617,4 +618,3 @@
     <string name="action_cat_apps">Apps &amp; Tools</string>
     <string name="compose_action_needs_config">Configure</string>
 </resources>
-
