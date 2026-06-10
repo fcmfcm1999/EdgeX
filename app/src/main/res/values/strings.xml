@@ -91,6 +91,7 @@
     <string name="update_already_latest">Already up to date</string>
     <string name="update_no_changelog">No changelog available.</string>
     <string name="update_checking">Checking for updates…</string>
+    <string name="update_view_release">View release</string>
 
     <string name="label_donate">Tip me</string>
     <string name="label_donate_desc">Buy me more AI token</string>

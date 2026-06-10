@@ -1,6 +1,5 @@
 package com.fan.edgex.ui.compose.screens
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -64,7 +63,6 @@ import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import com.fan.edgex.utils.DonateDialog
-import com.fan.edgex.utils.UpdateChecker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -421,6 +419,7 @@ private fun SupportGrid(showToast: (String) -> Unit) {
 fun AboutScreen(
     onBack: () -> Unit,
     showToast: (String) -> Unit,
+    onCheckForUpdates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -452,7 +451,7 @@ fun AboutScreen(
                 title = stringResource(R.string.label_version),
                 subtitle = "v${BuildConfig.VERSION_NAME}",
                 icon = EdgeXIcons.Info,
-                onClick = { (context as? Activity)?.let(UpdateChecker::checkNow) },
+                onClick = onCheckForUpdates,
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
             }
