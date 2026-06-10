@@ -2,6 +2,7 @@ package com.fan.edgex.hook
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -42,8 +43,16 @@ internal class GestureActionDispatcher(
     @Volatile private var serviceBound = false
     private var serviceContext: Context? = null
     private val pendingCommands = ArrayDeque<Pair<String, Context>>()
+    private val pendingUnlockActions = ArrayDeque<PendingUnlockAction>()
     private var idleUnbindRunnable: Runnable? = null
     private val SHELL_SERVICE_IDLE_TIMEOUT_MS = 5 * 60 * 1000L
+
+    private data class PendingUnlockAction(
+        val action: String,
+        val context: Context,
+        val touchX: Float,
+        val touchY: Float,
+    )
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -164,6 +173,12 @@ internal class GestureActionDispatcher(
     }
 
     private fun dispatchAction(action: String, context: Context, touchX: Float, touchY: Float) {
+        if (LockscreenActionPolicy.requiresUnlock(action) && isKeyguardLocked(context)) {
+            pendingUnlockActions.addLast(PendingUnlockAction(action, context, touchX, touchY))
+            log("Action queued until unlock: '$action'")
+            return
+        }
+
         when {
             action == "back" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_BACK)
@@ -283,6 +298,38 @@ internal class GestureActionDispatcher(
                 GameModeManager.enable(context, handlerProvider())
             }
         }
+    }
+
+    fun onUserUnlocked(context: Context) {
+        handlerProvider().post {
+            if (isKeyguardLocked(context) || pendingUnlockActions.isEmpty()) return@post
+
+            val actions = buildList {
+                while (pendingUnlockActions.isNotEmpty()) {
+                    add(pendingUnlockActions.removeFirst())
+                }
+            }
+            log("Executing ${actions.size} action(s) queued during lockscreen")
+
+            var delay = 0L
+            actions.forEach { pending ->
+                handlerProvider().postDelayed({
+                    dispatchAction(
+                        pending.action,
+                        pending.context,
+                        pending.touchX,
+                        pending.touchY,
+                    )
+                }, delay)
+                delay += stepSettleDuration(pending.action)
+            }
+        }
+    }
+
+    private fun isKeyguardLocked(context: Context): Boolean = try {
+        context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+    } catch (_: Throwable) {
+        false
     }
 
     private fun executeConditionAction(action: String, context: Context, touchX: Float, touchY: Float) {

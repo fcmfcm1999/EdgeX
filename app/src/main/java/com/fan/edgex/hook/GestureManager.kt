@@ -343,6 +343,10 @@ object GestureManager {
                     Intent.ACTION_USER_UNLOCKED -> {
                         configRepository.invalidate()
                         configRepository.reloadAsync()
+                        actionDispatcher.onUserUnlocked(ctx)
+                    }
+                    Intent.ACTION_USER_PRESENT -> {
+                        actionDispatcher.onUserUnlocked(ctx)
                     }
                 }
             }
@@ -353,6 +357,7 @@ object GestureManager {
                 addAction(Intent.ACTION_SCREEN_OFF)
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_USER_UNLOCKED)
+                addAction(Intent.ACTION_USER_PRESENT)
             }
             context.registerReceiver(receiver, filter)
         } catch (e: Exception) {
@@ -474,12 +479,6 @@ object GestureManager {
 
         if (!configRepository.isGesturesEnabled()) return false
         if (GameModeManager.isActive) return false
-
-        // Skip gestures when keyguard (lockscreen) is showing to avoid intercepting unlock swipes
-        try {
-            val km = context.getSystemService(android.app.KeyguardManager::class.java)
-            if (km?.isKeyguardLocked == true) return false
-        } catch (_: Exception) {}
 
         return gestureDetector.handle(event, context)
     }
