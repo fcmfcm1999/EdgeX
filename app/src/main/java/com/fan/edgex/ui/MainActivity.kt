@@ -9,7 +9,6 @@ import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.config.broadcastFullConfigSnapshot
 import com.fan.edgex.config.syncRuntimeEnableFlagsFromConfiguredActions
 import com.fan.edgex.ui.compose.EdgeXApp
-import com.fan.edgex.utils.UpdateChecker
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,7 +21,6 @@ class MainActivity : AppCompatActivity() {
         ModuleActivationState.requestRefresh(this)
         broadcastFullConfigSnapshot()
         FreezerBootstrap.ensureMigrated(this)
-        UpdateChecker.checkOnLaunch(this)
         setContent {
             EdgeXApp()
         }

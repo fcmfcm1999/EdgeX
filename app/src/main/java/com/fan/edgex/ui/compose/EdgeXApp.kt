@@ -1,5 +1,6 @@
 package com.fan.edgex.ui.compose
 
+import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -30,6 +31,7 @@ import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.ui.compose.components.EdgeXToast
+import com.fan.edgex.ui.compose.components.UpdateDialog
 import com.fan.edgex.ui.compose.screens.AboutScreen
 import com.fan.edgex.ui.compose.screens.EdgeLightingScreen
 import com.fan.edgex.ui.compose.screens.FluidEffectScreen
@@ -48,6 +50,7 @@ import com.fan.edgex.ui.compose.screens.ThemeScreen
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
+import com.fan.edgex.utils.UpdateChecker
 import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.delay
 
@@ -86,10 +89,13 @@ data class HomeUiState(
 fun EdgeXApp() {
     val context = LocalContext.current
     val restartSystemUiFailed = stringResource(R.string.toast_restart_sysui_failed)
+    val updateChecking = stringResource(R.string.update_checking)
+    val updateAlreadyLatest = stringResource(R.string.update_already_latest)
     val stack = remember { mutableStateListOf(EdgeXRoute.Home) }
     val saveableStateHolder = rememberSaveableStateHolder()
     var uiState by remember { mutableStateOf(context.readHomeUiState()) }
     var toast by remember { mutableStateOf<String?>(null) }
+    var availableUpdate by remember { mutableStateOf<UpdateChecker.ReleaseInfo?>(null) }
 
     fun refresh() {
         uiState = context.readHomeUiState()
@@ -111,6 +117,18 @@ fun EdgeXApp() {
         popRoute()
     }
 
+    fun checkForUpdates() {
+        val activity = context as? Activity ?: return
+        showToast(updateChecking)
+        UpdateChecker.checkNow(activity) { release ->
+            if (release == null) {
+                showToast(updateAlreadyLatest)
+            } else {
+                availableUpdate = release
+            }
+        }
+    }
+
     LaunchedEffect(toast) {
         if (toast != null) {
             delay(1800)
@@ -119,6 +137,9 @@ fun EdgeXApp() {
     }
 
     LaunchedEffect(Unit) {
+        (context as? Activity)?.let { activity ->
+            UpdateChecker.checkOnLaunch(activity) { availableUpdate = it }
+        }
         ModuleActivationState.requestRefresh(context)
         delay(350)
         refresh()
@@ -218,6 +239,7 @@ fun EdgeXApp() {
                     EdgeXRoute.About -> AboutScreen(
                         onBack = ::popRoute,
                         showToast = ::showToast,
+                        onCheckForUpdates = ::checkForUpdates,
                     )
                 }
             }
@@ -226,6 +248,17 @@ fun EdgeXApp() {
                 message = toast,
                 modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             )
+
+            availableUpdate?.let { release ->
+                UpdateDialog(
+                    release = release,
+                    onDismiss = { availableUpdate = null },
+                    onSkip = {
+                        UpdateChecker.skipVersion(context, release)
+                        availableUpdate = null
+                    },
+                )
+            }
         }
     }
 }
