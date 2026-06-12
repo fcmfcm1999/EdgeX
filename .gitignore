@@ -38,3 +38,7 @@ scripts
 .netlify
 .codegraph
 .antigravitycli
+.agent
+.agents
+.codex
+.trellis
