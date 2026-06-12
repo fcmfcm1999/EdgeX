@@ -31,6 +31,7 @@ object PremiumPluginLoader {
     @Volatile private var pendingPlugin: IPremiumPlugin? = null
     @Volatile private var storedPubKeyBytes: ByteArray? = null
     @Volatile private var challengeAttempt = 0
+    @Volatile private var activeConnection: ServiceConnection? = null
 
     @Volatile var plugin: IPremiumPlugin? = null
         private set
@@ -157,8 +158,20 @@ object PremiumPluginLoader {
         handler.postDelayed({ attemptChallenge(context) }, INITIAL_DELAY_MS)
     }
 
+    fun retryChallengeIfNeeded(context: Context) {
+        if (plugin != null || pendingPlugin == null || disabledForProcess) return
+        XposedBridge.log("EdgeX: retrying keystore challenge from broadcast trigger")
+        attemptChallenge(context)
+    }
+
     private fun attemptChallenge(context: Context) {
         if (pendingPlugin == null || disabledForProcess) return
+
+        // Safely unbind any existing connection to avoid leaks or duplicate binders
+        activeConnection?.let {
+            runCatching { context.unbindService(it) }
+            activeConnection = null
+        }
 
         val intent = Intent().apply {
             component = ComponentName(VERIFIER_PKG, VERIFIER_SVC)
@@ -167,6 +180,9 @@ object PremiumPluginLoader {
 
         val connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                if (activeConnection != this) return
+                activeConnection = null
+
                 val pubKeyBytes = storedPubKeyBytes
                 val success = if (pubKeyBytes == null) {
                     XposedBridge.log("EdgeX: challenge aborted — no stored pubkey")
@@ -196,14 +212,21 @@ object PremiumPluginLoader {
                 }
             }
 
-            override fun onServiceDisconnected(name: ComponentName) {}
+            override fun onServiceDisconnected(name: ComponentName) {
+                if (activeConnection == this) {
+                    activeConnection = null
+                }
+            }
         }
+
+        activeConnection = connection
 
         val bound = runCatching {
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }.getOrDefault(false)
 
         if (!bound) {
+            activeConnection = null
             challengeAttempt++
             if (challengeAttempt < MAX_ATTEMPTS) {
                 XposedBridge.log("EdgeX: KeystoreVerifierService bind failed (attempt $challengeAttempt/$MAX_ATTEMPTS), retrying")

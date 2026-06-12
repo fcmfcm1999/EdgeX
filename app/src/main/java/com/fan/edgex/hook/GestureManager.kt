@@ -387,6 +387,7 @@ object GestureManager {
                             configRepository.invalidate()
                             configRepository.reloadAsync(::refreshDebugOverlay)
                         }
+                        PremiumPluginLoader.retryChallengeIfNeeded(ctx)
                     }
                     HookConfigSnapshot.ACTION_EXECUTE_ACTION -> {
                         val action = intent.getStringExtra(HookConfigSnapshot.EXTRA_ACTION_CODE).orEmpty()
@@ -397,6 +398,7 @@ object GestureManager {
                     }
                     HookConfigSnapshot.ACTION_HOOK_STATUS_REQUEST -> {
                         ctx.sendBroadcast(ModuleActivationState.responseIntent(System.currentTimeMillis()))
+                        PremiumPluginLoader.retryChallengeIfNeeded(ctx)
                     }
                     HookConfigSnapshot.ACTION_EDGE_LIGHTING -> {
                         if (configRepository.get(AppConfig.EDGE_LIGHTING_ENABLED) != "true") return
