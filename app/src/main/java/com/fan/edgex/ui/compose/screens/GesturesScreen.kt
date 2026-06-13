@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -757,137 +758,146 @@ private fun ZoneSheet(
         onDismissRequest = onDismiss,
     ) {
         if (zone == null) return@EdgeXBottomSheet
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState())
+        val fallbackEdge = AppConfig.fallbackEdgeZone(zone.id)
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            EdgeXListGroup {
-                EdgeXSwitchRow(
-                    title = stringResource(R.string.compose_zone_enabled),
-                    subtitle = stringResource(if (state.zoneEnabled(zone.id)) R.string.compose_enabled else R.string.compose_disabled),
-                    checked = state.zoneEnabled(zone.id),
-                    onCheckedChange = { onZoneEnabledChange(zone, it) },
-                )
-            }
-
-            val fallbackEdge = AppConfig.fallbackEdgeZone(zone.id)
-            Spacer(modifier = Modifier.height(12.dp))
-            EdgeXListGroup {
-                val thickness = state.thicknesses[zone.id] ?: 12
-                val thicknessLabel = stringResource(R.string.compose_zone_thickness_width)
-                ConfigSlider(
-                    label = thicknessLabel,
-                    valueText = "$thickness dp",
-                    value = thickness,
-                    range = 8..32,
-                    onValue = { newVal ->
-                        context.putConfig(AppConfig.zoneThicknessKey(zone.id), newVal.toString())
-                        onRefresh()
-                    }
-                )
-
-                if (fallbackEdge != null) {
-                    val splits = state.splitPoints[fallbackEdge] ?: Pair(33, 66)
-                    val isFirst = zone.id.endsWith("_top") || zone.id.endsWith("_left")
-                    val isMid = zone.id.endsWith("_mid")
-                    val isLast = zone.id.endsWith("_bottom") || zone.id.endsWith("_right")
-
-                    val splitsLabel = stringResource(R.string.compose_zone_proportion)
-
-                    if (isFirst) {
-                        ConfigSlider(
-                            label = splitsLabel,
-                            valueText = "${splits.first}%",
-                            value = splits.first,
-                            range = 10..80,
-                            onValue = { newVal ->
-                                val adjusted = GestureZoneGeometryCalculator.adjustFirst(newVal, splits.second)
-                                context.putConfigsSync(
-                                    AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
-                                    AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
-                                )
-                                onRefresh()
-                            }
-                        )
-                    } else if (isMid) {
-                        val midH = splits.second - splits.first
-                        ConfigSlider(
-                            label = splitsLabel,
-                            valueText = "$midH%",
-                            value = midH,
-                            range = 10..80,
-                            onValue = { newVal ->
-                                val adjusted = GestureZoneGeometryCalculator.adjustMiddleHeight(newVal, splits.first, splits.second)
-                                context.putConfigsSync(
-                                    AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
-                                    AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
-                                )
-                                onRefresh()
-                            }
-                        )
-                    } else if (isLast) {
-                        val lastH = 100 - splits.second
-                        ConfigSlider(
-                            label = splitsLabel,
-                            valueText = "$lastH%",
-                            value = lastH,
-                            range = 10..80,
-                            onValue = { newVal ->
-                                val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, 100 - newVal)
-                                context.putConfigsSync(
-                                    AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
-                                    AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
-                                )
-                                onRefresh()
-                            }
-                        )
-                    }
-                }
-
-                EdgeXDivider()
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(
-                        onClick = {
-                            if (fallbackEdge != null) {
-                                context.putConfigsSync(
-                                    AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to "33",
-                                    AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to "66",
-                                    AppConfig.zoneThicknessKey(zone.id) to "16"
-                                )
-                            } else {
-                                context.putConfig(AppConfig.zoneThicknessKey(zone.id), "16")
-                            }
-                            onRefresh()
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
-                    ) {
-                        Text(stringResource(R.string.compose_zone_reset_default), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            EdgeXListGroup {
-                val gestures = gesturesFor(zone.edge)
-                gestures.forEachIndexed { index, gesture ->
-                    val actionCode = state.actionCode(zone.id, gesture.id)
-                    GestureRow(
-                        title = stringResource(gesture.labelRes),
-                        subtitle = state.actionLabel(zone.id, gesture.id),
-                        actionCode = actionCode,
-                        onClick = { onPickAction(gesture) },
+            // 启用/禁用开关
+            item {
+                EdgeXListGroup {
+                    EdgeXSwitchRow(
+                        title = stringResource(R.string.compose_zone_enabled),
+                        subtitle = stringResource(if (state.zoneEnabled(zone.id)) R.string.compose_enabled else R.string.compose_disabled),
+                        checked = state.zoneEnabled(zone.id),
+                        onCheckedChange = { onZoneEnabledChange(zone, it) },
                     )
-                    if (index != gestures.lastIndex) EdgeXDivider()
                 }
             }
+
+            // 宽度/比例滑块
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                EdgeXListGroup {
+                    val thickness = state.thicknesses[zone.id] ?: 16
+                    val thicknessLabel = stringResource(R.string.compose_zone_thickness_width)
+                    ConfigSlider(
+                        label = thicknessLabel,
+                        valueText = "$thickness dp",
+                        value = thickness,
+                        range = 8..32,
+                        onValue = { newVal ->
+                            context.putConfig(AppConfig.zoneThicknessKey(zone.id), newVal.toString())
+                            onRefresh()
+                        }
+                    )
+
+                    if (fallbackEdge != null) {
+                        val splits = state.splitPoints[fallbackEdge] ?: Pair(33, 66)
+                        val isFirst = zone.id.endsWith("_top") || zone.id.endsWith("_left")
+                        val isMid = zone.id.endsWith("_mid")
+                        val isLast = zone.id.endsWith("_bottom") || zone.id.endsWith("_right")
+
+                        val splitsLabel = stringResource(R.string.compose_zone_proportion)
+
+                        if (isFirst) {
+                            ConfigSlider(
+                                label = splitsLabel,
+                                valueText = "${splits.first}%",
+                                value = splits.first,
+                                range = 10..80,
+                                onValue = { newVal ->
+                                    val adjusted = GestureZoneGeometryCalculator.adjustFirst(newVal, splits.second)
+                                    context.putConfigsSync(
+                                        AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                        AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                                    )
+                                    onRefresh()
+                                }
+                            )
+                        } else if (isMid) {
+                            val midH = splits.second - splits.first
+                            ConfigSlider(
+                                label = splitsLabel,
+                                valueText = "$midH%",
+                                value = midH,
+                                range = 10..80,
+                                onValue = { newVal ->
+                                    val adjusted = GestureZoneGeometryCalculator.adjustMiddleHeight(newVal, splits.first, splits.second)
+                                    context.putConfigsSync(
+                                        AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                        AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                                    )
+                                    onRefresh()
+                                }
+                            )
+                        } else if (isLast) {
+                            val lastH = 100 - splits.second
+                            ConfigSlider(
+                                label = splitsLabel,
+                                valueText = "$lastH%",
+                                value = lastH,
+                                range = 10..80,
+                                onValue = { newVal ->
+                                    val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, 100 - newVal)
+                                    context.putConfigsSync(
+                                        AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                        AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                                    )
+                                    onRefresh()
+                                }
+                            )
+                        }
+                    }
+
+                    EdgeXDivider()
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (fallbackEdge != null) {
+                                    context.putConfigsSync(
+                                        AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to "33",
+                                        AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to "66",
+                                        AppConfig.zoneThicknessKey(zone.id) to "16"
+                                    )
+                                } else {
+                                    context.putConfig(AppConfig.zoneThicknessKey(zone.id), "16")
+                                }
+                                onRefresh()
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
+                        ) {
+                            Text(stringResource(R.string.compose_zone_reset_default), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+
+            // 手势动作列表
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                EdgeXListGroup {
+                    val gestures = gesturesFor(zone.edge)
+                    gestures.forEachIndexed { index, gesture ->
+                        val actionCode = state.actionCode(zone.id, gesture.id)
+                        GestureRow(
+                            title = stringResource(gesture.labelRes),
+                            subtitle = state.actionLabel(zone.id, gesture.id),
+                            actionCode = actionCode,
+                            onClick = { onPickAction(gesture) },
+                        )
+                        if (index != gestures.lastIndex) EdgeXDivider()
+                    }
+                }
+            }
+
+            // 底部安全距离
+            item { Spacer(modifier = Modifier.height(8.dp)) }
         }
     }
 }
