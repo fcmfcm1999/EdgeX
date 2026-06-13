@@ -31,6 +31,22 @@ class GestureZoneGeometryCalculator(
             return Pair(f, s)
         }
 
+        fun adjustMiddleHeight(newH: Int, currentFirst: Int, currentSecond: Int): Pair<Int, Int> {
+            val h = newH.coerceIn(MIN_SEGMENT_PERCENT, MAX_PERCENT - MIN_PERCENT)
+            val currentMid = (currentFirst + currentSecond) / 2.0
+            var f = kotlin.math.round(currentMid - h / 2.0).toInt()
+            var s = f + h
+            if (f < MIN_PERCENT) {
+                f = MIN_PERCENT
+                s = f + h
+            }
+            if (s > MAX_PERCENT) {
+                s = MAX_PERCENT
+                f = s - h
+            }
+            return Pair(f, s)
+        }
+
         fun resolveSegment(v: Float, totalLength: Float, firstPercent: Int, secondPercent: Int): Int {
             val p1 = totalLength * (firstPercent / 100f)
             val p2 = totalLength * (secondPercent / 100f)

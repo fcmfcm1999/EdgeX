@@ -71,4 +71,31 @@ class GestureZoneGeometryCalculatorTest {
         assertEquals(1, GestureZoneGeometryCalculator.resolveSegmentWithOffset(50f, 10f, 90f, 33, 66))
         assertEquals(2, GestureZoneGeometryCalculator.resolveSegmentWithOffset(70f, 10f, 90f, 33, 66))
     }
+
+    @Test
+    fun testAdjustMiddleHeight() {
+        // Normal adjustment within bounds, no shifting needed
+        // Midpoint of 33 and 66 is 49.5. New height is 40.
+        // f = 49.5 - 20 = 29.5 -> rounded to 30. s = 30 + 40 = 70.
+        // Wait, let's double check round(49.5 - 20) = round(29.5) = 30.0 -> 30.
+        val (f1, s1) = GestureZoneGeometryCalculator.adjustMiddleHeight(40, 33, 66)
+        assertEquals(30, f1)
+        assertEquals(70, s1)
+
+        // Shifting left when hitting the right boundary (MAX_PERCENT = 90)
+        // Midpoint is 70. New height is 50.
+        // f = 70 - 25 = 45. s = 45 + 50 = 95. Since 95 > 90:
+        // s = 90, f = 90 - 50 = 40.
+        val (f2, s2) = GestureZoneGeometryCalculator.adjustMiddleHeight(50, 60, 80)
+        assertEquals(40, f2)
+        assertEquals(90, s2)
+
+        // Shifting right when hitting the left boundary (MIN_PERCENT = 10)
+        // Midpoint is 25. New height is 40.
+        // f = 25 - 20 = 5. Since 5 < 10:
+        // f = 10, s = 10 + 40 = 50.
+        val (f3, s3) = GestureZoneGeometryCalculator.adjustMiddleHeight(40, 20, 30)
+        assertEquals(10, f3)
+        assertEquals(50, s3)
+    }
 }

@@ -389,12 +389,23 @@ object GestureManager {
         if (systemConfigReceiverRegistered) return
         systemConfigReceiverRegistered = true
 
-        val receiver = object : BroadcastReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
+            addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
+            addAction(HookConfigSnapshot.ACTION_HOOK_STATUS_REQUEST)
+            addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING)
+            addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS)
+            addAction(GameModeManager.ACTION_DISABLE)
+            addAction(FlashlightManager.ACTION_TURN_OFF)
+        }
+
+        fun createReceiver(): BroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
                     HookConfigSnapshot.ACTION_CONFIG_CHANGED -> {
                         val keys = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_KEYS)
                         val values = intent.getStringArrayExtra(HookConfigSnapshot.EXTRA_VALUES)
+                        log("ACTION_CONFIG_CHANGED received in system_server: keys=${keys?.joinToString()}, values=${values?.joinToString()}")
                         if (keys != null && values != null) {
                             configRepository.updateFromBroadcast(
                                 keys,
@@ -473,20 +484,33 @@ object GestureManager {
             }
         }
 
+        var registered = false
         try {
-            val filter = IntentFilter().apply {
-                addAction(HookConfigSnapshot.ACTION_CONFIG_CHANGED)
-                addAction(HookConfigSnapshot.ACTION_EXECUTE_ACTION)
-                addAction(HookConfigSnapshot.ACTION_HOOK_STATUS_REQUEST)
-                addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING)
-                addAction(HookConfigSnapshot.ACTION_EDGE_LIGHTING_DISMISS)
-                addAction(GameModeManager.ACTION_DISABLE)
-                addAction(FlashlightManager.ACTION_TURN_OFF)
+            val receiver = createReceiver()
+            de.robv.android.xposed.XposedHelpers.callMethod(
+                context,
+                "registerReceiverForAllUsers",
+                receiver,
+                filter,
+                null,
+                mainHandler(),
+                Context.RECEIVER_EXPORTED
+            )
+            registered = true
+            log("Registered config receiver for all users in system_server")
+        } catch (t: Throwable) {
+            log("Failed to registerReceiverForAllUsers: ${t.message}")
+        }
+
+        if (!registered) {
+            try {
+                val receiver = createReceiver()
+                context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+                log("Fallback: Registered config receiver with standard registerReceiver in system_server")
+            } catch (e: Exception) {
+                systemConfigReceiverRegistered = false
+                log("Failed to register config broadcast receiver: ${e.message}")
             }
-            context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
-        } catch (e: Exception) {
-            systemConfigReceiverRegistered = false
-            log("Failed to register config broadcast receiver: ${e.message}")
         }
     }
 

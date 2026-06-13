@@ -747,29 +747,14 @@ private fun ZoneSheet(
                 val isLast = zone.id.endsWith("_bottom") || zone.id.endsWith("_right")
 
                 val splitsLabel = if (zone.edge == "L" || zone.edge == "R") {
-                    stringResource(R.string.compose_zone_range_vertical)
+                    stringResource(R.string.compose_zone_thickness_height)
                 } else {
-                    stringResource(R.string.compose_zone_range_horizontal)
+                    stringResource(R.string.compose_zone_thickness_width)
                 }
 
                 if (isFirst) {
                     ConfigSlider(
                         label = splitsLabel,
-                        valueText = "0% - ${splits.first}%",
-                        value = splits.first,
-                        range = 10..80,
-                        onValue = { newVal ->
-                            val adjusted = GestureZoneGeometryCalculator.adjustFirst(newVal, splits.second)
-                            context.putConfigsSync(
-                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
-                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
-                            )
-                            onRefresh()
-                        }
-                    )
-                } else if (isMid) {
-                    ConfigSlider(
-                        label = "$splitsLabel (Start)",
                         valueText = "${splits.first}%",
                         value = splits.first,
                         range = 10..80,
@@ -782,14 +767,15 @@ private fun ZoneSheet(
                             onRefresh()
                         }
                     )
-                    EdgeXDivider()
+                } else if (isMid) {
+                    val midH = splits.second - splits.first
                     ConfigSlider(
-                        label = "$splitsLabel (End)",
-                        valueText = "${splits.second}%",
-                        value = splits.second,
-                        range = 20..90,
+                        label = splitsLabel,
+                        valueText = "$midH%",
+                        value = midH,
+                        range = 10..80,
                         onValue = { newVal ->
-                            val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, newVal)
+                            val adjusted = GestureZoneGeometryCalculator.adjustMiddleHeight(newVal, splits.first, splits.second)
                             context.putConfigsSync(
                                 AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
                                 AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
@@ -798,13 +784,14 @@ private fun ZoneSheet(
                         }
                     )
                 } else if (isLast) {
+                    val lastH = 100 - splits.second
                     ConfigSlider(
                         label = splitsLabel,
-                        valueText = "${splits.second}% - 100%",
-                        value = splits.second,
-                        range = 20..90,
+                        valueText = "$lastH%",
+                        value = lastH,
+                        range = 10..80,
                         onValue = { newVal ->
-                            val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, newVal)
+                            val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, 100 - newVal)
                             context.putConfigsSync(
                                 AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
                                 AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
