@@ -42,21 +42,25 @@ class NotificationEdgeService : NotificationListenerService() {
         }
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED)) return
+    override fun onNotificationPosted(sbn: StatusBarNotification, rankingMap: RankingMap) {
+        if (!getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, true)) return
         if (!isScreenInteractive()) return
         if (!isAllowedPackage(sbn.packageName)) return
 
         val ranking = Ranking()
-        val hasRanking = currentRanking?.getRanking(sbn.key, ranking) == true
+        val hasRanking = rankingMap.getRanking(sbn.key, ranking)
         val alertInfo = if (hasRanking) {
-            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR or
-                NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST
-            ranking.matchesInterruptionFilter() &&
-                ranking.importance >= NotificationManager.IMPORTANCE_DEFAULT &&
-                !ranking.isSuspended &&
-                ranking.suppressedVisualEffects and hiddenEffects == 0
+            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK
+            val matchesFilter = ranking.matchesInterruptionFilter()
+            val hasHighImportance = ranking.importance >= NotificationManager.IMPORTANCE_HIGH
+            val isNotSuspended = !ranking.isSuspended
+            val isNotSuppressed = (ranking.suppressedVisualEffects and hiddenEffects) == 0
+            
+            Xlog.d(TAG, "onNotificationPosted debug: key=${sbn.key}, matchesFilter=$matchesFilter, importance=${ranking.importance}, isNotSuspended=$isNotSuspended, isNotSuppressed=$isNotSuppressed")
+            
+            matchesFilter && hasHighImportance && isNotSuspended && isNotSuppressed
         } else {
+            Xlog.d(TAG, "onNotificationPosted debug: key=${sbn.key} has no ranking in map")
             false
         }
 
@@ -176,12 +180,11 @@ class NotificationEdgeService : NotificationListenerService() {
         val ranking = Ranking()
         return runCatching {
             if (!rankingMap.getRanking(notificationKey, ranking)) return@runCatching false
-            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR or
-                NotificationManager.Policy.SUPPRESSED_EFFECT_NOTIFICATION_LIST
+            val hiddenEffects = NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK
             ranking.matchesInterruptionFilter() &&
-                ranking.importance >= NotificationManager.IMPORTANCE_DEFAULT &&
+                ranking.importance >= NotificationManager.IMPORTANCE_HIGH &&
                 !ranking.isSuspended &&
-                ranking.suppressedVisualEffects and hiddenEffects == 0
+                (ranking.suppressedVisualEffects and hiddenEffects) == 0
         }.getOrDefault(false)
     }
 
