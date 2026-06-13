@@ -16,18 +16,18 @@ class GestureZoneGeometryCalculatorTest {
 
         // Default thickness
         val thickness = calculator.getThicknessDp("left_top")
-        assertEquals(8, thickness)
+        assertEquals(16, thickness)
         
-        // Fallback zone thickness should always be 8
+        // Fallback zone thickness should be 16
         val fallbackThickness = calculator.getThicknessDp("left")
-        assertEquals(8, fallbackThickness)
+        assertEquals(16, fallbackThickness)
     }
 
     @Test
     fun testThicknessClamping() {
-        // Underflow thickness (less than 4)
+        // Underflow thickness (less than 8)
         val calcUnder = GestureZoneGeometryCalculator { _, _ -> "2" }
-        assertEquals(4, calcUnder.getThicknessDp("left_top"))
+        assertEquals(8, calcUnder.getThicknessDp("left_top"))
 
         // Overflow thickness (greater than 32)
         val calcOver = GestureZoneGeometryCalculator { _, _ -> "40" }

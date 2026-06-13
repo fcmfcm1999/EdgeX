@@ -391,7 +391,7 @@ internal class EdgeGestureDetector(
         val thicknessDp = if (isDirectEnabled) {
             callbacks.getZoneThicknessDp(zone)
         } else {
-            8
+            callbacks.getZoneThicknessDp(fallbackZone!!)
         }
         val thicknessPx = thicknessDp * density
 

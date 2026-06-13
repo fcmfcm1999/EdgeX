@@ -512,11 +512,7 @@
     <string name="compose_gestures_enabled_toast">Gestures enabled</string>
     <string name="compose_gestures_disabled_toast">Gestures disabled</string>
     <string name="compose_zone_enabled">Enable this zone</string>
-    <string name="compose_zone_size_title">Zone size</string>
     <string name="compose_zone_thickness_width">Width</string>
-    <string name="compose_zone_thickness_height">Height</string>
-    <string name="compose_zone_range_vertical">Vertical range</string>
-    <string name="compose_zone_range_horizontal">Horizontal range</string>
     <string name="compose_zone_proportion">Proportion</string>
     <string name="compose_zone_reset_default">Reset to default</string>
     <string name="compose_gesture_preview_subtitle">Tap an edge zone to configure its gestures.</string>

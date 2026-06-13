@@ -9,8 +9,8 @@ class GestureZoneGeometryCalculator(
         const val MIN_SEGMENT_PERCENT = 10
         const val DEFAULT_FIRST_PERCENT = 33
         const val DEFAULT_SECOND_PERCENT = 66
-        const val DEFAULT_THICKNESS_DP = 8
-        const val MIN_THICKNESS_DP = 4
+        const val DEFAULT_THICKNESS_DP = 16
+        const val MIN_THICKNESS_DP = 8
         const val MAX_THICKNESS_DP = 32
 
         fun clampFirstPercent(first: Int): Int =
@@ -87,9 +87,6 @@ class GestureZoneGeometryCalculator(
     }
 
     fun getThicknessDp(zone: String): Int {
-        if (AppConfig.fallbackEdgeZone(zone) == null) {
-            return DEFAULT_THICKNESS_DP
-        }
         val key = AppConfig.zoneThicknessKey(zone)
         val value = getVal(key, DEFAULT_THICKNESS_DP.toString()).toIntOrNull() ?: DEFAULT_THICKNESS_DP
         return value.coerceIn(MIN_THICKNESS_DP, MAX_THICKNESS_DP)

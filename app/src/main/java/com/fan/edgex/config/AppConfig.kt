@@ -108,8 +108,8 @@ object AppConfig {
     const val DEFAULT_SPLIT_FIRST_PERCENT = 33
     const val DEFAULT_SPLIT_SECOND_PERCENT = 66
     const val MIN_SEGMENT_PERCENT = 10
-    const val DEFAULT_THICKNESS_DP = 8
-    const val MIN_THICKNESS_DP = 4
+    const val DEFAULT_THICKNESS_DP = 16
+    const val MIN_THICKNESS_DP = 8
     const val MAX_THICKNESS_DP = 32
 
     fun zoneSplitFirstPercentKey(edge: String) = "zone_split_${edge}_first_percent"
