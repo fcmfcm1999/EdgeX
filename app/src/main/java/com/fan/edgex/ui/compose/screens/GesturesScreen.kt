@@ -21,10 +21,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Density
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.GestureZoneGeometryCalculator
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
@@ -78,6 +84,7 @@ import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import androidx.compose.ui.viewinterop.AndroidView
 import android.widget.ImageView
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.math.roundToInt
 
 
 private enum class GestureFilter(val labelRes: Int) {
@@ -103,6 +110,8 @@ private data class GestureScreenState(
     val zones: Map<String, Map<String, String>>,
     val labels: Map<String, Map<String, String>>,
     val enabled: Map<String, Boolean>,
+    val splitPoints: Map<String, Pair<Int, Int>>,
+    val thicknesses: Map<String, Int>,
 ) {
     fun count(zoneId: String): Int =
         zones[zoneId].orEmpty().values.count { it.isNotBlank() && it != "none" }
@@ -258,6 +267,7 @@ fun GesturesScreen(
         },
         onZoneEnabledChange = ::setZoneEnabled,
         onPickAction = { pickingActionFor = it },
+        onRefresh = ::refresh,
     )
 
     val activeZone = selectedZone
@@ -368,11 +378,11 @@ private fun GestureZoneCanvas(
         PhoneFrame(
             width = phoneWidth,
             height = phoneHeight,
-            modifier = Modifier.pointerInput(geometry) {
+            modifier = Modifier.pointerInput(geometry, state) {
                 detectTapGestures { offset ->
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
-                    val hitZone = hitTestEdgeZone(offset, w, h, geometry)
+                    val hitZone = hitTestEdgeZone(offset, w, h, geometry, currentState, density)
                     if (hitZone != null) {
                         val zone = zones.firstOrNull { it.id == hitZone }
                         if (zone != null) currentOnClick(zone)
@@ -387,7 +397,7 @@ private fun GestureZoneCanvas(
                 drawEdgeStrips(
                     w = w, h = h,
                     stripThickness = geometry.stripThicknessPx,
-                    state = state,
+                    state = currentState,
                     accentColor = accentColor,
                     unconfiguredFill = unconfiguredFill,
                     unconfiguredStroke = unconfiguredStroke,
@@ -407,17 +417,10 @@ private fun DrawScope.drawEdgeStrips(
     unconfiguredStroke: Color,
     configuredStroke: Color,
 ) {
-    val leftZones = listOf("left_top", "left_mid", "left_bottom")
-    val rightZones = listOf("right_top", "right_mid", "right_bottom")
-    val topZones = listOf("top_left", "top_mid", "top_right")
-    val bottomZones = listOf("bottom_left", "bottom_mid", "bottom_right")
     val cornerR = CornerRadius(2.dp.toPx())
     val strokeW = 1.dp.toPx()
-
-    // Left/Right edge segments: avoid corners, range is stripThickness .. h - stripThickness
-    val vSegmentH = (h - 2 * stripThickness) / 3f
-    // Top/Bottom edge segments: avoid corners, range is stripThickness .. w - stripThickness
-    val hSegmentW = (w - 2 * stripThickness) / 3f
+    val scale = stripThickness / 12.dp.toPx()
+    val density = 1.dp.toPx()
 
     fun drawSegment(x: Float, y: Float, segW: Float, segH: Float, active: Boolean) {
         drawRoundRect(
@@ -435,57 +438,159 @@ private fun DrawScope.drawEdgeStrips(
         )
     }
 
-    for (i in 0..2) {
-        val active = state.zoneEnabled("left") || state.zoneEnabled(leftZones[i])
-        drawSegment(0f, stripThickness + i * vSegmentH, stripThickness, vSegmentH, active)
-    }
+    // Left edge
+    val leftSplits = state.splitPoints["left"] ?: Pair(33, 66)
+    val leftActiveH = h - 2 * stripThickness
+    val leftP1 = stripThickness + leftActiveH * (leftSplits.first / 100f)
+    val leftP2 = stripThickness + leftActiveH * (leftSplits.second / 100f)
 
-    for (i in 0..2) {
-        val active = state.zoneEnabled("right") || state.zoneEnabled(rightZones[i])
-        drawSegment(w - stripThickness, stripThickness + i * vSegmentH, stripThickness, vSegmentH, active)
-    }
+    val leftTopThick = (state.thicknesses["left_top"] ?: 8) * density * scale
+    drawSegment(0f, stripThickness, leftTopThick, leftP1 - stripThickness, state.zoneEnabled("left") || state.zoneEnabled("left_top"))
+    val leftMidThick = (state.thicknesses["left_mid"] ?: 8) * density * scale
+    drawSegment(0f, leftP1, leftMidThick, leftP2 - leftP1, state.zoneEnabled("left") || state.zoneEnabled("left_mid"))
+    val leftBottomThick = (state.thicknesses["left_bottom"] ?: 8) * density * scale
+    drawSegment(0f, leftP2, leftBottomThick, h - stripThickness - leftP2, state.zoneEnabled("left") || state.zoneEnabled("left_bottom"))
 
-    for (i in 0..2) {
-        val active = state.zoneEnabled("top") || state.zoneEnabled(topZones[i])
-        drawSegment(stripThickness + i * hSegmentW, 0f, hSegmentW, stripThickness, active)
-    }
+    // Right edge
+    val rightSplits = state.splitPoints["right"] ?: Pair(33, 66)
+    val rightActiveH = h - 2 * stripThickness
+    val rightP1 = stripThickness + rightActiveH * (rightSplits.first / 100f)
+    val rightP2 = stripThickness + rightActiveH * (rightSplits.second / 100f)
 
-    for (i in 0..2) {
-        val active = state.zoneEnabled("bottom") || state.zoneEnabled(bottomZones[i])
-        drawSegment(stripThickness + i * hSegmentW, h - stripThickness, hSegmentW, stripThickness, active)
-    }
+    val rightTopThick = (state.thicknesses["right_top"] ?: 8) * density * scale
+    drawSegment(w - rightTopThick, stripThickness, rightTopThick, rightP1 - stripThickness, state.zoneEnabled("right") || state.zoneEnabled("right_top"))
+    val rightMidThick = (state.thicknesses["right_mid"] ?: 8) * density * scale
+    drawSegment(w - rightMidThick, rightP1, rightMidThick, rightP2 - rightP1, state.zoneEnabled("right") || state.zoneEnabled("right_mid"))
+    val rightBottomThick = (state.thicknesses["right_bottom"] ?: 8) * density * scale
+    drawSegment(w - rightBottomThick, rightP2, rightBottomThick, h - stripThickness - rightP2, state.zoneEnabled("right") || state.zoneEnabled("right_bottom"))
+
+    // Top edge
+    val topSplits = state.splitPoints["top"] ?: Pair(33, 66)
+    val topActiveW = w - 2 * stripThickness
+    val topP1 = stripThickness + topActiveW * (topSplits.first / 100f)
+    val topP2 = stripThickness + topActiveW * (topSplits.second / 100f)
+
+    val topLeftThick = (state.thicknesses["top_left"] ?: 8) * density * scale
+    drawSegment(stripThickness, 0f, topP1 - stripThickness, topLeftThick, state.zoneEnabled("top") || state.zoneEnabled("top_left"))
+    val topMidThick = (state.thicknesses["top_mid"] ?: 8) * density * scale
+    drawSegment(topP1, 0f, topP2 - topP1, topMidThick, state.zoneEnabled("top") || state.zoneEnabled("top_mid"))
+    val topRightThick = (state.thicknesses["top_right"] ?: 8) * density * scale
+    drawSegment(topP2, 0f, w - stripThickness - topP2, topRightThick, state.zoneEnabled("top") || state.zoneEnabled("top_right"))
+
+    // Bottom edge
+    val bottomSplits = state.splitPoints["bottom"] ?: Pair(33, 66)
+    val bottomActiveW = w - 2 * stripThickness
+    val bottomP1 = stripThickness + bottomActiveW * (bottomSplits.first / 100f)
+    val bottomP2 = stripThickness + bottomActiveW * (bottomSplits.second / 100f)
+
+    val bottomLeftThick = (state.thicknesses["bottom_left"] ?: 8) * density * scale
+    drawSegment(stripThickness, h - bottomLeftThick, bottomP1 - stripThickness, bottomLeftThick, state.zoneEnabled("bottom") || state.zoneEnabled("bottom_left"))
+    val bottomMidThick = (state.thicknesses["bottom_mid"] ?: 8) * density * scale
+    drawSegment(bottomP1, h - bottomMidThick, bottomP2 - bottomP1, bottomMidThick, state.zoneEnabled("bottom") || state.zoneEnabled("bottom_mid"))
+    val bottomRightThick = (state.thicknesses["bottom_right"] ?: 8) * density * scale
+    drawSegment(bottomP2, h - bottomRightThick, w - stripThickness - bottomP2, bottomRightThick, state.zoneEnabled("bottom") || state.zoneEnabled("bottom_right"))
 }
 
-private fun hitTestEdgeZone(offset: Offset, w: Float, h: Float, geometry: GestureZoneGeometry): String? {
+private fun hitTestEdgeZone(
+    offset: Offset,
+    w: Float,
+    h: Float,
+    geometry: GestureZoneGeometry,
+    state: GestureScreenState,
+    density: Density
+): String? {
     val stripThickness = geometry.stripThicknessPx
-    val hitThickness = geometry.hitThicknessPx
     val x = offset.x
     val y = offset.y
+    val scale = with(density) { stripThickness / 12.dp.toPx() }
+    val densityVal = with(density) { 1.dp.toPx() }
 
-    val vSegmentH = (h - 2 * stripThickness) / 3f
-    val hSegmentW = (w - 2 * stripThickness) / 3f
-    val suffixesHV = listOf("top", "mid", "bottom")
-    val suffixesVH = listOf("left", "mid", "right")
+    // 1. LEFT edge
+    val leftSplits = state.splitPoints["left"] ?: Pair(33, 66)
+    val leftActiveH = h - 2 * stripThickness
+    val leftP1 = stripThickness + leftActiveH * (leftSplits.first / 100f)
+    val leftP2 = stripThickness + leftActiveH * (leftSplits.second / 100f)
 
-    // Left edge
-    if (x in 0f..hitThickness && y in 0f..h) {
-        val seg = ((y - stripThickness) / vSegmentH).toInt().coerceIn(0, 2)
-        return "left_${suffixesHV[seg]}"
+    val leftSeg = when {
+        y < leftP1 -> 0
+        y < leftP2 -> 1
+        else -> 2
     }
-    // Right edge
-    if (x in (w - hitThickness)..w && y in 0f..h) {
-        val seg = ((y - stripThickness) / vSegmentH).toInt().coerceIn(0, 2)
-        return "right_${suffixesHV[seg]}"
+    val leftZoneId = when (leftSeg) {
+        0 -> "left_top"
+        1 -> "left_mid"
+        else -> "left_bottom"
     }
-    // Top edge
-    if (y in 0f..hitThickness && x in 0f..w) {
-        val seg = ((x - stripThickness) / hSegmentW).toInt().coerceIn(0, 2)
-        return "top_${suffixesVH[seg]}"
+    val leftThickPx = (state.thicknesses[leftZoneId] ?: 8) * densityVal * scale
+    val leftHitThreshold = maxOf(leftThickPx, with(density) { 16.dp.toPx() } * scale)
+    if (x in 0f..leftHitThreshold && y in stripThickness..(h - stripThickness)) {
+        return leftZoneId
     }
-    // Bottom edge
-    if (y in (h - hitThickness)..h && x in 0f..w) {
-        val seg = ((x - stripThickness) / hSegmentW).toInt().coerceIn(0, 2)
-        return "bottom_${suffixesVH[seg]}"
+
+    // 2. RIGHT edge
+    val rightSplits = state.splitPoints["right"] ?: Pair(33, 66)
+    val rightActiveH = h - 2 * stripThickness
+    val rightP1 = stripThickness + rightActiveH * (rightSplits.first / 100f)
+    val rightP2 = stripThickness + rightActiveH * (rightSplits.second / 100f)
+
+    val rightSeg = when {
+        y < rightP1 -> 0
+        y < rightP2 -> 1
+        else -> 2
+    }
+    val rightZoneId = when (rightSeg) {
+        0 -> "right_top"
+        1 -> "right_mid"
+        else -> "right_bottom"
+    }
+    val rightThickPx = (state.thicknesses[rightZoneId] ?: 8) * densityVal * scale
+    val rightHitThreshold = maxOf(rightThickPx, with(density) { 16.dp.toPx() } * scale)
+    if (x in (w - rightHitThreshold)..w && y in stripThickness..(h - stripThickness)) {
+        return rightZoneId
+    }
+
+    // 3. TOP edge
+    val topSplits = state.splitPoints["top"] ?: Pair(33, 66)
+    val topActiveW = w - 2 * stripThickness
+    val topP1 = stripThickness + topActiveW * (topSplits.first / 100f)
+    val topP2 = stripThickness + topActiveW * (topSplits.second / 100f)
+
+    val topSeg = when {
+        x < topP1 -> 0
+        x < topP2 -> 1
+        else -> 2
+    }
+    val topZoneId = when (topSeg) {
+        0 -> "top_left"
+        1 -> "top_mid"
+        else -> "top_right"
+    }
+    val topThickPx = (state.thicknesses[topZoneId] ?: 8) * densityVal * scale
+    val topHitThreshold = maxOf(topThickPx, with(density) { 16.dp.toPx() } * scale)
+    if (y in 0f..topHitThreshold && x in stripThickness..(w - stripThickness)) {
+        return topZoneId
+    }
+
+    // 4. BOTTOM edge
+    val bottomSplits = state.splitPoints["bottom"] ?: Pair(33, 66)
+    val bottomActiveW = w - 2 * stripThickness
+    val bottomP1 = stripThickness + bottomActiveW * (bottomSplits.first / 100f)
+    val bottomP2 = stripThickness + bottomActiveW * (bottomSplits.second / 100f)
+
+    val bottomSeg = when {
+        x < bottomP1 -> 0
+        x < bottomP2 -> 1
+        else -> 2
+    }
+    val bottomZoneId = when (bottomSeg) {
+        0 -> "bottom_left"
+        1 -> "bottom_mid"
+        else -> "bottom_right"
+    }
+    val bottomThickPx = (state.thicknesses[bottomZoneId] ?: 8) * densityVal * scale
+    val bottomHitThreshold = maxOf(bottomThickPx, with(density) { 16.dp.toPx() } * scale)
+    if (y in (h - bottomHitThreshold)..h && x in stripThickness..(w - stripThickness)) {
+        return bottomZoneId
     }
 
     return null
@@ -594,7 +699,11 @@ private fun ZoneSheet(
     onDismiss: () -> Unit,
     onZoneEnabledChange: (GestureZone, Boolean) -> Unit,
     onPickAction: (GestureOption) -> Unit,
+    onRefresh: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val colors = LocalEdgeXColors.current
+
     EdgeXBottomSheet(
         open = zone != null,
         title = zone?.let { stringResource(it.labelRes) }.orEmpty(),
@@ -609,6 +718,127 @@ private fun ZoneSheet(
                 onCheckedChange = { onZoneEnabledChange(zone, it) },
             )
         }
+
+        val fallbackEdge = AppConfig.fallbackEdgeZone(zone.id)
+        if (fallbackEdge != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            GestureSectionLabel(stringResource(R.string.compose_zone_size_title))
+            EdgeXListGroup {
+                val thickness = state.thicknesses[zone.id] ?: 8
+                val thicknessLabel = if (zone.edge == "L" || zone.edge == "R") {
+                    stringResource(R.string.compose_zone_thickness_width)
+                } else {
+                    stringResource(R.string.compose_zone_thickness_height)
+                }
+                ConfigSlider(
+                    label = thicknessLabel,
+                    valueText = "$thickness dp",
+                    value = thickness,
+                    range = 4..32,
+                    onValue = { newVal ->
+                        context.putConfig(AppConfig.zoneThicknessKey(zone.id), newVal.toString())
+                        onRefresh()
+                    }
+                )
+
+                val splits = state.splitPoints[fallbackEdge] ?: Pair(33, 66)
+                val isFirst = zone.id.endsWith("_top") || zone.id.endsWith("_left")
+                val isMid = zone.id.endsWith("_mid")
+                val isLast = zone.id.endsWith("_bottom") || zone.id.endsWith("_right")
+
+                val splitsLabel = if (zone.edge == "L" || zone.edge == "R") {
+                    stringResource(R.string.compose_zone_range_vertical)
+                } else {
+                    stringResource(R.string.compose_zone_range_horizontal)
+                }
+
+                if (isFirst) {
+                    ConfigSlider(
+                        label = splitsLabel,
+                        valueText = "0% - ${splits.first}%",
+                        value = splits.first,
+                        range = 10..80,
+                        onValue = { newVal ->
+                            val adjusted = GestureZoneGeometryCalculator.adjustFirst(newVal, splits.second)
+                            context.putConfigsSync(
+                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                            )
+                            onRefresh()
+                        }
+                    )
+                } else if (isMid) {
+                    ConfigSlider(
+                        label = "$splitsLabel (Start)",
+                        valueText = "${splits.first}%",
+                        value = splits.first,
+                        range = 10..80,
+                        onValue = { newVal ->
+                            val adjusted = GestureZoneGeometryCalculator.adjustFirst(newVal, splits.second)
+                            context.putConfigsSync(
+                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                            )
+                            onRefresh()
+                        }
+                    )
+                    EdgeXDivider()
+                    ConfigSlider(
+                        label = "$splitsLabel (End)",
+                        valueText = "${splits.second}%",
+                        value = splits.second,
+                        range = 20..90,
+                        onValue = { newVal ->
+                            val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, newVal)
+                            context.putConfigsSync(
+                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                            )
+                            onRefresh()
+                        }
+                    )
+                } else if (isLast) {
+                    ConfigSlider(
+                        label = splitsLabel,
+                        valueText = "${splits.second}% - 100%",
+                        value = splits.second,
+                        range = 20..90,
+                        onValue = { newVal ->
+                            val adjusted = GestureZoneGeometryCalculator.adjustSecond(splits.first, newVal)
+                            context.putConfigsSync(
+                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to adjusted.first.toString(),
+                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to adjusted.second.toString()
+                            )
+                            onRefresh()
+                        }
+                    )
+                }
+
+                EdgeXDivider()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = {
+                            context.putConfigsSync(
+                                AppConfig.zoneSplitFirstPercentKey(fallbackEdge) to "33",
+                                AppConfig.zoneSplitSecondPercentKey(fallbackEdge) to "66",
+                                AppConfig.zoneThicknessKey(zone.id) to "8"
+                            )
+                            onRefresh()
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = colors.accent)
+                    ) {
+                        Text(stringResource(R.string.compose_zone_reset_default), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
         EdgeXListGroup {
             val gestures = gesturesFor(zone.edge)
@@ -623,6 +853,37 @@ private fun ZoneSheet(
                 if (index != gestures.lastIndex) EdgeXDivider()
             }
         }
+    }
+}
+
+@Composable
+private fun ConfigSlider(
+    label: String,
+    valueText: String,
+    value: Int,
+    range: IntRange,
+    step: Int = 1,
+    onValue: (Int) -> Unit,
+) {
+    val colors = LocalEdgeXColors.current
+    Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = colors.onSurface, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), fontSize = 14.sp)
+            Text(valueText, color = colors.onSurfaceDim, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = {
+                val stepped = ((it.roundToInt() - range.first) / step) * step + range.first
+                onValue(stepped.coerceIn(range.first, range.last))
+            },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = colors.accent,
+                activeTrackColor = colors.accent,
+                inactiveTrackColor = colors.surface2,
+            ),
+        )
     }
 }
 
@@ -748,7 +1009,16 @@ private fun Context.readGestureScreenState(): GestureScreenState {
     val enabledByZone = zones.associate { zone ->
         zone.id to getConfigBool(AppConfig.zoneEnabled(zone.id), default = zoneHasConfiguredAction(zone.id, actionsByZone))
     }
-    return GestureScreenState(actionsByZone, labelsByZone, enabledByZone)
+    val edges = listOf("left", "right", "top", "bottom")
+    val splitPoints = edges.associateWith { edge ->
+        val calculator = GestureZoneGeometryCalculator { key, def -> getConfigString(key, def) }
+        calculator.getSplits(edge)
+    }
+    val thicknesses = zones.filter { AppConfig.fallbackEdgeZone(it.id) != null }.associate { zone ->
+        val calculator = GestureZoneGeometryCalculator { key, def -> getConfigString(key, def) }
+        zone.id to calculator.getThicknessDp(zone.id)
+    }
+    return GestureScreenState(actionsByZone, labelsByZone, enabledByZone, splitPoints, thicknesses)
 }
 
 private fun zoneHasConfiguredAction(zoneId: String, actionsByZone: Map<String, Map<String, String>>): Boolean =

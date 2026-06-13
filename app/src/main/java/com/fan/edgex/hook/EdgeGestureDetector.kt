@@ -28,6 +28,8 @@ internal class EdgeGestureDetector(
         fun onFluidEffectDown(zone: String, touchX: Float, touchY: Float, screenW: Float, screenH: Float) = Unit
         fun onFluidEffectMove(touchX: Float, touchY: Float) = Unit
         fun onFluidEffectUp() = Unit
+        fun getZoneThicknessDp(zone: String): Int
+        fun getEdgeSplits(edge: String): Pair<Int, Int>
     }
 
     private enum class Edge { LEFT, RIGHT, TOP, BOTTOM }
@@ -352,54 +354,97 @@ internal class EdgeGestureDetector(
     private fun resolveEdgeZone(context: Context, x: Float, y: Float): EdgeZoneMatch? {
         val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val bounds = windowManager.currentWindowMetrics.bounds
-
-        val edgeThreshold = EDGE_THRESHOLD_DP * context.resources.displayMetrics.density
         val width = bounds.width().toFloat()
         val height = bounds.height().toFloat()
+        val density = context.resources.displayMetrics.density
 
         val candidates = buildList {
-            if (x < edgeThreshold) add(Edge.LEFT to x)
-            if (x > width - edgeThreshold) add(Edge.RIGHT to (width - x))
-            if (y < edgeThreshold) add(Edge.TOP to y)
-            if (y > height - edgeThreshold) add(Edge.BOTTOM to (height - y))
+            resolveEdgeMatch(Edge.LEFT, x, y, width, height, density)?.let { add(it) }
+            resolveEdgeMatch(Edge.RIGHT, x, y, width, height, density)?.let { add(it) }
+            resolveEdgeMatch(Edge.TOP, x, y, width, height, density)?.let { add(it) }
+            resolveEdgeMatch(Edge.BOTTOM, x, y, width, height, density)?.let { add(it) }
         }
+
         if (candidates.isEmpty()) return null
 
-        for ((edge, _) in candidates.sortedBy { it.second }) {
-            val zone = resolveZoneForEdge(edge, x, y, width, height)
-            if (callbacks.isZoneEnabled(zone)) {
-                return EdgeZoneMatch(zone, edge)
-            }
+        val closest = candidates.sortedBy { it.second }.firstOrNull()
+        return closest?.first
+    }
 
-            val fallbackZone = AppConfig.fallbackEdgeZone(zone)
-            if (fallbackZone != null && callbacks.isZoneEnabled(fallbackZone)) {
-                return EdgeZoneMatch(fallbackZone, edge)
-            }
+    private fun resolveEdgeMatch(
+        edge: Edge,
+        x: Float,
+        y: Float,
+        width: Float,
+        height: Float,
+        density: Float
+    ): Pair<EdgeZoneMatch, Float>? {
+        val zone = resolveZoneForEdge(edge, x, y, width, height)
+        val isDirectEnabled = callbacks.isZoneEnabled(zone)
+        val fallbackZone = AppConfig.fallbackEdgeZone(zone)
+        val isFallbackEnabled = fallbackZone != null && callbacks.isZoneEnabled(fallbackZone)
+
+        if (!isDirectEnabled && !isFallbackEnabled) {
+            return null
         }
-        return null
+
+        val thicknessDp = if (isDirectEnabled) {
+            callbacks.getZoneThicknessDp(zone)
+        } else {
+            8
+        }
+        val thicknessPx = thicknessDp * density
+
+        val (inside, distance) = when (edge) {
+            Edge.LEFT -> (x < thicknessPx) to x
+            Edge.RIGHT -> (x > width - thicknessPx) to (width - x)
+            Edge.TOP -> (y < thicknessPx) to y
+            Edge.BOTTOM -> (y > height - thicknessPx) to (height - y)
+        }
+
+        if (!inside) return null
+
+        val matchedZone = if (isDirectEnabled) zone else fallbackZone!!
+        return Pair(EdgeZoneMatch(matchedZone, matchedZone.substringBefore("_").let { edgeName ->
+            when (edgeName) {
+                "left" -> Edge.LEFT
+                "right" -> Edge.RIGHT
+                "top" -> Edge.TOP
+                "bottom" -> Edge.BOTTOM
+                else -> edge
+            }
+        }), distance)
     }
 
     private fun resolveZoneForEdge(edge: Edge, x: Float, y: Float, width: Float, height: Float): String =
         when (edge) {
-            Edge.LEFT -> "left_${resolveVerticalThird(y, height)}"
-            Edge.RIGHT -> "right_${resolveVerticalThird(y, height)}"
-            Edge.TOP -> "top_${resolveHorizontalThird(x, width)}"
-            Edge.BOTTOM -> "bottom_${resolveHorizontalThird(x, width)}"
+            Edge.LEFT -> "left_${resolveVerticalSegment("left", y, height)}"
+            Edge.RIGHT -> "right_${resolveVerticalSegment("right", y, height)}"
+            Edge.TOP -> "top_${resolveHorizontalSegment("top", x, width)}"
+            Edge.BOTTOM -> "bottom_${resolveHorizontalSegment("bottom", x, width)}"
         }
 
-    private fun resolveVerticalThird(y: Float, height: Float): String =
-        when {
-            y < height * 0.33f -> "top"
-            y < height * 0.66f -> "mid"
+    private fun resolveVerticalSegment(edgeKey: String, y: Float, height: Float): String {
+        val splits = callbacks.getEdgeSplits(edgeKey)
+        val p1 = height * (splits.first / 100f)
+        val p2 = height * (splits.second / 100f)
+        return when {
+            y < p1 -> "top"
+            y < p2 -> "mid"
             else -> "bottom"
         }
+    }
 
-    private fun resolveHorizontalThird(x: Float, width: Float): String =
-        when {
-            x < width * 0.33f -> "left"
-            x < width * 0.66f -> "mid"
+    private fun resolveHorizontalSegment(edgeKey: String, x: Float, width: Float): String {
+        val splits = callbacks.getEdgeSplits(edgeKey)
+        val p1 = width * (splits.first / 100f)
+        val p2 = width * (splits.second / 100f)
+        return when {
+            x < p1 -> "left"
+            x < p2 -> "mid"
             else -> "right"
         }
+    }
 
     private fun resolveAdjustmentAxis(gestureType: String): AdjustmentAxis =
         when (gestureType) {

@@ -14,6 +14,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.GestureZoneGeometryCalculator
 import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.overlay.PanelOverlayManager
@@ -68,6 +69,14 @@ object GestureManager {
             override fun isGesturesEnabled(): Boolean = configRepository.isGesturesEnabled()
             override fun isZoneEnabled(zone: String): Boolean = configRepository.isZoneEnabled(zone)
             override fun isDebugEnabled(): Boolean = configRepository.get(AppConfig.DEBUG_MATRIX) == "true"
+            override fun getZoneThicknessDp(zone: String): Int {
+                val calc = GestureZoneGeometryCalculator { key, def -> configRepository.get(key, def) }
+                return calc.getThicknessDp(zone)
+            }
+            override fun getEdgeSplits(edge: String): Pair<Int, Int> {
+                val calc = GestureZoneGeometryCalculator { key, def -> configRepository.get(key, def) }
+                return calc.getSplits(edge)
+            }
         },
         log = ::log,
     )
@@ -212,6 +221,16 @@ object GestureManager {
                             completeFluidEffectGate(gestureId)
                         }
                     }
+                }
+
+                override fun getZoneThicknessDp(zone: String): Int {
+                    val calc = GestureZoneGeometryCalculator { key, def -> configRepository.get(key, def) }
+                    return calc.getThicknessDp(zone)
+                }
+
+                override fun getEdgeSplits(edge: String): Pair<Int, Int> {
+                    val calc = GestureZoneGeometryCalculator { key, def -> configRepository.get(key, def) }
+                    return calc.getSplits(edge)
                 }
             },
         )

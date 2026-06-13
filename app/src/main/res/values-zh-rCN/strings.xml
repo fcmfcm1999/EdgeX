@@ -514,6 +514,12 @@
     <string name="compose_gestures_enabled_toast">手势已启用</string>
     <string name="compose_gestures_disabled_toast">手势已停用</string>
     <string name="compose_zone_enabled">启用此区域</string>
+    <string name="compose_zone_size_title">边缘区域大小</string>
+    <string name="compose_zone_thickness_width">宽度</string>
+    <string name="compose_zone_thickness_height">高度</string>
+    <string name="compose_zone_range_vertical">垂直范围</string>
+    <string name="compose_zone_range_horizontal">水平范围</string>
+    <string name="compose_zone_reset_default">重置为默认值</string>
     <string name="compose_gesture_preview_subtitle">点击边缘区域配置手势。</string>
     <string name="compose_view_visual">可视化</string>
     <string name="compose_view_list">列表</string>
