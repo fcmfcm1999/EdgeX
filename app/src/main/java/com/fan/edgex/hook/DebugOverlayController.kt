@@ -11,6 +11,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.fan.edgex.config.AppConfig
 import com.fan.edgex.overlay.DrawerManager
 
 internal class DebugOverlayController(
@@ -28,6 +29,8 @@ internal class DebugOverlayController(
         fun isGesturesEnabled(): Boolean
         fun isZoneEnabled(zone: String): Boolean
         fun isDebugEnabled(): Boolean
+        fun getZoneThicknessDp(zone: String): Int
+        fun getEdgeSplits(edge: String): Pair<Int, Int>
     }
 
     private var initialized = false
@@ -171,39 +174,79 @@ internal class DebugOverlayController(
 
             when (edge) {
                 OverlayEdge.LEFT -> {
-                    if (config.isZoneEnabled("left")) {
-                        canvas.drawRect(0f, 0f, w, h, paint)
-                    } else {
-                        if (config.isZoneEnabled("left_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
-                        if (config.isZoneEnabled("left_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
-                        if (config.isZoneEnabled("left_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    val splits = config.getEdgeSplits("left")
+                    val p1 = h * (splits.first / 100f)
+                    val p2 = h * (splits.second / 100f)
+                    val density = context.resources.displayMetrics.density
+
+                    if (config.isZoneEnabled("left_top") || config.isZoneEnabled("left")) {
+                        val thick = if (config.isZoneEnabled("left_top")) config.getZoneThicknessDp("left_top") else 8
+                        canvas.drawRect(0f, 0f, thick * density, p1, paint)
+                    }
+                    if (config.isZoneEnabled("left_mid") || config.isZoneEnabled("left")) {
+                        val thick = if (config.isZoneEnabled("left_mid")) config.getZoneThicknessDp("left_mid") else 8
+                        canvas.drawRect(0f, p1, thick * density, p2, paint)
+                    }
+                    if (config.isZoneEnabled("left_bottom") || config.isZoneEnabled("left")) {
+                        val thick = if (config.isZoneEnabled("left_bottom")) config.getZoneThicknessDp("left_bottom") else 8
+                        canvas.drawRect(0f, p2, thick * density, h, paint)
                     }
                 }
                 OverlayEdge.RIGHT -> {
-                    if (config.isZoneEnabled("right")) {
-                        canvas.drawRect(0f, 0f, w, h, paint)
-                    } else {
-                        if (config.isZoneEnabled("right_top")) canvas.drawRect(0f, 0f, w, h * 0.33f, paint)
-                        if (config.isZoneEnabled("right_mid")) canvas.drawRect(0f, h * 0.33f, w, h * 0.66f, paint)
-                        if (config.isZoneEnabled("right_bottom")) canvas.drawRect(0f, h * 0.66f, w, h, paint)
+                    val splits = config.getEdgeSplits("right")
+                    val p1 = h * (splits.first / 100f)
+                    val p2 = h * (splits.second / 100f)
+                    val density = context.resources.displayMetrics.density
+
+                    if (config.isZoneEnabled("right_top") || config.isZoneEnabled("right")) {
+                        val thick = if (config.isZoneEnabled("right_top")) config.getZoneThicknessDp("right_top") else 8
+                        canvas.drawRect(w - thick * density, 0f, w, p1, paint)
+                    }
+                    if (config.isZoneEnabled("right_mid") || config.isZoneEnabled("right")) {
+                        val thick = if (config.isZoneEnabled("right_mid")) config.getZoneThicknessDp("right_mid") else 8
+                        canvas.drawRect(w - thick * density, p1, w, p2, paint)
+                    }
+                    if (config.isZoneEnabled("right_bottom") || config.isZoneEnabled("right")) {
+                        val thick = if (config.isZoneEnabled("right_bottom")) config.getZoneThicknessDp("right_bottom") else 8
+                        canvas.drawRect(w - thick * density, p2, w, h, paint)
                     }
                 }
                 OverlayEdge.TOP -> {
-                    if (config.isZoneEnabled("top")) {
-                        canvas.drawRect(0f, 0f, w, h, paint)
-                    } else {
-                        if (config.isZoneEnabled("top_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
-                        if (config.isZoneEnabled("top_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
-                        if (config.isZoneEnabled("top_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    val splits = config.getEdgeSplits("top")
+                    val p1 = w * (splits.first / 100f)
+                    val p2 = w * (splits.second / 100f)
+                    val density = context.resources.displayMetrics.density
+
+                    if (config.isZoneEnabled("top_left") || config.isZoneEnabled("top")) {
+                        val thick = if (config.isZoneEnabled("top_left")) config.getZoneThicknessDp("top_left") else 8
+                        canvas.drawRect(0f, 0f, p1, thick * density, paint)
+                    }
+                    if (config.isZoneEnabled("top_mid") || config.isZoneEnabled("top")) {
+                        val thick = if (config.isZoneEnabled("top_mid")) config.getZoneThicknessDp("top_mid") else 8
+                        canvas.drawRect(p1, 0f, p2, thick * density, paint)
+                    }
+                    if (config.isZoneEnabled("top_right") || config.isZoneEnabled("top")) {
+                        val thick = if (config.isZoneEnabled("top_right")) config.getZoneThicknessDp("top_right") else 8
+                        canvas.drawRect(p2, 0f, w, thick * density, paint)
                     }
                 }
                 OverlayEdge.BOTTOM -> {
-                    if (config.isZoneEnabled("bottom")) {
-                        canvas.drawRect(0f, 0f, w, h, paint)
-                    } else {
-                        if (config.isZoneEnabled("bottom_left")) canvas.drawRect(0f, 0f, w * 0.33f, h, paint)
-                        if (config.isZoneEnabled("bottom_mid")) canvas.drawRect(w * 0.33f, 0f, w * 0.66f, h, paint)
-                        if (config.isZoneEnabled("bottom_right")) canvas.drawRect(w * 0.66f, 0f, w, h, paint)
+                    val splits = config.getEdgeSplits("bottom")
+                    val p1 = w * (splits.first / 100f)
+                    val p2 = w * (splits.second / 100f)
+                    val density = context.resources.displayMetrics.density
+
+                    if (config.isZoneEnabled("bottom_left") || config.isZoneEnabled("bottom")) {
+                        val thick = if (config.isZoneEnabled("bottom_left")) config.getZoneThicknessDp("bottom_left") else 8
+                        canvas.drawRect(0f, h - thick * density, p1, h, paint)
+                    }
+                    if (config.isZoneEnabled("bottom_mid") || config.isZoneEnabled("bottom")) {
+                        val thick = if (config.isZoneEnabled("bottom_mid")) config.getZoneThicknessDp("bottom_mid") else 8
+                        canvas.drawRect(p1, h - thick * density, p2, h, paint)
+                    }
+                    if (config.isZoneEnabled("bottom_right") || config.isZoneEnabled("bottom")) {
+                        val thick = if (config.isZoneEnabled("bottom_right")) config.getZoneThicknessDp("bottom_right") else 8
+                        canvas.drawRect(p2, h - thick * density, w, h, paint)
                     }
                 }
             }
@@ -212,7 +255,30 @@ internal class DebugOverlayController(
         fun updateWindowRegion() {
             val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val bounds = wm.currentWindowMetrics.bounds
-            val thicknessPx = (12 * context.resources.displayMetrics.density).toInt()
+
+            val maxThicknessDp = when (edge) {
+                OverlayEdge.LEFT -> listOf("left_top", "left_mid", "left_bottom").maxOfOrNull {
+                    val directThick = if (config.isZoneEnabled(it)) config.getZoneThicknessDp(it) else 8
+                    val fallbackThick = if (config.isZoneEnabled("left")) 8 else 0
+                    maxOf(directThick, fallbackThick)
+                } ?: 8
+                OverlayEdge.RIGHT -> listOf("right_top", "right_mid", "right_bottom").maxOfOrNull {
+                    val directThick = if (config.isZoneEnabled(it)) config.getZoneThicknessDp(it) else 8
+                    val fallbackThick = if (config.isZoneEnabled("right")) 8 else 0
+                    maxOf(directThick, fallbackThick)
+                } ?: 8
+                OverlayEdge.TOP -> listOf("top_left", "top_mid", "top_right").maxOfOrNull {
+                    val directThick = if (config.isZoneEnabled(it)) config.getZoneThicknessDp(it) else 8
+                    val fallbackThick = if (config.isZoneEnabled("top")) 8 else 0
+                    maxOf(directThick, fallbackThick)
+                } ?: 8
+                OverlayEdge.BOTTOM -> listOf("bottom_left", "bottom_mid", "bottom_right").maxOfOrNull {
+                    val directThick = if (config.isZoneEnabled(it)) config.getZoneThicknessDp(it) else 8
+                    val fallbackThick = if (config.isZoneEnabled("bottom")) 8 else 0
+                    maxOf(directThick, fallbackThick)
+                } ?: 8
+            }
+            val thicknessPx = (maxThicknessDp * context.resources.displayMetrics.density).toInt()
 
             try {
                 val params = layoutParams as WindowManager.LayoutParams

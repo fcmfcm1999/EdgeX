@@ -105,6 +105,17 @@ object AppConfig {
     fun sideBarSlot(side: String, index: Int) = "side_bar_${side}_$index"
     fun sideBarSlotTitle(side: String, index: Int) = "side_bar_${side}_${index}_title"
 
+    const val DEFAULT_SPLIT_FIRST_PERCENT = 33
+    const val DEFAULT_SPLIT_SECOND_PERCENT = 66
+    const val MIN_SEGMENT_PERCENT = 10
+    const val DEFAULT_THICKNESS_DP = 16
+    const val MIN_THICKNESS_DP = 8
+    const val MAX_THICKNESS_DP = 32
+
+    fun zoneSplitFirstPercentKey(edge: String) = "zone_split_${edge}_first_percent"
+    fun zoneSplitSecondPercentKey(edge: String) = "zone_split_${edge}_second_percent"
+    fun zoneThicknessKey(zone: String) = "zone_thickness_${zone}_dp"
+
     fun fallbackEdgeZone(zone: String): String? =
         when (zone) {
             "left_top", "left_mid", "left_bottom" -> "left"

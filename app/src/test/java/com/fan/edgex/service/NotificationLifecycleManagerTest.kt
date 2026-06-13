@@ -78,7 +78,7 @@ class NotificationLifecycleManagerTest {
     }
 
     @Test
-    fun testInPlaceAlertUpdateTriggers() {
+    fun testInPlaceAlertUpdateIgnored() {
         // First post triggers
         manager.onNotificationPosted(
             key = "key1",
@@ -90,7 +90,7 @@ class NotificationLifecycleManagerTest {
             shouldAlert = true
         )
 
-        // Update with new alert timestamp (e.g. subsequent message) triggers again
+        // Update with new alert timestamp (e.g. subsequent message) is ignored
         clock.currentTime = 2000L
         val decision = manager.onNotificationPosted(
             key = "key1",
@@ -101,7 +101,7 @@ class NotificationLifecycleManagerTest {
             lastAudiblyAlertedMillis = 2000L,
             shouldAlert = true
         )
-        assertEquals(NotificationLifecycleManager.Decision.TRIGGER, decision)
+        assertEquals(NotificationLifecycleManager.Decision.IGNORE, decision)
     }
 
     @Test
