@@ -117,17 +117,9 @@ class NotificationLifecycleManager(private val clock: Clock = SystemTimeClock())
                 return Decision.TRIGGER
             }
         } else {
-            // In-place update
-            val newAlert = lastAudiblyAlertedMillis > state.lastTriggeredAt
-            if (newAlert) {
-                seenNotifications[key] = state.copy(
-                    lastTriggeredAt = now,
-                    lastPostTime = postTime
-                )
-                return Decision.TRIGGER
-            } else {
-                return Decision.IGNORE
-            }
+            // In-place update: once a notification is in the shade, subsequent updates
+            // do not show a heads-up banner. Thus, we should not trigger Edge Lighting.
+            return Decision.IGNORE
         }
     }
     
