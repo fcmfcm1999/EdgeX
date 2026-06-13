@@ -519,6 +519,7 @@
     <string name="compose_zone_thickness_height">高度</string>
     <string name="compose_zone_range_vertical">垂直范围</string>
     <string name="compose_zone_range_horizontal">水平范围</string>
+    <string name="compose_zone_proportion">比例</string>
     <string name="compose_zone_reset_default">重置为默认值</string>
     <string name="compose_gesture_preview_subtitle">点击边缘区域配置手势。</string>
     <string name="compose_view_visual">可视化</string>

@@ -725,11 +725,7 @@ private fun ZoneSheet(
             GestureSectionLabel(stringResource(R.string.compose_zone_size_title))
             EdgeXListGroup {
                 val thickness = state.thicknesses[zone.id] ?: 8
-                val thicknessLabel = if (zone.edge == "L" || zone.edge == "R") {
-                    stringResource(R.string.compose_zone_thickness_width)
-                } else {
-                    stringResource(R.string.compose_zone_thickness_height)
-                }
+                val thicknessLabel = stringResource(R.string.compose_zone_thickness_width)
                 ConfigSlider(
                     label = thicknessLabel,
                     valueText = "$thickness dp",
@@ -746,11 +742,7 @@ private fun ZoneSheet(
                 val isMid = zone.id.endsWith("_mid")
                 val isLast = zone.id.endsWith("_bottom") || zone.id.endsWith("_right")
 
-                val splitsLabel = if (zone.edge == "L" || zone.edge == "R") {
-                    stringResource(R.string.compose_zone_thickness_height)
-                } else {
-                    stringResource(R.string.compose_zone_thickness_width)
-                }
+                val splitsLabel = stringResource(R.string.compose_zone_proportion)
 
                 if (isFirst) {
                     ConfigSlider(

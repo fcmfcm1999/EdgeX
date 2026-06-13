@@ -517,6 +517,7 @@
     <string name="compose_zone_thickness_height">Height</string>
     <string name="compose_zone_range_vertical">Vertical range</string>
     <string name="compose_zone_range_horizontal">Horizontal range</string>
+    <string name="compose_zone_proportion">Proportion</string>
     <string name="compose_zone_reset_default">Reset to default</string>
     <string name="compose_gesture_preview_subtitle">Tap an edge zone to configure its gestures.</string>
     <string name="compose_view_visual">Visual</string>
