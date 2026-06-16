@@ -67,7 +67,7 @@ fun ConditionSheet(
             EdgeXRow(
                 title = stringResource(R.string.cond_label_if),
                 subtitle = ifLabel + refreshTick.let { "" },
-                icon = EdgeXIcons.Condition,
+                icon = EdgeXIcons.If,
                 onClick = { showConditionPicker = true },
             ) {
                 EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)

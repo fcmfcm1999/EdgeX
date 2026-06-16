@@ -71,6 +71,7 @@ object EdgeXIcons {
     @DrawableRes val Music = R.drawable.ic_music
     @DrawableRes val FastScroll = R.drawable.ic_fast_scroll
     @DrawableRes val Condition = R.drawable.ic_condition
+    @DrawableRes val If = R.drawable.ic_if
     @DrawableRes val Wifi = R.drawable.ic_wifi
     @DrawableRes val MobileData = R.drawable.ic_mobile_data
     @DrawableRes val GameMode = R.drawable.ic_game_mode
