@@ -119,7 +119,7 @@ fun SubGestureSheet(
     }
  
     val activeDir = pickingDirection
-    if (activeDir != null) {
+    if (activeDir != null && secondarySheet == null) {
         val childKey = AppConfig.subGestureChildKey(prefKey, activeDir.direction)
         val childTitle = "$title / ${stringResource(activeDir.labelRes)}"
         ActionSelectionSheet(
@@ -131,10 +131,10 @@ fun SubGestureSheet(
             },
             excludedCodes = excludedCodes,
             onSelect = { action ->
-                pickingDirection = null
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
                 } else {
+                    pickingDirection = null
                     context.putConfigsSync(
                         childKey to action.code,
                         "${childKey}_label" to context.getString(action.labelRes),
@@ -155,9 +155,13 @@ fun SubGestureSheet(
             prefKey = childKey,
             title = childTitle,
             excludedCodes = excludedCodes,
-            onDismiss = { secondarySheet = null },
+            onDismiss = {
+                secondarySheet = null
+                pickingDirection = null
+            },
             onSaved = {
                 secondarySheet = null
+                pickingDirection = null
                 refreshTick++
             },
         )

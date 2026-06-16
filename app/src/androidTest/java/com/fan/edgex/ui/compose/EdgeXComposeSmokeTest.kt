@@ -120,6 +120,42 @@ class EdgeXComposeSmokeTest {
             .assertIsDisplayed()
     }
 
+    @Test
+    fun conditionThenElseShellCommandPickerFlow() {
+        composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_view_list)).performClick()
+        composeRule.onNodeWithTag("gesture_zone_right_mid").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.gesture_swipe_left)).performClick()
+        composeRule.onNodeWithTag("gesture_action_condition").performScrollTo().performClick()
+
+        // Tap the THEN row
+        composeRule.onNodeWithText(appContext.getString(R.string.cond_label_then)).performClick()
+
+        // Click Shell Command
+        composeRule.onNodeWithTag("gesture_action_shell_command").performScrollTo().performClick()
+
+        // Verify Shell Command configuration sheet is immediately shown
+        composeRule.onNodeWithText(appContext.getString(R.string.label_run_as_root)).assertIsDisplayed()
+    }
+
+    @Test
+    fun subGestureShellCommandPickerFlow() {
+        composeRule.onNodeWithTag("home_tile_gestures").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_view_list)).performClick()
+        composeRule.onNodeWithTag("gesture_zone_right_mid").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.gesture_swipe_left)).performClick()
+        composeRule.onNodeWithTag("gesture_action_sub_gesture").performScrollTo().performClick()
+
+        // Tap Hold direction
+        composeRule.onNodeWithText(appContext.getString(R.string.sub_gesture_hold)).performClick()
+
+        // Click Shell Command
+        composeRule.onNodeWithTag("gesture_action_shell_command").performScrollTo().performClick()
+
+        // Verify Shell Command configuration sheet is immediately shown
+        composeRule.onNodeWithText(appContext.getString(R.string.label_run_as_root)).assertIsDisplayed()
+    }
+
     private fun waitUntilTextExists(text: String) {
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()

@@ -109,7 +109,7 @@ fun ConditionSheet(
     )
 
     val activeBranch = pickingBranch
-    if (activeBranch != null) {
+    if (activeBranch != null && secondarySheet == null) {
         val branchPrefKey = if (activeBranch == "then") {
             ConditionStore.condThenKey(condId)
         } else {
@@ -125,10 +125,10 @@ fun ConditionSheet(
             },
             excludedCodes = excludedCodes,
             onSelect = { action ->
-                pickingBranch = null
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
                 } else {
+                    pickingBranch = null
                     context.putConfig(branchPrefKey, action.code)
                     context.putConfig("${branchPrefKey}_label", context.getString(action.labelRes))
                     refreshTick++
@@ -155,9 +155,13 @@ fun ConditionSheet(
             prefKey = branchPrefKey,
             title = branchTitle,
             excludedCodes = excludedCodes,
-            onDismiss = { secondarySheet = null },
+            onDismiss = {
+                secondarySheet = null
+                pickingBranch = null
+            },
             onSaved = {
                 secondarySheet = null
+                pickingBranch = null
                 refreshTick++
                 val ifLbl = context.getConfigString(ConditionStore.condIfLabelKey(condId), none)
                 val thenLbl = context.getConfigString(ConditionStore.condThenLabelKey(condId), none)
