@@ -510,6 +510,8 @@
     <string name="compose_gestures_enabled">Enable Gestures</string>
     <string name="compose_gestures_enabled_desc">Intercept screen edge touches to trigger actions</string>
     <string name="compose_gestures_enabled_toast">Gestures enabled</string>
+    <string name="compose_gesture_trigger_on_release">Trigger on release</string>
+    <string name="compose_gesture_trigger_on_release_desc">Action triggers after finger lifts; swipe back to cancel</string>
     <string name="compose_gestures_disabled_toast">Gestures disabled</string>
     <string name="compose_zone_enabled">Enable this zone</string>
     <string name="compose_zone_thickness_width">Width</string>
