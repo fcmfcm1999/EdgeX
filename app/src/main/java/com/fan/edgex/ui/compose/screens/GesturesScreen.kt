@@ -185,6 +185,7 @@ fun GesturesScreen(
     )
     val removedToast = stringResource(R.string.compose_removed)
     val setActionToastTemplate = stringResource(R.string.compose_set_action_toast, "%s")
+    var triggerOnRelease by remember { mutableStateOf(context.getConfigBool(AppConfig.GESTURE_TRIGGER_ON_RELEASE)) }
 
     fun refresh() {
         state = context.readGestureScreenState()
@@ -214,6 +215,16 @@ fun GesturesScreen(
                     gesturesEnabled = it
                     context.putConfig(AppConfig.GESTURES_ENABLED, it)
                     showToast(context.getString(if (it) R.string.compose_gestures_enabled_toast else R.string.compose_gestures_disabled_toast))
+                },
+            )
+            EdgeXDivider()
+            EdgeXSwitchRow(
+                title = stringResource(R.string.compose_gesture_trigger_on_release),
+                subtitle = stringResource(R.string.compose_gesture_trigger_on_release_desc),
+                checked = triggerOnRelease,
+                onCheckedChange = {
+                    triggerOnRelease = it
+                    context.putConfig(AppConfig.GESTURE_TRIGGER_ON_RELEASE, it)
                 },
             )
         }

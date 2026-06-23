@@ -512,6 +512,8 @@
     <string name="compose_gestures_enabled">启用手势</string>
     <string name="compose_gestures_enabled_desc">拦截屏幕边缘触摸来触发动作</string>
     <string name="compose_gestures_enabled_toast">手势已启用</string>
+    <string name="compose_gesture_trigger_on_release">划动手势抬起后触发</string>
+    <string name="compose_gesture_trigger_on_release_desc">手抬起后才触发动作；往回滑动可取消</string>
     <string name="compose_gestures_disabled_toast">手势已停用</string>
     <string name="compose_zone_enabled">启用此区域</string>
     <string name="compose_zone_thickness_width">宽度</string>
