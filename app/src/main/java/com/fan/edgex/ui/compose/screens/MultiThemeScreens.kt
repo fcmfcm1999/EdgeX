@@ -92,59 +92,16 @@ import com.fan.edgex.ui.compose.components.EdgeXRow
 import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
+import com.fan.edgex.ui.compose.components.ActionSelectionSheet
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private data class MultiStepAction(
-    val code: String,
-    val labelRes: Int,
-    val icon: Int,
-    val needsDetail: Boolean = false,
-)
-
 private data class MultiAppItem(
     val packageName: String,
     val label: String,
-)
-
-private val multiStepActions = listOf(
-    MultiStepAction("back", R.string.action_back, EdgeXIcons.Back),
-    MultiStepAction("home", R.string.action_home, EdgeXIcons.Home),
-    MultiStepAction("recents", R.string.action_recents, EdgeXIcons.Recents),
-    MultiStepAction("expand_notifications", R.string.action_expand_notifications, EdgeXIcons.Notifications),
-    MultiStepAction("lock_screen", R.string.action_lock_screen, EdgeXIcons.Lock),
-    MultiStepAction("screenshot", R.string.action_screenshot, EdgeXIcons.Screenshot),
-    MultiStepAction(AppConfig.PARTIAL_SCREENSHOT_ACTION, R.string.action_partial_screenshot, EdgeXIcons.PartialScreenshot),
-    MultiStepAction("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
-    MultiStepAction("brightness_up", R.string.action_brightness_up, EdgeXIcons.BrightnessUp),
-    MultiStepAction("brightness_down", R.string.action_brightness_down, EdgeXIcons.BrightnessDown),
-    MultiStepAction("volume_up", R.string.action_volume_up, EdgeXIcons.VolumeUp),
-    MultiStepAction("volume_down", R.string.action_volume_down, EdgeXIcons.VolumeDown),
-    MultiStepAction("freezer_drawer", R.string.action_freezer_drawer, EdgeXIcons.Freeze),
-    MultiStepAction("refreeze", R.string.action_refreeze, EdgeXIcons.Refreeze),
-    MultiStepAction("clear_background", R.string.action_clear_background, EdgeXIcons.ClearBackground),
-    MultiStepAction("kill_app", R.string.action_kill_app, EdgeXIcons.KillApp),
-    MultiStepAction("prev_app", R.string.action_prev_app, EdgeXIcons.PrevApp),
-    MultiStepAction("next_app", R.string.action_next_app, EdgeXIcons.NextApp),
-    MultiStepAction("clipboard", R.string.action_clipboard, EdgeXIcons.Clipboard),
-    MultiStepAction("universal_copy", R.string.action_universal_copy, EdgeXIcons.UniversalCopy),
-    MultiStepAction("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
-    MultiStepAction("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
-    MultiStepAction("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
-    MultiStepAction("pie", R.string.action_pie, EdgeXIcons.Pie),
-    MultiStepAction(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
-    MultiStepAction(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
-    MultiStepAction(AppConfig.SIDE_BAR_RIGHT_ACTION, R.string.action_right_side_bar, EdgeXIcons.SideBarRight),
-    MultiStepAction("music_control", R.string.action_music_control, EdgeXIcons.Music, needsDetail = true),
-    MultiStepAction("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsDetail = true),
-    MultiStepAction("shell_command", R.string.action_shell_command, EdgeXIcons.Terminal, needsDetail = true),
-    MultiStepAction("launch_app", R.string.action_launch_app, EdgeXIcons.LaunchApp, needsDetail = true),
-    MultiStepAction("app_shortcut", R.string.action_app_shortcut, EdgeXIcons.AppShortcut, needsDetail = true),
-    MultiStepAction("condition", R.string.action_condition, EdgeXIcons.Condition, needsDetail = true),
-    MultiStepAction("sub_gesture", R.string.action_sub_gesture, EdgeXIcons.SubGesture, needsDetail = true),
 )
 
 @Composable
@@ -540,13 +497,15 @@ private fun MultiActionEditorScreen(
         },
     )
 
-    StepActionSheet(
+    ActionSelectionSheet(
         open = choosingAction,
+        title = stringResource(R.string.header_action_selection),
         onDismiss = {
             choosingAction = false
             editingStepIndex = null
         },
-        onAction = { action ->
+        excludedCodes = emptySet(),
+        onSelect = { action ->
             val targetIndex = editingStepIndex
             when (action.code) {
                 "shell_command" -> {
@@ -1054,67 +1013,6 @@ private fun StepOptionEdgeRow(row: StepOptionRow) {
                 color = colors.onSurfaceDim,
                 fontWeight = FontWeight.Bold,
             )
-        }
-    }
-}
-
-@Composable
-private fun StepActionSheet(
-    open: Boolean,
-    onDismiss: () -> Unit,
-    onAction: (MultiStepAction) -> Unit,
-) {
-    val colors = LocalEdgeXColors.current
-    var searchQuery by remember { mutableStateOf("") }
-    EdgeXBottomSheet(
-        open = open,
-        title = stringResource(R.string.header_action_selection),
-        onDismissRequest = {
-            searchQuery = ""
-            onDismiss()
-        },
-    ) {
-        val query = searchQuery.trim()
-        val filtered = if (query.isBlank()) multiStepActions else multiStepActions.filter { action ->
-            val label = stringResource(action.labelRes)
-            label.contains(query, ignoreCase = true) || action.code.contains(query, ignoreCase = true)
-        }
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            placeholder = { Text(stringResource(R.string.compose_search_actions_hint), color = colors.onSurfaceDim) },
-            singleLine = true,
-            shape = RoundedCornerShape(EdgeXRadius.sm),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colors.accent,
-                unfocusedBorderColor = colors.outline,
-                cursorColor = colors.accent,
-            ),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            EdgeXListGroup {
-                filtered.forEachIndexed { index, action ->
-                    EdgeXRow(
-                        title = stringResource(action.labelRes),
-                        subtitle = if (action.needsDetail) null else action.code,
-                        icon = action.icon,
-                        onClick = { onAction(action) },
-                    ) {
-                        if (action.needsDetail) {
-                            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = colors.onSurfaceDim)
-                        }
-                    }
-                    if (index != filtered.lastIndex) EdgeXDivider()
-                }
-            }
         }
     }
 }
