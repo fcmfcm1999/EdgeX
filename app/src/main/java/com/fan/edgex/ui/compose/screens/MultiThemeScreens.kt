@@ -64,6 +64,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.MultiAction
 import com.fan.edgex.config.MultiActionStep
 import com.fan.edgex.config.MultiActionStore
@@ -75,7 +76,6 @@ import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.config.requestHookActionExecution
 import com.fan.edgex.ui.AppIconPickerActivity
-import com.fan.edgex.ui.ConditionActionActivity
 import com.fan.edgex.ui.MultiActionIconUtils
 import com.fan.edgex.ui.ShortcutSelectionActivity
 import com.fan.edgex.ui.SubGestureActivity
@@ -326,6 +326,8 @@ private fun MultiActionEditorScreen(
     var multiTargetIndex by remember { mutableStateOf<Int?>(null) }
     var musicTargetIndex by remember { mutableStateOf<Int?>(null) }
     var appTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var showConditionSheet by remember { mutableStateOf(false) }
+    var conditionTargetIndex by remember { mutableStateOf<Int?>(null) }
     var pendingLegacyIndex by remember { mutableStateOf<Int?>(null) }
     var showRenameStep by remember { mutableStateOf(false) }
 
@@ -345,6 +347,15 @@ private fun MultiActionEditorScreen(
         modified = true
         choosingAction = false
         editingStepIndex = null
+    }
+
+    fun conditionStepLabel(code: String, fallback: String): String {
+        val conditionId = ConditionStore.extractId(code) ?: return fallback.ifBlank { code }
+        val none = context.getString(R.string.action_none)
+        val ifLabel = context.getConfigString(ConditionStore.condIfLabelKey(conditionId), none)
+        val thenLabel = context.getConfigString(ConditionStore.condThenLabelKey(conditionId), none)
+        val elseLabel = context.getConfigString(ConditionStore.condElseLabelKey(conditionId), none)
+        return "if($ifLabel){$thenLabel} else {$elseLabel}"
     }
 
     fun handleBack() {
@@ -554,13 +565,44 @@ private fun MultiActionEditorScreen(
                     appTargetIndex = targetIndex
                     choosingAction = false
                 }
-                "app_shortcut", "condition", "sub_gesture" -> {
+                "condition" -> {
+                    val tempKey = MultiActionStore.tempStepKey()
+                    val current = targetIndex?.let { steps.getOrNull(it) }
+                    context.putConfig(tempKey, current?.code.orEmpty())
+                    context.putConfig("${tempKey}_label", current?.label.orEmpty())
+                    conditionTargetIndex = targetIndex
+                    showConditionSheet = true
+                    choosingAction = false
+                }
+                "app_shortcut", "sub_gesture" -> {
                     pendingLegacyIndex = targetIndex
                     context.startLegacyStepDetail(action.code, targetIndex?.let { steps[it] })
                     choosingAction = false
                 }
                 else -> applyStep(targetIndex, MultiActionStep(action.code, context.getString(action.labelRes)))
             }
+        },
+    )
+
+    ConditionSheet(
+        open = showConditionSheet,
+        prefKey = MultiActionStore.tempStepKey(),
+        title = stringResource(R.string.action_condition),
+        onDismiss = { showConditionSheet = false; conditionTargetIndex = null },
+        onSaved = {
+            val tempKey = MultiActionStore.tempStepKey()
+            val code = context.getConfigString(tempKey)
+            val fallback = context.getConfigString("${tempKey}_label")
+            if (code.isNotBlank() && code != "none") {
+                applyStep(
+                    conditionTargetIndex,
+                    MultiActionStep(code, conditionStepLabel(code, fallback)),
+                )
+            }
+            context.putConfig(tempKey, "")
+            context.putConfig("${tempKey}_label", "")
+            showConditionSheet = false
+            conditionTargetIndex = null
         },
     )
 
@@ -1319,9 +1361,6 @@ private fun Context.startLegacyStepDetail(code: String, current: MultiActionStep
     val intent = when (code) {
         "app_shortcut" -> Intent(this, ShortcutSelectionActivity::class.java)
             .putExtra("pref_key", tempKey)
-        "condition" -> Intent(this, ConditionActionActivity::class.java)
-            .putExtra("pref_key", tempKey)
-            .putExtra("title", getString(R.string.header_condition_if))
         "sub_gesture" -> {
             putConfigsSync(
                 tempKey to "sub_gesture",

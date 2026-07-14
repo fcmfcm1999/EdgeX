@@ -36,7 +36,8 @@ fun ConditionSheet(
     val colors = LocalEdgeXColors.current
     val none = stringResource(R.string.action_none)
     var refreshTick by remember { mutableStateOf(0) }
-    var condId by remember { mutableStateOf("") }
+    // Re-resolve the condition when this sheet is reopened for another action step.
+    var condId by remember(open, prefKey) { mutableStateOf("") }
     var pickingBranch by remember { mutableStateOf<String?>(null) } // "then" or "else"
     var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
     var showConditionPicker by remember { mutableStateOf(false) }
