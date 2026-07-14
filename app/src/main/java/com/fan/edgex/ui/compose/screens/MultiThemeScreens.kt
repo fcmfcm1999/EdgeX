@@ -1060,7 +1060,7 @@ fun MultiActionPickerSheet(
 ) {
     val context = LocalContext.current
     EdgeXBottomSheet(open = open, title = stringResource(R.string.action_multi_action), onDismissRequest = onDismiss) {
-        val items = remember(open) { MultiActionStore.getAll(context.configPrefs()).filter { it.id != currentId } }
+        val items = MultiActionStore.getAll(context.configPrefs()).filter { it.id != currentId }
         if (onCreate != null) {
             Button(
                 onClick = onCreate,

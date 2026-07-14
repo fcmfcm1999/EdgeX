@@ -314,11 +314,7 @@ fun GesturesScreen(
             type = secondarySheet,
             prefKey = prefKey,
             title = gestureTitle,
-            onCreateMultiAction = {
-                secondarySheet = null
-                pickingActionFor = null
-                onOpenMultiActions()
-            },
+            onCreateMultiAction = onOpenMultiActions,
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null
