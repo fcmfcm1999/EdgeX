@@ -913,8 +913,10 @@ private fun MultiStepCard(
             }
             MultiStepIcon(step = step, tint = colors.onSurface)
             Column(modifier = Modifier.weight(1f)) {
-                Text(presentation.first, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(presentation.second, color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(presentation.title, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                presentation.subtitle?.let { subtitle ->
+                    Text(subtitle, color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             EdgeXIconButton(onClick = onMore) {
                 EdgeXIcon(EdgeXIcons.More, contentDescription = null, tint = colors.onSurfaceDim)
@@ -943,16 +945,60 @@ private fun MultiStepIcon(step: MultiActionStep, tint: Color) {
     }
 }
 
-private fun Context.presentMultiStep(step: MultiActionStep): Pair<String, String> {
+private data class MultiActionStepPresentation(
+    val title: String,
+    val subtitle: String?,
+)
+
+private fun Context.presentMultiStep(step: MultiActionStep): MultiActionStepPresentation {
     return when {
         step.code.startsWith("launch_app:") -> {
-            getString(R.string.action_launch_app) to appLabelForPackage(step.packageNameForMultiStep(), step.label)
+            MultiActionStepPresentation(
+                title = getString(R.string.action_launch_app),
+                subtitle = appLabelForPackage(step.packageNameForMultiStep(), step.label),
+            )
         }
         step.code.startsWith("app_shortcut:") -> {
             val appName = appLabelForPackage(step.packageNameForMultiStep(), step.packageNameForMultiStep().orEmpty())
-            getString(R.string.action_app_shortcut) to "$appName: ${step.label}"
+            MultiActionStepPresentation(
+                title = getString(R.string.action_app_shortcut),
+                subtitle = listOf(appName, step.label).filter { it.isNotBlank() }.joinToString(": "),
+            )
         }
-        else -> step.label to step.code
+        step.code.startsWith("shell:") -> {
+            MultiActionStepPresentation(
+                title = getString(R.string.action_shell_command),
+                subtitle = step.code.removePrefix("shell:").split(":", limit = 2).getOrNull(1).orEmpty(),
+            )
+        }
+        step.code.startsWith("music_control:") -> {
+            val labelRes = when (step.code.removePrefix("music_control:")) {
+                "play_pause" -> R.string.action_music_play_pause
+                "stop" -> R.string.action_music_stop
+                "previous" -> R.string.action_music_previous
+                "next" -> R.string.action_music_next
+                else -> null
+            }
+            MultiActionStepPresentation(
+                title = getString(R.string.action_music_control),
+                subtitle = labelRes?.let(::getString) ?: step.label,
+            )
+        }
+        step.code.startsWith("fast_scroll:") -> {
+            val labelRes = when (step.code.removePrefix("fast_scroll:")) {
+                "to_top" -> R.string.action_scroll_to_top
+                "to_bottom" -> R.string.action_scroll_to_bottom
+                else -> null
+            }
+            MultiActionStepPresentation(
+                title = getString(R.string.header_fast_scroll),
+                subtitle = labelRes?.let(::getString) ?: step.label,
+            )
+        }
+        step.code.startsWith("condition:") -> {
+            MultiActionStepPresentation(getString(R.string.action_condition), step.label)
+        }
+        else -> MultiActionStepPresentation(step.label, null)
     }
 }
 
