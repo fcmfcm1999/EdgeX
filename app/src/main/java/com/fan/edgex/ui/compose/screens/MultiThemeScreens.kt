@@ -92,13 +92,6 @@ import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-
-private data class MultiAppItem(
-    val packageName: String,
-    val label: String,
-)
 
 @Composable
 fun MultiScreen(
@@ -275,8 +268,6 @@ private fun MultiActionEditorScreen(
     var editingStepIndex by remember { mutableStateOf<Int?>(null) }
     var optionsStepIndex by remember { mutableStateOf<Int?>(null) }
     var multiTargetIndex by remember { mutableStateOf<Int?>(null) }
-    var showAppPicker by remember { mutableStateOf(false) }
-    var appTargetIndex by remember { mutableStateOf<Int?>(null) }
     var secondaryTargetIndex by remember { mutableStateOf<Int?>(null) }
     var secondaryType by remember { mutableStateOf<SecondaryType?>(null) }
     var showConditionSheet by remember { mutableStateOf(false) }
@@ -491,8 +482,12 @@ private fun MultiActionEditorScreen(
                     choosingAction = false
                 }
                 "launch_app" -> {
-                    appTargetIndex = targetIndex
-                    showAppPicker = true
+                    val tempKey = MultiActionStore.tempStepKey()
+                    val current = targetIndex?.let { steps.getOrNull(it) }
+                    context.putConfig(tempKey, current?.code.orEmpty())
+                    context.putConfig("${tempKey}_label", current?.label.orEmpty())
+                    secondaryTargetIndex = targetIndex
+                    secondaryType = SecondaryType.AppPicker
                     choosingAction = false
                 }
                 "condition" -> {
@@ -577,18 +572,6 @@ private fun MultiActionEditorScreen(
         },
     )
 
-    AppPickerSheet(
-        open = showAppPicker,
-        onDismiss = {
-            showAppPicker = false
-            appTargetIndex = null
-        },
-        onPick = { app ->
-            applyStep(appTargetIndex, MultiActionStep("launch_app:${app.packageName}", app.label))
-            showAppPicker = false
-            appTargetIndex = null
-        },
-    )
 }
 
 @Composable
@@ -1103,79 +1086,6 @@ fun MultiActionPickerSheet(
             }
         }
     }
-}
-
-@Composable
-private fun AppPickerSheet(
-    open: Boolean,
-    onDismiss: () -> Unit,
-    onPick: (MultiAppItem) -> Unit,
-) {
-    val context = LocalContext.current
-    val colors = LocalEdgeXColors.current
-    var apps by remember { mutableStateOf(emptyList<MultiAppItem>()) }
-    var query by remember { mutableStateOf("") }
-    LaunchedEffect(open) {
-        if (open && apps.isEmpty()) {
-            apps = withContext(Dispatchers.IO) { context.loadLaunchableApps() }
-        }
-        if (!open) query = ""
-    }
-    EdgeXBottomSheet(open = open, title = stringResource(R.string.action_launch_app), onDismissRequest = onDismiss) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            placeholder = { Text(stringResource(R.string.hint_search_apps), color = colors.onSurfaceDim) },
-            singleLine = true,
-            shape = RoundedCornerShape(EdgeXRadius.sm),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colors.accent,
-                unfocusedBorderColor = colors.outline,
-                cursorColor = colors.accent,
-            ),
-        )
-        val filtered = remember(apps, query) {
-            val q = query.trim()
-            if (q.isBlank()) apps else apps.filter {
-                it.label.contains(q, ignoreCase = true) || it.packageName.contains(q, ignoreCase = true)
-            }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            EdgeXListGroup {
-                filtered.forEachIndexed { index, app ->
-                    EdgeXRow(
-                        title = app.label,
-                        subtitle = app.packageName,
-                        icon = EdgeXIcons.LaunchApp,
-                        onClick = { onPick(app) },
-                    )
-                    if (index != filtered.lastIndex) EdgeXDivider()
-                }
-            }
-        }
-    }
-}
-
-private fun Context.loadLaunchableApps(): List<MultiAppItem> {
-    val pm = packageManager
-    val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-    return pm.queryIntentActivities(intent, 0)
-        .map {
-            MultiAppItem(
-                packageName = it.activityInfo.packageName,
-                label = it.loadLabel(pm).toString(),
-            )
-        }
-        .distinctBy { it.packageName }
-        .sortedBy { it.label.lowercase() }
 }
 
 private fun iconForStep(step: MultiActionStep): Int = when {
