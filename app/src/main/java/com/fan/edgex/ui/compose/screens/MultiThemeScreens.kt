@@ -275,6 +275,7 @@ private fun MultiActionEditorScreen(
     var editingStepIndex by remember { mutableStateOf<Int?>(null) }
     var optionsStepIndex by remember { mutableStateOf<Int?>(null) }
     var multiTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var showAppPicker by remember { mutableStateOf(false) }
     var appTargetIndex by remember { mutableStateOf<Int?>(null) }
     var secondaryTargetIndex by remember { mutableStateOf<Int?>(null) }
     var secondaryType by remember { mutableStateOf<SecondaryType?>(null) }
@@ -491,6 +492,7 @@ private fun MultiActionEditorScreen(
                 }
                 "launch_app" -> {
                     appTargetIndex = targetIndex
+                    showAppPicker = true
                     choosingAction = false
                 }
                 "condition" -> {
@@ -576,10 +578,14 @@ private fun MultiActionEditorScreen(
     )
 
     AppPickerSheet(
-        open = appTargetIndex != null,
-        onDismiss = { appTargetIndex = null },
+        open = showAppPicker,
+        onDismiss = {
+            showAppPicker = false
+            appTargetIndex = null
+        },
         onPick = { app ->
             applyStep(appTargetIndex, MultiActionStep("launch_app:${app.packageName}", app.label))
+            showAppPicker = false
             appTargetIndex = null
         },
     )
