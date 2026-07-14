@@ -35,7 +35,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,9 +58,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConditionStore
@@ -77,8 +73,6 @@ import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.config.requestHookActionExecution
 import com.fan.edgex.ui.AppIconPickerActivity
 import com.fan.edgex.ui.MultiActionIconUtils
-import com.fan.edgex.ui.ShortcutSelectionActivity
-import com.fan.edgex.ui.SubGestureActivity
 import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
 import com.fan.edgex.ui.compose.components.EdgeXChip
@@ -93,6 +87,8 @@ import com.fan.edgex.ui.compose.components.EdgeXSegmentedControl
 import com.fan.edgex.ui.compose.components.EdgeXSwitchRow
 import com.fan.edgex.ui.compose.components.EdgeXTopBar
 import com.fan.edgex.ui.compose.components.ActionSelectionSheet
+import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
+import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -268,7 +264,6 @@ private fun MultiActionEditorScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val existing = remember(id, isNew) { if (isNew) null else MultiActionStore.get(context.configPrefs(), id) }
     var name by remember(id, isNew) { mutableStateOf(existing?.name ?: id) }
     var steps by remember(id, isNew) { mutableStateOf(existing?.steps?.toList().orEmpty()) }
@@ -279,13 +274,12 @@ private fun MultiActionEditorScreen(
     var choosingAction by remember { mutableStateOf(false) }
     var editingStepIndex by remember { mutableStateOf<Int?>(null) }
     var optionsStepIndex by remember { mutableStateOf<Int?>(null) }
-    var shellTargetIndex by remember { mutableStateOf<Int?>(null) }
     var multiTargetIndex by remember { mutableStateOf<Int?>(null) }
-    var musicTargetIndex by remember { mutableStateOf<Int?>(null) }
     var appTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var secondaryTargetIndex by remember { mutableStateOf<Int?>(null) }
+    var secondaryType by remember { mutableStateOf<SecondaryType?>(null) }
     var showConditionSheet by remember { mutableStateOf(false) }
     var conditionTargetIndex by remember { mutableStateOf<Int?>(null) }
-    var pendingLegacyIndex by remember { mutableStateOf<Int?>(null) }
     var showRenameStep by remember { mutableStateOf(false) }
 
     fun save() {
@@ -321,23 +315,6 @@ private fun MultiActionEditorScreen(
         } else {
             onBack()
         }
-    }
-
-    DisposableEffect(lifecycleOwner, pendingLegacyIndex) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event != Lifecycle.Event.ON_RESUME || pendingLegacyIndex == null) return@LifecycleEventObserver
-            val tempKey = MultiActionStore.tempStepKey()
-            val code = context.getConfigString(tempKey)
-            val label = context.getConfigString("${tempKey}_label")
-            if (code.isNotBlank() && code != "none") {
-                applyStep(pendingLegacyIndex, MultiActionStep(code, label.ifBlank { code }))
-                context.putConfig(tempKey, "")
-                context.putConfig("${tempKey}_label", "")
-            }
-            pendingLegacyIndex = null
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     BackHandler { handleBack() }
@@ -508,16 +485,8 @@ private fun MultiActionEditorScreen(
         onSelect = { action ->
             val targetIndex = editingStepIndex
             when (action.code) {
-                "shell_command" -> {
-                    shellTargetIndex = targetIndex
-                    choosingAction = false
-                }
                 "multi_action" -> {
                     multiTargetIndex = targetIndex
-                    choosingAction = false
-                }
-                "music_control" -> {
-                    musicTargetIndex = targetIndex
                     choosingAction = false
                 }
                 "launch_app" -> {
@@ -533,9 +502,13 @@ private fun MultiActionEditorScreen(
                     showConditionSheet = true
                     choosingAction = false
                 }
-                "app_shortcut", "sub_gesture" -> {
-                    pendingLegacyIndex = targetIndex
-                    context.startLegacyStepDetail(action.code, targetIndex?.let { steps[it] })
+                "shell_command", "music_control", "fast_scroll", "app_shortcut", "sub_gesture" -> {
+                    val tempKey = MultiActionStore.tempStepKey()
+                    val current = targetIndex?.let { steps.getOrNull(it) }
+                    context.putConfig(tempKey, current?.code.orEmpty())
+                    context.putConfig("${tempKey}_label", current?.label.orEmpty())
+                    secondaryTargetIndex = targetIndex
+                    secondaryType = SecondaryType.fromCode(action.code)
                     choosingAction = false
                 }
                 else -> applyStep(targetIndex, MultiActionStep(action.code, context.getString(action.labelRes)))
@@ -565,28 +538,32 @@ private fun MultiActionEditorScreen(
         },
     )
 
-    ShellCommandDialog(
-        open = shellTargetIndex != null,
-        existing = shellTargetIndex?.let { steps.getOrNull(it)?.code },
-        onDismiss = { shellTargetIndex = null },
-        onSave = { command, runAsRoot ->
-            if (command.isBlank()) {
-                showToast(context.getString(R.string.toast_shell_command_empty))
-            } else {
-                applyStep(shellTargetIndex, MultiActionStep("shell:$runAsRoot:$command", command))
-                shellTargetIndex = null
-            }
-        },
-    )
-
-    MusicPickerSheet(
-        open = musicTargetIndex != null,
-        onDismiss = { musicTargetIndex = null },
-        onPick = { code, label ->
-            applyStep(musicTargetIndex, MultiActionStep("music_control:$code", context.getString(R.string.label_music_prefix, label)))
-            musicTargetIndex = null
-        },
-    )
+    val activeSecondaryType = secondaryType
+    if (activeSecondaryType != null) {
+        SecondaryActionDispatcher(
+            type = activeSecondaryType,
+            prefKey = MultiActionStore.tempStepKey(),
+            title = stringResource(R.string.header_action_selection),
+            onDismiss = {
+                secondaryType = null
+                secondaryTargetIndex = null
+                context.putConfig(MultiActionStore.tempStepKey(), "")
+                context.putConfig("${MultiActionStore.tempStepKey()}_label", "")
+            },
+            onSaved = {
+                val tempKey = MultiActionStore.tempStepKey()
+                val code = context.getConfigString(tempKey)
+                val label = context.getConfigString("${tempKey}_label")
+                if (code.isNotBlank() && code != "none") {
+                    applyStep(secondaryTargetIndex, MultiActionStep(code, label.ifBlank { code }))
+                }
+                context.putConfig(tempKey, "")
+                context.putConfig("${tempKey}_label", "")
+                secondaryType = null
+                secondaryTargetIndex = null
+            },
+        )
+    }
 
     MultiActionPickerSheet(
         open = multiTargetIndex != null,
@@ -1074,74 +1051,6 @@ private fun UnsavedDialog(
 }
 
 @Composable
-private fun ShellCommandDialog(
-    open: Boolean,
-    existing: String?,
-    onDismiss: () -> Unit,
-    onSave: (String, Boolean) -> Unit,
-) {
-    if (!open) return
-    val parsed = remember(existing, open) { parseShell(existing.orEmpty()) }
-    var command by remember(existing, open) { mutableStateOf(parsed.first) }
-    var runAsRoot by remember(existing, open) { mutableStateOf(parsed.second) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.header_shell_command)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = command,
-                    onValueChange = { command = it },
-                    label = { Text(stringResource(R.string.label_shell_command)) },
-                    placeholder = { Text(stringResource(R.string.hint_shell_command)) },
-                    minLines = 2,
-                )
-                EdgeXSwitchRow(
-                    title = stringResource(R.string.label_run_as_root),
-                    subtitle = stringResource(R.string.desc_run_as_root),
-                    checked = runAsRoot,
-                    onCheckedChange = { runAsRoot = it },
-                    icon = EdgeXIcons.Terminal,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(command.trim(), runAsRoot) }) {
-                Text(stringResource(R.string.btn_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
-            }
-        },
-    )
-}
-
-@Composable
-private fun MusicPickerSheet(
-    open: Boolean,
-    onDismiss: () -> Unit,
-    onPick: (String, String) -> Unit,
-) {
-    EdgeXBottomSheet(open = open, title = stringResource(R.string.header_music_control), onDismissRequest = onDismiss) {
-        val options = listOf(
-            Triple("play_pause", R.string.action_music_play_pause, R.drawable.ic_music_play_pause),
-            Triple("stop", R.string.action_music_stop, R.drawable.ic_music_stop),
-            Triple("previous", R.string.action_music_previous, R.drawable.ic_music_previous),
-            Triple("next", R.string.action_music_next, R.drawable.ic_music_next),
-        )
-        EdgeXListGroup {
-            options.forEachIndexed { index, option ->
-                val label = stringResource(option.second)
-                EdgeXRow(title = label, icon = option.third, onClick = { onPick(option.first, label) })
-                if (index != options.lastIndex) EdgeXDivider()
-            }
-        }
-    }
-}
-
-@Composable
 private fun MultiActionPickerSheet(
     open: Boolean,
     currentId: String,
@@ -1232,12 +1141,6 @@ private fun AppPickerSheet(
     }
 }
 
-private fun parseShell(code: String): Pair<String, Boolean> {
-    if (!code.startsWith("shell:")) return "" to false
-    val parts = code.removePrefix("shell:").split(":", limit = 2)
-    return if (parts.size == 2) parts[1] to (parts[0] == "true") else "" to false
-}
-
 private fun Context.loadLaunchableApps(): List<MultiAppItem> {
     val pm = packageManager
     val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
@@ -1250,27 +1153,6 @@ private fun Context.loadLaunchableApps(): List<MultiAppItem> {
         }
         .distinctBy { it.packageName }
         .sortedBy { it.label.lowercase() }
-}
-
-private fun Context.startLegacyStepDetail(code: String, current: MultiActionStep?) {
-    val tempKey = MultiActionStore.tempStepKey()
-    putConfig(tempKey, current?.code.orEmpty())
-    putConfig("${tempKey}_label", current?.label.orEmpty())
-    val intent = when (code) {
-        "app_shortcut" -> Intent(this, ShortcutSelectionActivity::class.java)
-            .putExtra("pref_key", tempKey)
-        "sub_gesture" -> {
-            putConfigsSync(
-                tempKey to "sub_gesture",
-                "${tempKey}_label" to getString(R.string.action_sub_gesture),
-            )
-            Intent(this, SubGestureActivity::class.java)
-                .putExtra("pref_key", tempKey)
-                .putExtra("title", getString(R.string.header_sub_gesture))
-        }
-        else -> return
-    }
-    startActivity(intent)
 }
 
 private fun iconForStep(step: MultiActionStep): Int = when {
