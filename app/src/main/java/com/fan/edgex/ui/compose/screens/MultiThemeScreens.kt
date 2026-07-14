@@ -1054,12 +1054,29 @@ private fun UnsavedDialog(
 fun MultiActionPickerSheet(
     open: Boolean,
     currentId: String,
+    onCreate: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onPick: (MultiAction) -> Unit,
 ) {
     val context = LocalContext.current
     EdgeXBottomSheet(open = open, title = stringResource(R.string.action_multi_action), onDismissRequest = onDismiss) {
         val items = remember(open) { MultiActionStore.getAll(context.configPrefs()).filter { it.id != currentId } }
+        if (onCreate != null) {
+            Button(
+                onClick = onCreate,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LocalEdgeXColors.current.accent,
+                    contentColor = LocalEdgeXColors.current.onAccent,
+                ),
+            ) {
+                EdgeXIcon(EdgeXIcons.Plus, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.compose_new), fontWeight = FontWeight.Bold)
+            }
+        }
         if (items.isEmpty()) {
             Text(
                 text = stringResource(R.string.compose_empty_multi_title),

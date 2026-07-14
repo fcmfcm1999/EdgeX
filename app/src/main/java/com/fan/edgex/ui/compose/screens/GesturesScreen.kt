@@ -170,6 +170,7 @@ private const val GESTURE_EDGE_HIT_DP = 16f
 fun GesturesScreen(
     onBack: () -> Unit,
     showToast: (String) -> Unit,
+    onOpenMultiActions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -313,6 +314,11 @@ fun GesturesScreen(
             type = secondarySheet,
             prefKey = prefKey,
             title = gestureTitle,
+            onCreateMultiAction = {
+                secondarySheet = null
+                pickingActionFor = null
+                onOpenMultiActions()
+            },
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null

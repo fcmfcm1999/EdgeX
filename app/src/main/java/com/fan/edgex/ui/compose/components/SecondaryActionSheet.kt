@@ -40,6 +40,7 @@ fun SecondaryActionDispatcher(
     prefKey: String,
     title: String,
     excludedCodes: Set<String> = emptySet(),
+    onCreateMultiAction: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -141,6 +142,7 @@ fun SecondaryActionDispatcher(
             MultiActionPickerSheet(
                 open = true,
                 currentId = "",
+                onCreate = onCreateMultiAction,
                 onDismiss = onDismiss,
                 onPick = { action ->
                     context.putConfigsSync(
