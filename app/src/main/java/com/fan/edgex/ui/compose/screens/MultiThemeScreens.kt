@@ -879,7 +879,9 @@ private fun MultiStepCard(
     onEdit: () -> Unit,
     onMore: () -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = LocalEdgeXColors.current
+    val presentation = remember(step.code, step.label) { context.presentMultiStep(step) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -909,15 +911,63 @@ private fun MultiStepCard(
                     lineHeight = 12.sp,
                 )
             }
-            EdgeXIcon(iconForStep(step), contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(22.dp))
+            MultiStepIcon(step = step, tint = colors.onSurface)
             Column(modifier = Modifier.weight(1f)) {
-                Text(step.label, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(step.code, color = colors.onSurfaceDim, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(presentation.first, color = colors.onSurface, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(presentation.second, color = colors.onSurfaceDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             EdgeXIconButton(onClick = onMore) {
                 EdgeXIcon(EdgeXIcons.More, contentDescription = null, tint = colors.onSurfaceDim)
             }
         }
+    }
+}
+
+@Composable
+private fun MultiStepIcon(step: MultiActionStep, tint: Color) {
+    val context = LocalContext.current
+    val packageName = step.packageNameForMultiStep()
+    val appIcon = remember(step.code) {
+        packageName?.let { packageNameValue ->
+            runCatching { context.packageManager.getApplicationIcon(packageNameValue) }.getOrNull()
+        }
+    }
+    if (appIcon != null) {
+        AndroidView(
+            factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.CENTER_INSIDE } },
+            update = { it.setImageDrawable(appIcon) },
+            modifier = Modifier.size(24.dp),
+        )
+    } else {
+        EdgeXIcon(iconForStep(step), contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+    }
+}
+
+private fun Context.presentMultiStep(step: MultiActionStep): Pair<String, String> {
+    return when {
+        step.code.startsWith("launch_app:") -> {
+            getString(R.string.action_launch_app) to appLabelForPackage(step.packageNameForMultiStep(), step.label)
+        }
+        step.code.startsWith("app_shortcut:") -> {
+            val appName = appLabelForPackage(step.packageNameForMultiStep(), step.packageNameForMultiStep().orEmpty())
+            getString(R.string.action_app_shortcut) to "$appName: ${step.label}"
+        }
+        else -> step.label to step.code
+    }
+}
+
+private fun Context.appLabelForPackage(packageName: String?, fallback: String): String {
+    if (packageName.isNullOrBlank()) return fallback
+    return runCatching {
+        packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, 0)).toString()
+    }.getOrDefault(fallback)
+}
+
+private fun MultiActionStep.packageNameForMultiStep(): String? {
+    return when {
+        code.startsWith("launch_app:") -> code.removePrefix("launch_app:").takeIf { it.isNotBlank() }
+        code.startsWith("app_shortcut:") -> code.removePrefix("app_shortcut:").substringBefore(":").takeIf { it.isNotBlank() }
+        else -> null
     }
 }
 
