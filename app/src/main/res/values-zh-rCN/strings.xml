@@ -198,6 +198,9 @@
     <string name="cond_label_if">如果</string>
     <string name="cond_label_then">然后</string>
     <string name="cond_label_else">否则</string>
+    <string name="cond_foreground_app">前台 App</string>
+    <string name="cond_foreground_selected_count">已选择 %d 个应用</string>
+    <string name="cond_foreground_summary">%1$s · %2$d 个应用</string>
     <string name="cond_auto_brightness">自动亮度开启</string>
     <string name="cond_auto_rotate">自动旋转开启</string>
     <string name="cond_wifi_enabled">WIFI 开启</string>

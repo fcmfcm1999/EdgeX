@@ -199,6 +199,9 @@
     <string name="cond_label_if">If</string>
     <string name="cond_label_then">Then</string>
     <string name="cond_label_else">Else</string>
+    <string name="cond_foreground_app">Foreground App</string>
+    <string name="cond_foreground_selected_count">%d apps selected</string>
+    <string name="cond_foreground_summary">%1$s · %2$d apps</string>
     <string name="cond_auto_brightness">Auto Brightness On</string>
     <string name="cond_auto_rotate">Auto Rotate On</string>
     <string name="cond_wifi_enabled">Wi-Fi Enabled</string>

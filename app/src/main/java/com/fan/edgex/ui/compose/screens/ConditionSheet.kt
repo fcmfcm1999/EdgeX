@@ -11,6 +11,7 @@ import com.fan.edgex.R
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.compose.components.ActionSelectionSheet
 import com.fan.edgex.ui.compose.components.ConditionPickerSheet
 import com.fan.edgex.ui.compose.components.EdgeXBottomSheet
@@ -19,6 +20,7 @@ import com.fan.edgex.ui.compose.components.EdgeXIcon
 import com.fan.edgex.ui.compose.components.EdgeXIcons
 import com.fan.edgex.ui.compose.components.EdgeXListGroup
 import com.fan.edgex.ui.compose.components.EdgeXRow
+import com.fan.edgex.ui.compose.components.ForegroundAppConditionSheet
 import com.fan.edgex.ui.compose.components.SecondaryActionDispatcher
 import com.fan.edgex.ui.compose.components.SecondaryType
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -41,6 +43,7 @@ fun ConditionSheet(
     var pickingBranch by remember { mutableStateOf<String?>(null) } // "then" or "else"
     var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
     var showConditionPicker by remember { mutableStateOf(false) }
+    var showForegroundAppConfig by remember { mutableStateOf(false) }
 
     // Resolve or create condition ID when sheet opens
     if (open && condId.isBlank()) {
@@ -102,9 +105,38 @@ fun ConditionSheet(
         open = showConditionPicker,
         onDismiss = { showConditionPicker = false },
         onSelect = { item ->
-            context.putConfig(ConditionStore.condIfKey(condId), item.code)
-            context.putConfig(ConditionStore.condIfLabelKey(condId), context.getString(item.labelRes))
             showConditionPicker = false
+            if (item.code == ConditionStore.FOREGROUND_APP) {
+                showForegroundAppConfig = true
+            } else {
+                context.putConfigsSync(
+                    ConditionStore.condIfKey(condId) to item.code,
+                    ConditionStore.condIfLabelKey(condId) to context.getString(item.labelRes),
+                    ConditionStore.foregroundPackagesKey(condId) to "",
+                )
+                refreshTick++
+            }
+        },
+    )
+
+    ForegroundAppConditionSheet(
+        open = showForegroundAppConfig,
+        initialPackageNames = ConditionStore.decodePackageNames(
+            context.getConfigString(ConditionStore.foregroundPackagesKey(condId)),
+        ),
+        onDismiss = { showForegroundAppConfig = false },
+        onSave = { packageNames ->
+            val summary = context.getString(
+                R.string.cond_foreground_summary,
+                context.getString(R.string.cond_foreground_app),
+                packageNames.size,
+            )
+            context.putConfigsSync(
+                ConditionStore.condIfKey(condId) to ConditionStore.FOREGROUND_APP,
+                ConditionStore.foregroundPackagesKey(condId) to ConditionStore.encodePackageNames(packageNames),
+                ConditionStore.condIfLabelKey(condId) to summary,
+            )
+            showForegroundAppConfig = false
             refreshTick++
         },
     )

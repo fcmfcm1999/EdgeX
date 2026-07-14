@@ -26,6 +26,8 @@ import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.HookConfigSnapshot
+import com.fan.edgex.config.ConditionStore
+import com.fan.edgex.config.ForegroundAppConditionConfig
 import com.fan.edgex.ui.ThemeManager
 import com.fan.edgex.overlay.DrawerManager
 import com.fan.edgex.overlay.PanelOverlayManager
@@ -335,13 +337,22 @@ internal class GestureActionDispatcher(
     private fun executeConditionAction(action: String, context: Context, touchX: Float, touchY: Float) {
         val id = action.removePrefix("condition:")
         if (id.isBlank()) return
-        val condCode = resolveConfig(com.fan.edgex.config.ConditionStore.condIfKey(id))
+        val condCode = resolveConfig(ConditionStore.condIfKey(id))
         if (condCode.isBlank()) return
-        val result = ConditionEvaluator.evaluate(condCode, context)
-        val nextAction = if (result) {
-            resolveConfig(com.fan.edgex.config.ConditionStore.condThenKey(id))
+        val foregroundAppConfig = if (condCode == ConditionStore.FOREGROUND_APP) {
+            ForegroundAppConditionConfig(
+                packageNames = ConditionStore.decodePackageNames(
+                    resolveConfig(ConditionStore.foregroundPackagesKey(id)),
+                ),
+            )
         } else {
-            resolveConfig(com.fan.edgex.config.ConditionStore.condElseKey(id))
+            null
+        }
+        val result = ConditionEvaluator.evaluate(condCode, context, foregroundAppConfig)
+        val nextAction = if (result) {
+            resolveConfig(ConditionStore.condThenKey(id))
+        } else {
+            resolveConfig(ConditionStore.condElseKey(id))
         }
         if (nextAction.isNotBlank() && nextAction != "none") {
             dispatchAction(nextAction, context, touchX, touchY)

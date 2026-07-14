@@ -16,6 +16,7 @@ data class ConditionItem(
 )
 
 val allConditionItems = listOf(
+    ConditionItem(R.string.cond_foreground_app, "foreground_app", R.drawable.ic_apps),
     ConditionItem(R.string.cond_auto_brightness, "auto_brightness", R.drawable.ic_brightness_up),
     ConditionItem(R.string.cond_auto_rotate, "auto_rotate", R.drawable.ic_screen_rotation),
     ConditionItem(R.string.cond_wifi_enabled, "wifi_enabled", R.drawable.ic_wifi),

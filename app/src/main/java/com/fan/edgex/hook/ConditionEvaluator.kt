@@ -1,5 +1,6 @@
 package com.fan.edgex.hook
 
+import android.app.ActivityManager
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -12,10 +13,16 @@ import android.nfc.NfcAdapter
 import android.os.BatteryManager
 import android.provider.Settings
 import android.telephony.TelephonyManager
+import com.fan.edgex.config.ConditionStore
+import com.fan.edgex.config.ForegroundAppConditionConfig
 
 internal object ConditionEvaluator {
 
-    fun evaluate(conditionCode: String, context: Context): Boolean = try {
+    fun evaluate(
+        conditionCode: String,
+        context: Context,
+        foregroundAppConfig: ForegroundAppConditionConfig? = null,
+    ): Boolean = try {
         when (conditionCode) {
             "auto_brightness" -> isAutoBrightnessOn(context)
             "auto_rotate" -> isAutoRotateOn(context)
@@ -30,6 +37,7 @@ internal object ConditionEvaluator {
             "media_playing" -> isMediaPlaying(context)
             "screen_portrait" -> isPortrait(context)
             "screen_landscape" -> isLandscape(context)
+            ConditionStore.FOREGROUND_APP -> isForegroundAppMatch(context, foregroundAppConfig)
             else -> false
         }
     } catch (_: Throwable) {
@@ -97,4 +105,25 @@ internal object ConditionEvaluator {
 
     private fun isLandscape(context: Context) =
         context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    @Suppress("DEPRECATION")
+    private fun isForegroundAppMatch(
+        context: Context,
+        config: ForegroundAppConditionConfig?,
+    ): Boolean {
+        val activityManager = context.getSystemService(ActivityManager::class.java) ?: return false
+        val foregroundPackage = activityManager.getRunningTasks(1)
+            .firstOrNull()
+            ?.topActivity
+            ?.packageName
+        return matchesForegroundApp(config, foregroundPackage)
+    }
+
+    internal fun matchesForegroundApp(
+        config: ForegroundAppConditionConfig?,
+        foregroundPackage: String?,
+    ): Boolean {
+        if (config == null || foregroundPackage.isNullOrBlank() || config.packageNames.isEmpty()) return false
+        return foregroundPackage in config.packageNames
+    }
 }
