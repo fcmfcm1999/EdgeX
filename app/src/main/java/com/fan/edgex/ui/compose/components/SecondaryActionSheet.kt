@@ -1,12 +1,11 @@
 package com.fan.edgex.ui.compose.components
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.runtime.Composable
 import com.fan.edgex.R
+import com.fan.edgex.config.MultiActionStore
 import com.fan.edgex.config.putConfigsSync
-import com.fan.edgex.ui.MultiActionsListActivity
 import com.fan.edgex.ui.compose.screens.ConditionSheet
+import com.fan.edgex.ui.compose.screens.MultiActionPickerSheet
 import com.fan.edgex.ui.compose.screens.SubGestureSheet
 
 enum class SecondaryType {
@@ -139,14 +138,19 @@ fun SecondaryActionDispatcher(
         }
 
         SecondaryType.MultiAction -> {
-            context.startActivity(
-                Intent(context, MultiActionsListActivity::class.java)
-                    .putExtra(MultiActionsListActivity.EXTRA_MODE, MultiActionsListActivity.MODE_PICK)
-                    .putExtra(MultiActionsListActivity.EXTRA_PREF_KEY, prefKey)
-                    .putExtra(MultiActionsListActivity.EXTRA_TITLE, title)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            MultiActionPickerSheet(
+                open = true,
+                currentId = "",
+                onDismiss = onDismiss,
+                onPick = { action ->
+                    context.putConfigsSync(
+                        prefKey to MultiActionStore.actionCode(action.id),
+                        "${prefKey}_label" to action.name,
+                        "${prefKey}_title" to action.name,
+                    )
+                    onSaved()
+                },
             )
-            onDismiss()
         }
 
         null -> {}

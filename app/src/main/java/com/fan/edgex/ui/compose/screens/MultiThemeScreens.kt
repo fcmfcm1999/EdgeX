@@ -1051,7 +1051,7 @@ private fun UnsavedDialog(
 }
 
 @Composable
-private fun MultiActionPickerSheet(
+fun MultiActionPickerSheet(
     open: Boolean,
     currentId: String,
     onDismiss: () -> Unit,
