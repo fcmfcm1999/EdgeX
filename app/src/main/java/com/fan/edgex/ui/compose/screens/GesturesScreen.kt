@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -177,9 +178,16 @@ fun GesturesScreen(
     var state by remember { mutableStateOf(context.readGestureScreenState()) }
     var gesturesEnabled by remember { mutableStateOf(context.getConfigBool(AppConfig.GESTURES_ENABLED)) }
     var filter by remember { mutableStateOf(GestureFilter.Visual) }
-    var selectedZone by remember { mutableStateOf<GestureZone?>(null) }
-    var pickingActionFor by remember { mutableStateOf<GestureOption?>(null) }
-    var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
+    var selectedZoneId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pickingActionForId by rememberSaveable { mutableStateOf<String?>(null) }
+    var secondaryTypeName by rememberSaveable { mutableStateOf<String?>(null) }
+    val selectedZone = selectedZoneId?.let { id -> zones.find { it.id == id } }
+    val pickingActionFor = selectedZone?.let { zone ->
+        pickingActionForId?.let { id -> gesturesFor(zone.edge).find { it.id == id } }
+    }
+    val secondarySheet = secondaryTypeName?.let { name ->
+        runCatching { SecondaryType.valueOf(name) }.getOrNull()
+    }
     val filterLabels = mapOf(
         GestureFilter.Visual to stringResource(GestureFilter.Visual.labelRes),
         GestureFilter.List to stringResource(GestureFilter.List.labelRes),
@@ -237,20 +245,20 @@ fun GesturesScreen(
             )
             GestureZoneCanvas(
                 state = state,
-                onZoneClick = { selectedZone = it },
+                onZoneClick = { selectedZoneId = it.id },
                 modifier = Modifier.padding(top = 4.dp),
             )
             GestureSectionLabel(stringResource(R.string.compose_full_edge_low_priority))
             FullEdgeGrid(
                 state = state,
-                onZoneClick = { selectedZone = it },
+                onZoneClick = { selectedZoneId = it.id },
                 onZoneEnabledChange = ::setZoneEnabled,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         } else {
             AllZoneList(
                 state = state,
-                onZoneClick = { selectedZone = it },
+                onZoneClick = { selectedZoneId = it.id },
                 onZoneEnabledChange = ::setZoneEnabled,
                 modifier = Modifier.padding(top = 12.dp, bottom = 28.dp),
             )
@@ -262,11 +270,11 @@ fun GesturesScreen(
         zone = selectedZone,
         state = state,
         onDismiss = {
-            selectedZone = null
-            pickingActionFor = null
+            selectedZoneId = null
+            pickingActionForId = null
         },
         onZoneEnabledChange = ::setZoneEnabled,
-        onPickAction = { pickingActionFor = it },
+        onPickAction = { pickingActionForId = it.id },
         onRefresh = ::refresh,
     )
 
@@ -283,19 +291,19 @@ fun GesturesScreen(
             open = true,
             title = gestureTitle,
             onDismiss = {
-                pickingActionFor = null
+                pickingActionForId = null
             },
             excludedCodes = emptySet(),
             onSelect = { action ->
                 if (action.needsSecondary) {
-                    secondarySheet = SecondaryType.fromCode(action.code)
+                    secondaryTypeName = SecondaryType.fromCode(action.code)?.name
                 } else {
                     context.putConfigsSync(
                         prefKey to action.code,
                         AppConfig.gestureActionLabel(activeZone.id, activeGesture.id) to context.getString(action.labelRes),
                     )
                     refresh()
-                    pickingActionFor = null
+                    pickingActionForId = null
                     val actionLabel = context.getString(action.labelRes)
                     showToast(if (action.code == "none") removedToast else setActionToastTemplate.format(actionLabel))
                 }
@@ -315,10 +323,10 @@ fun GesturesScreen(
             prefKey = prefKey,
             title = gestureTitle,
             onCreateMultiAction = onOpenMultiActions,
-            onDismiss = { secondarySheet = null },
+            onDismiss = { secondaryTypeName = null },
             onSaved = {
-                secondarySheet = null
-                pickingActionFor = null
+                secondaryTypeName = null
+                pickingActionForId = null
                 refresh()
             },
         )
