@@ -605,6 +605,7 @@ private fun MultiActionCard(
     onOptions: () -> Unit,
     onEdit: () -> Unit,
 ) {
+    val context = LocalContext.current
     val colors = LocalEdgeXColors.current
     Card(
         modifier = Modifier
@@ -635,7 +636,11 @@ private fun MultiActionCard(
                 ) {
                     previewSteps.forEachIndexed { index, step ->
                         StepPreviewChip(
-                            label = stringResource(R.string.compose_step_chip, index + 1, step.label),
+                            label = stringResource(
+                                R.string.compose_step_chip,
+                                index + 1,
+                                context.multiActionPreviewLabel(step),
+                            ),
                             selected = false,
                             modifier = Modifier.weight(1f),
                         )
@@ -949,6 +954,11 @@ private data class MultiActionStepPresentation(
     val title: String,
     val subtitle: String?,
 )
+
+private fun Context.multiActionPreviewLabel(step: MultiActionStep): String {
+    val presentation = presentMultiStep(step)
+    return presentation.subtitle ?: presentation.title
+}
 
 private fun Context.presentMultiStep(step: MultiActionStep): MultiActionStepPresentation {
     return when {
