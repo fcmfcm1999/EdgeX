@@ -504,7 +504,7 @@ private fun MultiActionEditorScreen(
             choosingAction = false
             editingStepIndex = null
         },
-        excludedCodes = emptySet(),
+        excludedCodes = setOf("multi_action"),
         onSelect = { action ->
             val targetIndex = editingStepIndex
             when (action.code) {
