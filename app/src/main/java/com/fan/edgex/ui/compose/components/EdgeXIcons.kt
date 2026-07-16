@@ -65,6 +65,8 @@ object EdgeXIcons {
     @DrawableRes val Restart = R.drawable.ic_restart_alt
     @DrawableRes val SubGesture = R.drawable.ic_sub_gesture
     @DrawableRes val LaunchApp = R.drawable.ic_launch_app
+    @DrawableRes val LaunchActivity = R.drawable.ic_launch_app
+    @DrawableRes val Assistant = R.drawable.ic_search
     @DrawableRes val AppShortcut = R.drawable.ic_app_shortcut
     @DrawableRes val Clipboard = R.drawable.ic_paste
     @DrawableRes val UniversalCopy = R.drawable.ic_content_copy

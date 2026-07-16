@@ -176,6 +176,8 @@
     <string name="action_expand_notifications">Expand Notifications</string>
     <string name="action_clear_background">Clear Background Apps</string>
     <string name="action_launch_app">Launch App</string>
+    <string name="action_launch_activity">Launch Activity</string>
+    <string name="action_assistant">Assistant</string>
     <string name="action_music_control">Music Control</string>
     <string name="action_fast_scroll">Fast Scroll</string>
     <string name="action_scroll_to_top">Scroll to Top</string>
@@ -269,10 +271,13 @@
     <string name="header_shell_command">Shell Command</string>
     <string name="label_shell_command">Command</string>
     <string name="hint_shell_command">Enter shell command…</string>
+    <string name="hint_launch_activity">com.example.app/com.example.app.MainActivity</string>
     <string name="label_run_as_root">Run as root (su)</string>
     <string name="desc_run_as_root">Execute command with superuser privileges</string>
     <string name="btn_save">Save</string>
     <string name="toast_shell_command_empty">Please enter a command</string>
+    <string name="toast_launch_activity_empty">Please enter a package/activity path</string>
+    <string name="toast_launch_activity_invalid">Use package/activity format, e.g. com.example/.MainActivity</string>
     <string name="toast_shell_command_saved">Command saved</string>
     <string name="toast_shell_su_warning">No need to add \'su\' manually when \"Run as root\" is checked</string>
     <string name="toast_shell_exec_failed">Command execution failed: %s</string>

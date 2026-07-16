@@ -10,6 +10,7 @@ import com.fan.edgex.ui.compose.screens.SubGestureSheet
 
 enum class SecondaryType {
     AppPicker,
+    LaunchActivity,
     MusicControl,
     FastScroll,
     ShellCommand,
@@ -22,6 +23,7 @@ enum class SecondaryType {
     companion object {
         fun fromCode(code: String): SecondaryType? = when (code) {
             "launch_app" -> AppPicker
+            "launch_activity" -> LaunchActivity
             "music_control" -> MusicControl
             "fast_scroll" -> FastScroll
             "shell_command" -> ShellCommand
@@ -59,6 +61,15 @@ fun SecondaryActionDispatcher(
                     )
                     onSaved()
                 },
+            )
+        }
+
+        SecondaryType.LaunchActivity -> {
+            LaunchActivitySheet(
+                open = true,
+                prefKey = prefKey,
+                onDismiss = onDismiss,
+                onSave = onSaved,
             )
         }
 

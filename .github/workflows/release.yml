@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -56,7 +57,7 @@ jobs:
           fi
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleDebug
         env:
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
@@ -65,16 +66,26 @@ jobs:
       - name: Rename APK with version and date
         id: apk
         run: |
-          APK_PATH=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          NEW_NAME="EdgeX-v${{ steps.version.outputs.name }}-${{ steps.date.outputs.date }}.apk"
-          NEW_PATH="app/build/outputs/apk/release/$NEW_NAME"
-          mv "$APK_PATH" "$NEW_PATH"
-          echo "path=$NEW_PATH" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
+          # We search the entire apk folder recursively so it works for both debug and release builds
+          APK_PATH=$(find app/build/outputs/apk/ -name '*.apk' | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: No APK file found!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
+          # Rename/move it to a consistent name for the next upload/release steps
+          mv "$APK_PATH" app/build/outputs/apk/app-debug.apk
+          
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.apk.outputs.path }}
-          generate_release_notes: true
+          # This tells GitHub what tag to use (e.g., v1.0.35)
+          tag_name: "v2.1.${{ github.run_number }}"
+          name: "Build v2.1.${{ github.run_number }}"
+          body: "Automated manual build of EdgeXplus."
+          draft: false
+          prerelease: false
+          # Ensure this points to the exact path where we moved the APK!
+          files: app/build/outputs/apk/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

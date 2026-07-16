@@ -188,6 +188,14 @@ internal class GestureActionDispatcher(
             action == "home" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_HOME)
             }
+            action == "assistant" -> {
+                try {
+                    val intent = Intent(Intent.ACTION_VOICE_COMMAND).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    log("assistant failed: ${e.message}")
+                }
+            }
             action == "recent" || action == "recents" -> {
                 GlobalActionHelper.performGlobalAction(context, GlobalActionHelper.GLOBAL_ACTION_RECENTS)
             }
@@ -259,6 +267,23 @@ internal class GestureActionDispatcher(
             }
             action.startsWith("launch_app:") -> {
                 launchApp(context, action)
+            }
+            action.startsWith("launch_activity:") -> {
+                try {
+                    val fullTarget = action.substringAfter("launch_activity:")
+                    val parts = fullTarget.split("/")
+                    if (parts.size == 2) {
+                        val pkg = parts[0]
+                        val cls = parts[1]
+                        val intent = Intent().apply {
+                            component = ComponentName(pkg, cls)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    log("launchActivity failed: ${e.message}")
+                }
             }
             action == "clipboard" -> {
                 ClipboardOverlay.show(context)
