@@ -612,6 +612,8 @@
     <string name="compose_premium_status_installed">支持者附加功能已激活</string>
     <string name="compose_about_support_author">支持作者</string>
     <string name="compose_about_support_author_crypto">支付宝 · 微信 · 加密货币</string>
+    <string name="compose_about_edgey">EdgeY</string>
+    <string name="compose_about_edgey_subtitle">无需 Root 的 EdgeX 版本</string>
     <string name="compose_developer">开发者</string>
     <string name="compose_debug_logs">调试日志</string>
     <string name="compose_about_description">基于 Xposed 框架的边缘手势控制模块</string>

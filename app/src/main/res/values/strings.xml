@@ -610,6 +610,8 @@
     <string name="compose_premium_status_installed">Supporter Extras active</string>
     <string name="compose_about_support_author">Support Author</string>
     <string name="compose_about_support_author_crypto">Alipay · WeChat · Crypto</string>
+    <string name="compose_about_edgey">EdgeY</string>
+    <string name="compose_about_edgey_subtitle">The non-root version of EdgeX</string>
     <string name="compose_developer">Developer</string>
     <string name="compose_debug_logs">Debug Logs</string>
     <string name="compose_coming_soon">Coming soon</string>
