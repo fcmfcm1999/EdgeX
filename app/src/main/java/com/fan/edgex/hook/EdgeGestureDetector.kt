@@ -18,8 +18,11 @@ internal class EdgeGestureDetector(
         fun isZoneEnabled(zone: String): Boolean
         fun resolveAction(zone: String, gestureType: String): String
         fun dispatchAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float)
+        fun dispatchPendingSwipeAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float)
+        fun onSwipeActionRecognized(context: Context)
         fun performContinuousAdjustment(action: String, context: Context, up: Boolean)
         fun isGlobalCopyModeActive(): Boolean
+        fun isTriggerOnReleaseEnabled(): Boolean
         fun log(message: String)
         fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String)
         fun updatePie(x: Float, y: Float)
@@ -63,6 +66,11 @@ internal class EdgeGestureDetector(
         var primaryGesture: String = "",
         // Pie mode: finger holds to select, release to execute
         var pieMode: Boolean = false,
+        // Pending action for trigger-on-release mode
+        var pendingSwipeGesture: String? = null,
+        var pendingSwipeAction: String? = null,
+        var swipeFurthestX: Float = 0f,  // furthest X point during swipe
+        var swipeFurthestY: Float = 0f,  // furthest Y point during swipe
     )
 
     private var activeSession: GestureSession? = null
@@ -193,6 +201,13 @@ internal class EdgeGestureDetector(
                             session.adjustmentAxis = resolveAdjustmentAxis(gestureType)
                             session.lastAdjustCoord =
                                 resolveAdjustCoord(session.adjustmentAxis ?: AdjustmentAxis.VERTICAL, event.rawX, event.rawY)
+                        } else if (callbacks.isTriggerOnReleaseEnabled()) {
+                            // Trigger-on-release mode: defer action until finger lifts
+                            session.pendingSwipeGesture = gestureType
+                            session.pendingSwipeAction = action
+                            session.swipeFurthestX = event.rawX
+                            session.swipeFurthestY = event.rawY
+                            callbacks.onSwipeActionRecognized(context)
                         } else {
                             callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
                         }
@@ -204,6 +219,10 @@ internal class EdgeGestureDetector(
                 }
             }
         } else {
+            // Update furthest point for trigger-on-release mode
+            if (session.pendingSwipeGesture != null) {
+                updateSwipeFurthestPoint(session, event.rawX, event.rawY)
+            }
             val continuousAction = session.continuousAction
             when {
                 continuousAction != null ->
@@ -245,7 +264,37 @@ internal class EdgeGestureDetector(
         }
 
         if (session.isSwiping) {
-            handoff.forwardToNative(session.handoff, context, event)
+            // Check if there's a pending action in trigger-on-release mode
+            val pendingGesture = session.pendingSwipeGesture
+            val pendingAction = session.pendingSwipeAction
+            if (pendingGesture != null && pendingAction != null) {
+                // Check if user swiped back enough to cancel
+                // Use distance from furthest point to current position
+                // Cancel threshold: ~24dp (half finger width, Material Design touch target is 48dp)
+                val density = context.resources.displayMetrics.density
+                val cancelThresholdPx = CANCEL_SWIPE_BACK_DP * density
+                val cancelThresholdSq = cancelThresholdPx * cancelThresholdPx
+
+                val backDx = event.rawX - session.swipeFurthestX
+                val backDy = event.rawY - session.swipeFurthestY
+                val backDistanceSq = backDx * backDx + backDy * backDy
+
+                // Check if the back movement is towards the edge direction
+                val isTowardsEdge = when (session.edge) {
+                    Edge.LEFT -> backDx < 0
+                    Edge.RIGHT -> backDx > 0
+                    Edge.TOP -> backDy < 0
+                    Edge.BOTTOM -> backDy > 0
+                }
+
+                if (isTowardsEdge && backDistanceSq >= cancelThresholdSq) {
+                    // Cancelled: swiped back towards edge enough
+                } else {
+                    callbacks.dispatchPendingSwipeAction(session.zone, pendingGesture, context, session.targetX, session.targetY)
+                }
+            } else {
+                handoff.forwardToNative(session.handoff, context, event)
+            }
             return finishSession()
         }
 
@@ -549,6 +598,35 @@ internal class EdgeGestureDetector(
         }
     }
 
+    private fun updateSwipeFurthestPoint(session: GestureSession, x: Float, y: Float) {
+        when (session.edge) {
+            Edge.LEFT -> {
+                if (x > session.swipeFurthestX) {
+                    session.swipeFurthestX = x
+                    session.swipeFurthestY = y
+                }
+            }
+            Edge.RIGHT -> {
+                if (x < session.swipeFurthestX) {
+                    session.swipeFurthestX = x
+                    session.swipeFurthestY = y
+                }
+            }
+            Edge.TOP -> {
+                if (y > session.swipeFurthestY) {
+                    session.swipeFurthestX = x
+                    session.swipeFurthestY = y
+                }
+            }
+            Edge.BOTTOM -> {
+                if (y < session.swipeFurthestY) {
+                    session.swipeFurthestX = x
+                    session.swipeFurthestY = y
+                }
+            }
+        }
+    }
+
     private fun resolveSwipeGesture(dx: Float, dy: Float): String =
         when {
             abs(dx) > abs(dy) -> if (dx < 0) "swipe_left" else "swipe_right"
@@ -596,5 +674,6 @@ internal class EdgeGestureDetector(
         const val SUB_GESTURE_SLOP_PX = 40f
         const val SUB_GESTURE_SLOP_SQ = SUB_GESTURE_SLOP_PX * SUB_GESTURE_SLOP_PX
         const val SUB_GESTURE_SEGMENT_PAUSE_MS = 120L
+        const val CANCEL_SWIPE_BACK_DP = 24f  // ~half finger width for cancel threshold
     }
 }

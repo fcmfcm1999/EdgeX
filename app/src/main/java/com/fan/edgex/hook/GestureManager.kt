@@ -111,6 +111,25 @@ object GestureManager {
                     }
                 }
 
+                override fun dispatchPendingSwipeAction(
+                    zone: String,
+                    gestureType: String,
+                    context: Context,
+                    touchX: Float,
+                    touchY: Float,
+                ) {
+                    val action = Runnable {
+                        actionDispatcher.triggerGestureAction(zone, gestureType, context, touchX, touchY, withVibration = false)
+                    }
+                    if (!enqueueUntilFluidEffectComplete(action)) {
+                        action.run()
+                    }
+                }
+
+                override fun onSwipeActionRecognized(context: Context) {
+                    actionDispatcher.notifySwipeRecognized(context)
+                }
+
                 override fun performContinuousAdjustment(action: String, context: Context, up: Boolean) {
                     when {
                         action == "brightness_up" || action == "brightness_down" ->
@@ -122,6 +141,9 @@ object GestureManager {
 
                 override fun isGlobalCopyModeActive(): Boolean =
                     TextSelectionOverlay.isShowing()
+
+                override fun isTriggerOnReleaseEnabled(): Boolean =
+                    configRepository.get(AppConfig.GESTURE_TRIGGER_ON_RELEASE) == "true"
 
                 override fun log(message: String) {
                     gestureLog(message)
