@@ -61,6 +61,7 @@
     <string name="premium_activation_success">Supporter Extras installed. Reboot your phone to enable it.</string>
     <string name="premium_activation_failed">Activation failed: %s</string>
     <string name="premium_activation_error_empty_code">Enter your activation code first.</string>
+    <string name="premium_activation_error_already_active">This activation code has already been used. Deactivate it on the other device before activating it here.</string>
     <string name="premium_activation_error_invalid_code">This activation code is invalid. Check the code and try again.</string>
     <string name="premium_activation_error_not_configured">Activation is not configured in this build.</string>
     <string name="premium_activation_error_package_verify">The downloaded package could not be verified. Try again later.</string>

@@ -53,8 +53,14 @@ object PremiumActivator {
                 .put("code", code)
                 .put("device_pubkey", devicePubkeyHex())
                 .toString()
-            withApiFallback { baseUrl ->
-                postOk("$baseUrl/api/unbind", body)
+            try {
+                withApiFallback { baseUrl ->
+                    postOk("$baseUrl/api/unbind", body)
+                }
+            } catch (error: Throwable) {
+                // The local installation must still be removable when the server
+                // no longer has a binding for this code/device.
+                if (!isActivationBindingMissing(error)) throw error
             }
         }
 
@@ -298,6 +304,16 @@ object PremiumActivator {
         throwable is IOException ||
             (throwable is HttpStatusException && throwable.statusCode >= 500)
 
+    private fun isActivationBindingMissing(throwable: Throwable): Boolean {
+        val message = throwable.message.orEmpty().lowercase()
+        return (throwable as? HttpStatusException)?.statusCode == HttpURLConnection.HTTP_NOT_FOUND ||
+            message.contains("not found") ||
+            message.contains("not_found") ||
+            message.contains("code_not_found") ||
+            message.contains("no binding") ||
+            message.contains("binding not found")
+    }
+
     private fun postJson(url: String, body: String): JSONObject {
         val connection = openConnection(url).apply {
             requestMethod = "POST"
@@ -336,7 +352,14 @@ object PremiumActivator {
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
         val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        if (code !in 200..299) throw HttpStatusException(code, "Activation failed ($code): $body")
+        if (code !in 200..299) {
+            val message = if (code == HttpURLConnection.HTTP_CONFLICT) {
+                "Activation code is already active"
+            } else {
+                "Activation failed ($code): $body"
+            }
+            throw HttpStatusException(code, message)
+        }
         return body
     }
 

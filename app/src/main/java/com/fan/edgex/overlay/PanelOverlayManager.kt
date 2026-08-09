@@ -178,15 +178,25 @@ private class PanelOverlayWindow(
         }
     }
 
-    private fun animateOut() {
-        val panel = panelView ?: return forceDismiss()
+    private fun animateOut(onDismissed: (() -> Unit)? = null) {
+        val panel = panelView ?: run {
+            forceDismiss()
+            onDismissed?.invoke()
+            return
+        }
         when (val currentMode = mode) {
             PanelMode.Custom -> panel.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f)
-                .setDuration(110).withEndAction { forceDismiss() }.start()
+                .setDuration(110).withEndAction {
+                    forceDismiss()
+                    onDismissed?.invoke()
+                }.start()
             is PanelMode.SideBar -> {
                 val end = if (currentMode.side == "left") -panel.width.toFloat() else panel.width.toFloat()
                 panel.animate().translationX(end).alpha(0f).setDuration(140)
-                    .withEndAction { forceDismiss() }.start()
+                    .withEndAction {
+                        forceDismiss()
+                        onDismissed?.invoke()
+                    }.start()
             }
         }
     }
@@ -299,8 +309,7 @@ private class PanelOverlayWindow(
             isFocusable = true
             background = roundedBg(Color.TRANSPARENT, 8f)
             setOnClickListener {
-                animateOut()
-                dispatchAction(item.action)
+                animateOut { dispatchAction(item.action) }
             }
         }
         val iconSize = when {
