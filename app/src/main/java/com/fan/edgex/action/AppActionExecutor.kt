@@ -34,6 +34,7 @@ object AppActionExecutor {
         code == "home" -> { launchHome(context); true }
         code == "recents" || code == "recent" -> { toggleRecents(context); true }
         code == "expand_notifications" || code == "notifications" -> { expandNotifications(context); true }
+        code == "quick_settings" -> { expandQuickSettings(context); true }
         code.startsWith("launch_app:") -> { launchApp(context, code); true }
         code.startsWith("app_shortcut:") -> { launchShortcut(context, code); true }
         code.startsWith("shell:") -> { executeShell(context, code); true }
@@ -98,6 +99,13 @@ object AppActionExecutor {
         runCatching {
             val sb = context.getSystemService("statusbar") ?: return
             Class.forName("android.app.StatusBarManager").getMethod("expandNotificationsPanel").invoke(sb)
+        }
+    }
+
+    private fun expandQuickSettings(context: Context) {
+        runCatching {
+            val sb = context.getSystemService("statusbar") ?: return
+            Class.forName("android.app.StatusBarManager").getMethod("expandSettingsPanel").invoke(sb)
         }
     }
 

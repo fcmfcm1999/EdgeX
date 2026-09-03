@@ -19,6 +19,7 @@ import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.ModuleActivationState
 import com.fan.edgex.overlay.PanelOverlayManager
 import com.fan.edgex.overlay.PieManager
+import com.fan.edgex.overlay.QuickSettingsPanelManager
 import de.robv.android.xposed.XposedBridge
 
 @SuppressLint("StaticFieldLeak")
@@ -356,6 +357,7 @@ object GestureManager {
                         mainHandler().post {
                             PieManager.dismiss()
                             PanelOverlayManager.dismiss()
+                            QuickSettingsPanelManager.dismiss()
                             PremiumRuntime.onScreenOff()
                         }
                     }

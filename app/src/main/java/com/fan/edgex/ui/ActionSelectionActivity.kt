@@ -33,6 +33,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == "home" -> R.drawable.ic_home
             code == "recents" -> R.drawable.ic_recents
             code == "expand_notifications" -> R.drawable.ic_notifications
+            code == AppConfig.NATIVE_QUICK_SETTINGS_ACTION || code == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
             code.startsWith("shell:") -> R.drawable.ic_terminal
             code == "sub_gesture" -> R.drawable.ic_sub_gesture
             code == "pie" -> R.drawable.ic_pie_menu
@@ -62,6 +63,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             code.startsWith("multi_action:") -> R.drawable.ic_multi_action
             code.startsWith("condition:") -> R.drawable.ic_condition
             code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
+            code == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
             code == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
             code == "toggle_flashlight" -> R.drawable.ic_flashlight
@@ -116,6 +118,7 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "home" -> R.string.action_home
                 "recents" -> R.string.action_recents
                 "expand_notifications" -> R.string.action_expand_notifications
+                AppConfig.NATIVE_QUICK_SETTINGS_ACTION -> R.string.action_expand_quick_settings
                 "clear_background" -> R.string.action_clear_background
                 "freezer_drawer" -> R.string.action_freezer_drawer
                 "refreeze" -> R.string.action_refreeze
@@ -138,6 +141,7 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "sub_gesture" -> R.string.action_sub_gesture
                 "pie" -> R.string.action_pie
                 AppConfig.CUSTOM_PANEL_ACTION -> R.string.action_custom_panel
+                AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.string.action_quick_settings_panel
                 AppConfig.SIDE_BAR_LEFT_ACTION -> R.string.action_left_side_bar
                 AppConfig.SIDE_BAR_RIGHT_ACTION -> R.string.action_right_side_bar
                 else -> 0
@@ -156,6 +160,8 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_back), "back", R.drawable.ic_arrow_back),
         ActionItem(getString(R.string.action_home), "home", R.drawable.ic_home),
         ActionItem(getString(R.string.action_recents), "recents", R.drawable.ic_recents),
+        ActionItem(getString(R.string.action_expand_quick_settings), AppConfig.NATIVE_QUICK_SETTINGS_ACTION, R.drawable.ic_quick_settings),
+        ActionItem(getString(R.string.action_quick_settings_panel), AppConfig.QUICK_SETTINGS_PANEL_ACTION, R.drawable.ic_quick_settings),
         ActionItem(getString(R.string.action_expand_notifications), "expand_notifications", R.drawable.ic_notifications),
         ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal),
         ActionItem(getString(R.string.action_sub_gesture), "sub_gesture", R.drawable.ic_sub_gesture),

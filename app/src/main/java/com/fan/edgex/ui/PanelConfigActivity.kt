@@ -311,6 +311,7 @@ class PanelConfigActivity : AppCompatActivity() {
         action == "home" -> R.drawable.ic_home
         action == "recent" || action == "recents" -> R.drawable.ic_recents
         action == "expand_notifications" -> R.drawable.ic_notifications
+        action == AppConfig.NATIVE_QUICK_SETTINGS_ACTION -> R.drawable.ic_quick_settings
         action == "shell_command" || action.startsWith("shell:") -> R.drawable.ic_terminal
         action == "sub_gesture" -> R.drawable.ic_sub_gesture
         action.startsWith("launch_app:") -> R.drawable.ic_launch_app

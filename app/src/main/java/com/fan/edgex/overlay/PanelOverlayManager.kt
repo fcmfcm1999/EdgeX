@@ -178,15 +178,25 @@ private class PanelOverlayWindow(
         }
     }
 
-    private fun animateOut() {
-        val panel = panelView ?: return forceDismiss()
+    private fun animateOut(onDismissed: (() -> Unit)? = null) {
+        val panel = panelView ?: run {
+            forceDismiss()
+            onDismissed?.invoke()
+            return
+        }
         when (val currentMode = mode) {
             PanelMode.Custom -> panel.animate().alpha(0f).scaleX(0.94f).scaleY(0.94f)
-                .setDuration(110).withEndAction { forceDismiss() }.start()
+                .setDuration(110).withEndAction {
+                    forceDismiss()
+                    onDismissed?.invoke()
+                }.start()
             is PanelMode.SideBar -> {
                 val end = if (currentMode.side == "left") -panel.width.toFloat() else panel.width.toFloat()
                 panel.animate().translationX(end).alpha(0f).setDuration(140)
-                    .withEndAction { forceDismiss() }.start()
+                    .withEndAction {
+                        forceDismiss()
+                        onDismissed?.invoke()
+                    }.start()
             }
         }
     }
@@ -299,8 +309,7 @@ private class PanelOverlayWindow(
             isFocusable = true
             background = roundedBg(Color.TRANSPARENT, 8f)
             setOnClickListener {
-                animateOut()
-                dispatchAction(item.action)
+                animateOut { dispatchAction(item.action) }
             }
         }
         val iconSize = when {
@@ -354,6 +363,7 @@ private class PanelOverlayWindow(
         action == "home" -> "Home"
         action == "recent" || action == "recents" -> "Recents"
         action == "expand_notifications" -> "Notify"
+        action == AppConfig.NATIVE_QUICK_SETTINGS_ACTION -> "Quick Setting"
         action == "clear_background" -> "Clear"
         action == "freezer_drawer" -> "Freezer"
         action == "refreeze" -> "Refreeze"
@@ -371,6 +381,7 @@ private class PanelOverlayWindow(
         action == "toggle_flashlight" -> "Torch"
         action == "game_mode" -> "Game"
         action == AppConfig.PARTIAL_SCREENSHOT_ACTION -> "Crop Shot"
+        action == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> "Quick Setting(iOS)"
         action == "pie" -> "Pie"
         action == "sub_gesture" -> "SubGesture"
         action == "condition" -> "Condition"
@@ -465,6 +476,7 @@ private class PanelOverlayWindow(
         action == "home" -> R.drawable.ic_home
         action == "recent" || action == "recents" -> R.drawable.ic_recents
         action == "expand_notifications" -> R.drawable.ic_notifications
+        action == AppConfig.NATIVE_QUICK_SETTINGS_ACTION -> R.drawable.ic_quick_settings
         action.startsWith("shell:") -> R.drawable.ic_terminal
         action.startsWith("launch_app:") -> R.drawable.ic_launch_app
         action.startsWith("app_shortcut:") -> R.drawable.ic_app_shortcut
@@ -500,6 +512,7 @@ private class PanelOverlayWindow(
         action == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
         action == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
         action == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
+        action == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
         else -> R.drawable.ic_action_dot
     }
 }

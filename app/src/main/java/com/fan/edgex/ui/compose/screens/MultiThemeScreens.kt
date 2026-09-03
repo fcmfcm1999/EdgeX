@@ -1199,6 +1199,7 @@ private fun iconForStep(step: MultiActionStep): Int = when {
     step.code == "home" -> R.drawable.ic_home
     step.code == "recents" || step.code == "recent" -> R.drawable.ic_recents
     step.code == "expand_notifications" -> R.drawable.ic_notifications
+    step.code == AppConfig.NATIVE_QUICK_SETTINGS_ACTION || step.code == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
     step.code == "screenshot" -> R.drawable.ic_camera
     step.code == AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.drawable.ic_partial_screenshot
     step.code == "lock_screen" -> R.drawable.ic_power

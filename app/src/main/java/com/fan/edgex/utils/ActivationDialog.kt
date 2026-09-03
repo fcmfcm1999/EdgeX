@@ -74,6 +74,15 @@ object ActivationDialog {
         return when {
             message.contains("activation code is empty") ->
                 context.getString(R.string.premium_activation_error_empty_code)
+            message.contains("activation code is already active") ||
+                message.contains("activation code already active") ||
+                message.contains("activation code has already been used") ||
+                message.contains("activation code already used") ||
+                message.contains("code_already_used") ||
+                message.contains("already_active") ||
+                message.contains("already_bound") ||
+                message.contains("already used") ->
+                context.getString(R.string.premium_activation_error_already_active)
             message.contains("invalid code") || message.contains("activation failed (404)") ->
                 context.getString(R.string.premium_activation_error_invalid_code)
             message.contains("api url is not configured") ->

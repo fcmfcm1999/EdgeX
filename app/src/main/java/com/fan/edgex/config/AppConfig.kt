@@ -50,6 +50,8 @@ object AppConfig {
     const val HAPTIC_FEEDBACK_TYPE_DOUBLE_CLICK = "double_click"
 
     const val CUSTOM_PANEL_ACTION = "custom_panel"
+    const val QUICK_SETTINGS_PANEL_ACTION = "quick_settings_panel"
+    const val NATIVE_QUICK_SETTINGS_ACTION = "quick_settings"
     const val SIDE_BAR_LEFT_ACTION = "side_bar:left"
     const val SIDE_BAR_RIGHT_ACTION = "side_bar:right"
     const val CUSTOM_PANEL_ROWS = 4
