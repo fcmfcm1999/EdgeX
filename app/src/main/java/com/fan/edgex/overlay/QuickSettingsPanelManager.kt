@@ -377,7 +377,7 @@ private class QuickSettingsPanelWindow(
         listOf(
             UtilitySpec(QuickSettingsIcon.DO_NOT_DISTURB, R.drawable.ic_notifications, controller::toggleDoNotDisturb),
             UtilitySpec(QuickSettingsIcon.FLASHLIGHT, R.drawable.ic_flashlight, controller::toggleFlashlight),
-            UtilitySpec(QuickSettingsIcon.ROTATION_LOCK, R.drawable.ic_screen_rotation, controller::toggleRotationLock),
+            UtilitySpec(QuickSettingsIcon.ROTATION_LOCK, R.drawable.ic_screen_rotation, controller::toggleAutoRotate),
             UtilitySpec(QuickSettingsIcon.CAMERA, R.drawable.ic_camera) {
                 animateOut()
                 controller.launchCamera()
@@ -450,7 +450,7 @@ private class QuickSettingsPanelWindow(
         updateTile(QuickSettingsIcon.HOTSPOT, state.hotspot)
         updateTile(QuickSettingsIcon.DO_NOT_DISTURB, state.doNotDisturb)
         updateTile(QuickSettingsIcon.FLASHLIGHT, state.flashlight)
-        updateTile(QuickSettingsIcon.ROTATION_LOCK, state.rotationLocked)
+        updateTile(QuickSettingsIcon.ROTATION_LOCK, state.autoRotateEnabled)
         updateTile(QuickSettingsIcon.CAMERA, false)
         brightnessSlider?.setLevelFromSystem(state.brightness)
         volumeSlider?.setLevelFromSystem(state.volume)
@@ -602,7 +602,7 @@ private class QuickSettingsPanelWindow(
         QuickSettingsIcon.HOTSPOT -> ModuleRes.getString(R.string.quick_settings_hotspot)
         QuickSettingsIcon.DO_NOT_DISTURB -> ModuleRes.getString(R.string.quick_settings_do_not_disturb)
         QuickSettingsIcon.FLASHLIGHT -> ModuleRes.getString(R.string.quick_settings_flashlight)
-        QuickSettingsIcon.ROTATION_LOCK -> ModuleRes.getString(R.string.quick_settings_rotation_lock)
+        QuickSettingsIcon.ROTATION_LOCK -> ModuleRes.getString(R.string.quick_settings_auto_rotate)
         QuickSettingsIcon.CAMERA -> ModuleRes.getString(R.string.quick_settings_camera)
         else -> ""
     }

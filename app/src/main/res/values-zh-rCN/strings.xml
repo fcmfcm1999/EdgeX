@@ -230,7 +230,7 @@
     <string name="quick_settings_media_unknown">媒体播放</string>
     <string name="quick_settings_do_not_disturb">勿扰模式</string>
     <string name="quick_settings_flashlight">手电筒</string>
-    <string name="quick_settings_rotation_lock">旋转锁定</string>
+    <string name="quick_settings_auto_rotate">自动旋转</string>
     <string name="quick_settings_camera">相机</string>
     <string name="action_left_side_bar">左侧边栏</string>
     <string name="action_right_side_bar">右侧边栏</string>

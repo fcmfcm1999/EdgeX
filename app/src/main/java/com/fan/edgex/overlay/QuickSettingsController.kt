@@ -34,7 +34,7 @@ internal data class QuickSettingsState(
     val hotspot: Boolean,
     val doNotDisturb: Boolean,
     val flashlight: Boolean,
-    val rotationLocked: Boolean,
+    val autoRotateEnabled: Boolean,
     val brightness: Float,
     val volume: Float,
     val mediaArtwork: Bitmap?,
@@ -201,7 +201,7 @@ internal class QuickSettingsController(private val context: Context) {
         publishSoon()
     }
 
-    fun toggleRotationLock() {
+    fun toggleAutoRotate() {
         runCatching {
             val enabled = Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 1) == 1
             Settings.System.putInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, if (enabled) 0 else 1)
@@ -280,8 +280,8 @@ internal class QuickSettingsController(private val context: Context) {
             notificationManager?.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL
         }.getOrDefault(false),
         flashlight = torchEnabled,
-        rotationLocked = runCatching {
-            Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 1) == 0
+        autoRotateEnabled = runCatching {
+            Settings.System.getInt(context.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 1) == 1
         }.getOrDefault(false),
         brightness = readBrightness(),
         volume = readVolume(),
