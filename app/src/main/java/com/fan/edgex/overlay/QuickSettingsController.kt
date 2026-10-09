@@ -23,6 +23,7 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.view.KeyEvent
+import com.fan.edgex.utils.BrightnessLevelConverter
 import java.util.concurrent.Executor
 import kotlin.math.roundToInt
 
@@ -218,7 +219,7 @@ internal class QuickSettingsController(private val context: Context) {
 
     fun setBrightness(value: Float) {
         val (minimum, maximum) = brightnessRange()
-        val level = (minimum + value.coerceIn(0f, 1f) * (maximum - minimum))
+        val level = BrightnessLevelConverter.toDisplayBrightness(value, minimum, maximum)
         runCatching {
             val displayManager = context.getSystemService(DisplayManager::class.java) ?: return
             displayManager.javaClass.getMethod("setBrightness", Int::class.java, Float::class.java)
@@ -324,7 +325,7 @@ internal class QuickSettingsController(private val context: Context) {
             .invoke(displayManager, 0) as Float).takeUnless(Float::isNaN)
             ?: return@runCatching DEFAULT_LEVEL
         val (minimum, maximum) = brightnessRange()
-        ((current - minimum) / (maximum - minimum)).coerceIn(0f, 1f)
+        BrightnessLevelConverter.toUserLevel(current, minimum, maximum)
     }.getOrDefault(DEFAULT_LEVEL)
 
     private fun readVolume(): Float {

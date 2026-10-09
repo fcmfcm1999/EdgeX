@@ -112,12 +112,12 @@ object GestureManager {
                     }
                 }
 
-                override fun performContinuousAdjustment(action: String, context: Context, up: Boolean) {
+                override fun performContinuousAdjustment(action: String, context: Context, levelDelta: Float) {
                     when {
                         action == "brightness_up" || action == "brightness_down" ->
-                            actionDispatcher.adjustBrightness(context, up)
+                            actionDispatcher.adjustBrightness(context, levelDelta)
                         action == "volume_up" || action == "volume_down" ->
-                            actionDispatcher.adjustVolume(context, up)
+                            actionDispatcher.adjustVolume(context, levelDelta > 0f)
                     }
                 }
 

@@ -18,7 +18,7 @@ internal class EdgeGestureDetector(
         fun isZoneEnabled(zone: String): Boolean
         fun resolveAction(zone: String, gestureType: String): String
         fun dispatchAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float)
-        fun performContinuousAdjustment(action: String, context: Context, up: Boolean)
+        fun performContinuousAdjustment(action: String, context: Context, levelDelta: Float)
         fun isGlobalCopyModeActive(): Boolean
         fun log(message: String)
         fun showPie(context: Context, anchorX: Float, anchorY: Float, edge: String)
@@ -573,19 +573,32 @@ internal class EdgeGestureDetector(
         val currentCoord = resolveAdjustCoord(axis, currentX, currentY)
         val rawDelta = currentCoord - session.lastAdjustCoord
         val effectiveDelta = if (axis == AdjustmentAxis.HORIZONTAL) rawDelta else -rawDelta
-        if (abs(effectiveDelta) < CONTINUOUS_STEP_PX) return
+        if (action == "brightness_up" || action == "brightness_down") {
+            if (effectiveDelta == 0f) return
+            handlerProvider().post {
+                callbacks.performContinuousAdjustment(
+                    action,
+                    context,
+                    effectiveDelta / CONTINUOUS_FULL_SCALE_PX,
+                )
+            }
+            session.lastAdjustCoord = currentCoord
+            return
+        }
 
+        if (abs(effectiveDelta) < CONTINUOUS_STEP_PX) return
         val steps = (abs(effectiveDelta) / CONTINUOUS_STEP_PX).toInt()
-        val up = effectiveDelta > 0
         repeat(steps) {
             handlerProvider().post {
-                callbacks.performContinuousAdjustment(action, context, up)
+                callbacks.performContinuousAdjustment(action, context, if (effectiveDelta > 0) 1f else -1f)
             }
         }
         session.lastAdjustCoord += steps * CONTINUOUS_STEP_PX * (if (rawDelta > 0) 1 else -1)
     }
 
     private companion object {
+        /** A 320px edge swipe spans the full perceived brightness range. */
+        const val CONTINUOUS_FULL_SCALE_PX = 320f
         const val CONTINUOUS_STEP_PX = 30
         const val GESTURE_TIMEOUT_MS = 5000L
         const val DOUBLE_TAP_TIMEOUT_MS = 300L

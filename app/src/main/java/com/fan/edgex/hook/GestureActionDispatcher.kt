@@ -153,6 +153,9 @@ internal class GestureActionDispatcher(
     fun adjustBrightness(context: Context, up: Boolean) =
         com.fan.edgex.action.AppActionExecutor.adjustBrightness(context, up)
 
+    fun adjustBrightness(context: Context, userLevelDelta: Float) =
+        com.fan.edgex.action.AppActionExecutor.adjustBrightness(context, userLevelDelta)
+
     fun adjustVolume(context: Context, up: Boolean) =
         com.fan.edgex.action.AppActionExecutor.adjustVolume(context, up)
 
