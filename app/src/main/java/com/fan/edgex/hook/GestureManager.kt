@@ -534,9 +534,12 @@ object GestureManager {
      * Called from system_server (filterInputEvent hook) for KeyEvents.
      * Delegates to KeyManager for state machine processing.
      */
-    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
+    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0, beforeQueueing: Boolean = false): Boolean {
         ensureSystemServerInitialized(context, initializeKeys = true)
 
+        // Handle each press at one stage, before the ROM can consume assistant/side keys.
+        if (KeyManager.earlyKeyHookInstalled && !beforeQueueing) return false
+        if (KeyManager.detectKey(event, context, policyFlags)) return true
         if (GameModeManager.isActive) return false
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }

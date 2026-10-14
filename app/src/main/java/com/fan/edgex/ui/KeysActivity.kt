@@ -17,6 +17,8 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
+import com.fan.edgex.config.hardwareKeyCodes
+import com.fan.edgex.config.hardwareKeyName
 
 class KeysActivity : AppCompatActivity() {
 
@@ -27,7 +29,7 @@ class KeysActivity : AppCompatActivity() {
     )
 
     companion object {
-        // Only Volume Up, Volume Down and Power keys
+        // Default rows; learned manufacturer buttons are appended from shared configuration.
         val SUPPORTED_KEYS = listOf(
             KeyConfig(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, R.drawable.ic_volume_up),
             KeyConfig(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, R.drawable.ic_volume_down),
@@ -36,6 +38,11 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private val keyViews = mutableMapOf<Int, View>()
+    private val keyConfigs: List<KeyConfig>
+        get() = hardwareKeyCodes().map { code ->
+            SUPPORTED_KEYS.firstOrNull { it.keyCode == code }
+                ?: KeyConfig(code, 0, R.drawable.ic_keyboard)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +57,7 @@ class KeysActivity : AppCompatActivity() {
 
         // Add Key Items
         val container = findViewById<LinearLayout>(R.id.keys_container)
-        for (keyConfig in SUPPORTED_KEYS) {
+        for (keyConfig in keyConfigs) {
             val view = createKeyItem(keyConfig)
             keyViews[keyConfig.keyCode] = view
             container.addView(view)
@@ -66,7 +73,6 @@ class KeysActivity : AppCompatActivity() {
 
     private fun createKeyItem(config: KeyConfig): View {
         val keyCode = config.keyCode
-        val nameRes = config.nameRes
         val iconRes = config.iconRes
 
         val inflater = LayoutInflater.from(this)
@@ -82,7 +88,7 @@ class KeysActivity : AppCompatActivity() {
         val arrow = view.findViewById<ImageView>(R.id.arrow)
 
         // Set Title and Icon
-        title.text = getString(nameRes)
+        title.text = hardwareKeyName(keyCode)
         icon.setImageResource(iconRes)
 
         // Load State
@@ -110,7 +116,7 @@ class KeysActivity : AppCompatActivity() {
         }
 
         // Setup Actions
-        val keyName = getString(nameRes)
+        val keyName = hardwareKeyName(keyCode)
         setupAction(view.findViewById(R.id.action_click), getString(R.string.key_mode_click), keyCode, "click", keyName)
         setupAction(view.findViewById(R.id.action_double_click), getString(R.string.key_mode_double_click), keyCode, "double_click", keyName)
         setupAction(view.findViewById(R.id.action_long_press), getString(R.string.key_mode_long_press), keyCode, "long_press", keyName)
@@ -149,7 +155,7 @@ class KeysActivity : AppCompatActivity() {
     }
 
     private fun refreshAllKeyItems() {
-        for (config in SUPPORTED_KEYS) {
+        for (config in keyConfigs) {
             val keyCode = config.keyCode
             keyViews[keyCode]?.let { view ->
                 val subtitle = view.findViewById<TextView>(R.id.subtitle)

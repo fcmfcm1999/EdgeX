@@ -481,6 +481,11 @@
     <string name="key_volume_up">Volume Up</string>
     <string name="key_volume_down">Volume Down</string>
     <string name="key_power">Power</string>
+    <string name="key_custom_name">Hardware key %1$d</string>
+    <string name="key_detect">Detect hardware key</string>
+    <string name="key_detect_desc">Add Bixby, assistant, camera, or another phone button</string>
+    <string name="key_detect_instruction">Press and release the button you want to map within 30 seconds. For buttons such as Bixby, enable EdgeX in LSPosed and reboot first. A side button shared with Power may appear as Power.</string>
+    <string name="key_detect_timeout">No key detected. Check that EdgeX is enabled in LSPosed and rebooted. Some phones do not expose their special buttons as key events.</string>
     <string name="key_back">Back</string>
     <string name="key_home">Home</string>
     <string name="key_menu">Menu</string>

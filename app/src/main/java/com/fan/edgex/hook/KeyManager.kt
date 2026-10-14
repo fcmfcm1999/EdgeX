@@ -1,11 +1,14 @@
 package com.fan.edgex.hook
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.ViewConfiguration
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.HardwareKeyConfig
+import com.fan.edgex.BuildConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 
@@ -31,12 +34,9 @@ object KeyManager {
     const val MODE_DOUBLE_CLICK = 1
     const val MODE_LONG_PRESS = 2
 
-    // Supported keys (keyCode -> config index)
-    val SUPPORTED_KEYS = mapOf(
-        KeyEvent.KEYCODE_VOLUME_UP to 0,
-        KeyEvent.KEYCODE_VOLUME_DOWN to 1,
-        KeyEvent.KEYCODE_POWER to 2
-    )
+    var earlyKeyHookInstalled = false
+    private var detectUntil = 0L
+    private val keyDetector = HardwareKeyDetector()
 
     // State machine states
     private const val STATE_IDLE = 0
@@ -59,13 +59,11 @@ object KeyManager {
     // Track if we consumed the key (should not forward)
     private val keyConsumed = mutableMapOf<Int, Boolean>()
     
-    // Track injected events to avoid infinite loop
-    // We store (downTime, eventTime) pairs of events we injected
-    private val injectedEventTimes = mutableSetOf<Long>()
+    // Keep a bounded set of injected events; down and up may share the same timestamp.
+    private data class InjectedKey(val time: Long, val code: Int, val action: Int)
+    private val injectedEvents = linkedSetOf<InjectedKey>()
 
-    // Volume key passthrough: after our action fires for a volume key,
-    // the system volume panel is already showing (handled earlier in pipeline).
-    // Subsequent volume presses should pass through for normal volume control.
+    // After forwarding an unmapped volume press, let subsequent presses control volume.
     private var volumePassthroughUntil = 0L
     private const val VOLUME_PASSTHROUGH_DURATION = 3000L  // matches volume panel auto-hide
 
@@ -99,10 +97,14 @@ object KeyManager {
     /**
      * Update configuration from cache.
      */
+    @Synchronized
     fun updateConfig(configCache: Map<String, String>) {
         keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+        detectUntil = configCache[HardwareKeyConfig.DETECT_UNTIL]?.toLongOrNull() ?: 0L
+        keyEnabled.clear()
+        keyActions.clear()
 
-        for (keyCode in SUPPORTED_KEYS.keys) {
+        for (keyCode in HardwareKeyConfig.configuredCodes(configCache)) {
             keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
             keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "double_click")] ?: ""
             keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
@@ -120,9 +122,7 @@ object KeyManager {
      * Check if this key has any action configured.
      */
     private fun hasAnyAction(keyCode: Int): Boolean {
-        return keyActions["${keyCode}_$MODE_CLICK"]?.isNotEmpty() == true ||
-               keyActions["${keyCode}_$MODE_DOUBLE_CLICK"]?.isNotEmpty() == true ||
-               keyActions["${keyCode}_$MODE_LONG_PRESS"]?.isNotEmpty() == true
+        return hasAction(keyCode, MODE_CLICK) || hasAction(keyCode, MODE_DOUBLE_CLICK) || hasAction(keyCode, MODE_LONG_PRESS)
     }
 
     /**
@@ -154,7 +154,7 @@ object KeyManager {
      * Like Xposed Edge Pro's approach using InputManager.injectInputEvent.
      */
     private fun injectKeyEvent(event: KeyEvent, context: Context) {
-        // Mark this event as injected by us (using eventTime as identifier)
+        // Mark this event as injected by us before it re-enters the input pipeline.
         markInjectedEvent(event)
         
         // Volume key passthrough: if we inject a volume key, it means we didn't consume it
@@ -163,8 +163,6 @@ object KeyManager {
         if (isVolumeKey(event.keyCode)) {
             volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
         }
-        
-        // Clean up old entries (keep only last 10)
         
         try {
             // Try InputManager.getInstance()
@@ -201,8 +199,10 @@ object KeyManager {
         XposedBridge.log("$TAG: Failed to inject key event - no method worked")
     }
 
+    @Synchronized
     fun markInjectedEvent(event: KeyEvent) {
-        injectedEventTimes.add(event.eventTime)
+        injectedEvents.add(InjectedKey(event.eventTime, event.keyCode, event.action))
+        while (injectedEvents.size > 32) injectedEvents.remove(injectedEvents.first())
     }
     
     /**
@@ -226,32 +226,23 @@ object KeyManager {
         pendingUpEvents.remove(keyCode)
     }
 
-    // Policy flag used to mark injected events (to avoid infinite loop)
-    // Following Xposed Edge Pro's approach with 0x4000000
-    private const val INJECTED_EVENT_FLAG = 0x4000000
+    // InputDispatcher POLICY_FLAG_INJECTED (FILTERED is a different flag).
+    private const val INJECTED_EVENT_FLAG = 0x01000000
     
     /**
      * Handle key event from interceptKeyBeforeDispatching hook.
      * Returns true if event should be consumed (not forwarded to system).
      */
+    @Synchronized
     fun handleKeyEvent(event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
         val keyCode = event.keyCode
         val eventTime = event.eventTime
         
         
-        if (policyFlags and INJECTED_EVENT_FLAG != 0) return false
-
-        if (injectedEventTimes.contains(eventTime)) {
-            injectedEventTimes.remove(eventTime)
-            return false
-        }
+        val injectedByUs = injectedEvents.remove(InjectedKey(eventTime, keyCode, event.action))
+        if (injectedByUs || policyFlags and INJECTED_EVENT_FLAG != 0) return false
 
         if (!keysEnabled) return false
-        
-        // Check if this key is supported
-        if (!SUPPORTED_KEYS.containsKey(keyCode)) {
-            return false
-        }
         
         // Check if this specific key is enabled
         if (keyEnabled[keyCode] != true) {
@@ -525,8 +516,9 @@ object KeyManager {
      * Reset all state (e.g., on screen off or config change).
      * Ensures no stale key tracking survives a lock/unlock cycle.
      */
+    @Synchronized
     fun reset() {
-        for (keyCode in SUPPORTED_KEYS.keys) {
+        for (keyCode in (longPressRunnables.keys + doubleTapRunnables.keys).toSet()) {
             cancelLongPressTimeout(keyCode)
             cancelDoubleTapTimeout(keyCode)
         }
@@ -535,7 +527,28 @@ object KeyManager {
         pendingDownEvents.clear()
         pendingUpEvents.clear()
         keyConsumed.clear()
-        injectedEventTimes.clear()
+        injectedEvents.clear()
         volumePassthroughUntil = 0L
+    }
+
+    /** Capture one complete press, only during the short, explicit UI detection session. */
+    @Synchronized
+    fun detectKey(event: KeyEvent, context: Context, policyFlags: Int): Boolean {
+        if (policyFlags and INJECTED_EVENT_FLAG != 0 ||
+            InjectedKey(event.eventTime, event.keyCode, event.action) in injectedEvents) return false
+        if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
+        val result = keyDetector.handle(event.keyCode, event.deviceId,
+            event.action == KeyEvent.ACTION_DOWN, event.repeatCount, event.isCanceled,
+            detectUntil, System.currentTimeMillis())
+        if (result.code != null) {
+            handler.post {
+                context.sendBroadcast(Intent(HardwareKeyConfig.ACTION_DETECTED).apply {
+                    setPackage(BuildConfig.APPLICATION_ID)
+                    putExtra(HardwareKeyConfig.EXTRA_CODE, result.code)
+                    putExtra(HardwareKeyConfig.EXTRA_SESSION, result.session)
+                })
+            }
+        }
+        return result.consumed
     }
 }

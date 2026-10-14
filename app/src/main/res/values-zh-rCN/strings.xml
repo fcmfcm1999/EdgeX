@@ -393,6 +393,11 @@
     <string name="key_volume_up">音量加</string>
     <string name="key_volume_down">音量减</string>
     <string name="key_power">电源键</string>
+    <string name="key_custom_name">硬件按键 %1$d</string>
+    <string name="key_detect">检测硬件按键</string>
+    <string name="key_detect_desc">添加 Bixby、助手、相机或其他手机按键</string>
+    <string name="key_detect_instruction">请在 30 秒内按下并松开要映射的按键。检测 Bixby 等按键前，请先在 LSPosed 中启用 EdgeX 并重启手机。与电源键共用的侧键可能会显示为电源键。</string>
+    <string name="key_detect_timeout">未检测到按键。请确认已在 LSPosed 中启用 EdgeX 并重启手机。部分手机的特殊按键不会产生按键事件。</string>
     <string name="key_back">返回键</string>
     <string name="key_home">主页键</string>
     <string name="key_menu">菜单键</string>

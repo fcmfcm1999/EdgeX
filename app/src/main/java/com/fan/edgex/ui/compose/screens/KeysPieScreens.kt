@@ -61,6 +61,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.hardwareKeyCodes
+import com.fan.edgex.config.hardwareKeyName
+import com.fan.edgex.config.rememberHardwareKey
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
@@ -95,7 +98,7 @@ import kotlin.math.sqrt
 
 private data class KeyUiItem(
     val keyCode: Int,
-    val titleRes: Int,
+    val title: String,
     val icon: Int,
 )
 
@@ -104,10 +107,13 @@ private data class KeyTrigger(
     val labelRes: Int,
 )
 
-private val keyItems = listOf(
-    KeyUiItem(KeyEvent.KEYCODE_VOLUME_UP, R.string.key_volume_up, EdgeXIcons.VolumeUp),
-    KeyUiItem(KeyEvent.KEYCODE_VOLUME_DOWN, R.string.key_volume_down, EdgeXIcons.VolumeDown),
-    KeyUiItem(KeyEvent.KEYCODE_POWER, R.string.key_power, EdgeXIcons.Power),
+private fun Context.keyItem(code: Int) = KeyUiItem(
+    code, hardwareKeyName(code), when (code) {
+        KeyEvent.KEYCODE_VOLUME_UP -> EdgeXIcons.VolumeUp
+        KeyEvent.KEYCODE_VOLUME_DOWN -> EdgeXIcons.VolumeDown
+        KeyEvent.KEYCODE_POWER -> EdgeXIcons.Power
+        else -> EdgeXIcons.Keys
+    },
 )
 
 private val keyTriggers = listOf(
@@ -130,6 +136,8 @@ fun KeysScreen(
     var refreshTick by remember { mutableStateOf(0) }
     var pickingTrigger by remember { mutableStateOf<Pair<KeyUiItem, KeyTrigger>?>(null) }
     var secondarySheet by remember { mutableStateOf<SecondaryType?>(null) }
+    var detectingKey by remember { mutableStateOf(false) }
+    val keyItems = remember(refreshTick) { context.hardwareKeyCodes().map { context.keyItem(it) } }
 
     fun setKeyEnabled(key: KeyUiItem, enabled: Boolean) {
         context.putConfig(AppConfig.keyEnabled(key.keyCode), enabled)
@@ -164,12 +172,20 @@ fun KeysScreen(
             )
         }
         KeySectionLabel(stringResource(R.string.compose_key_mapping))
+        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            EdgeXRow(
+                title = stringResource(R.string.key_detect),
+                subtitle = stringResource(R.string.key_detect_desc),
+                icon = EdgeXIcons.Plus,
+                onClick = { detectingKey = true },
+            )
+        }
         EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
             keyItems.forEachIndexed { index, item ->
                 val keyEnabled = context.keyEnabledState(item.keyCode, refreshTick)
                 val statusLabel = stringResource(if (keyEnabled) R.string.compose_enabled else R.string.compose_disabled)
                 EdgeXRow(
-                    title = stringResource(item.titleRes),
+                    title = item.title,
                     subtitle = "$statusLabel · ${context.keySubtitle(item.keyCode, refreshTick)}",
                     icon = item.icon,
                     onClick = { selectedKey = item },
@@ -182,6 +198,22 @@ fun KeysScreen(
                 if (index != keyItems.lastIndex) EdgeXDivider()
             }
         }
+    }
+
+    if (detectingKey) {
+        HardwareKeyDetectionDialog(
+            onDetected = { code ->
+                context.rememberHardwareKey(code)
+                detectingKey = false
+                refreshTick++
+                selectedKey = context.keyItem(code)
+            },
+            onDismiss = { detectingKey = false },
+            onTimeout = {
+                detectingKey = false
+                showToast(context.getString(R.string.key_detect_timeout))
+            },
+        )
     }
 
     KeyDetailSheet(
@@ -200,7 +232,7 @@ fun KeysScreen(
         val prefKey = AppConfig.keyAction(activeTrigger.first.keyCode, activeTrigger.second.id)
         val triggerTitle = stringResource(
             R.string.compose_title_pair,
-            stringResource(activeTrigger.first.titleRes),
+            activeTrigger.first.title,
             stringResource(activeTrigger.second.labelRes),
         )
         ActionSelectionSheet(
@@ -228,7 +260,7 @@ fun KeysScreen(
         val prefKey = AppConfig.keyAction(activeTrigger.first.keyCode, activeTrigger.second.id)
         val triggerTitle = stringResource(
             R.string.compose_title_pair,
-            stringResource(activeTrigger.first.titleRes),
+            activeTrigger.first.title,
             stringResource(activeTrigger.second.labelRes),
         )
         SecondaryActionDispatcher(
@@ -254,7 +286,7 @@ private fun KeyDetailSheet(
     onTriggerClick: (KeyUiItem, KeyTrigger, String) -> Unit,
 ) {
     val context = LocalContext.current
-    EdgeXBottomSheet(open = key != null, title = key?.let { stringResource(it.titleRes) }.orEmpty(), onDismissRequest = onDismiss) {
+    EdgeXBottomSheet(open = key != null, title = key?.title.orEmpty(), onDismissRequest = onDismiss) {
         if (key == null) return@EdgeXBottomSheet
         EdgeXListGroup {
             val keyEnabled = context.keyEnabledState(key.keyCode, refreshTick)
@@ -270,7 +302,7 @@ private fun KeyDetailSheet(
             keyTriggers.forEachIndexed { index, trigger ->
                 val actionTitle = stringResource(
                     R.string.compose_title_pair,
-                    stringResource(key.titleRes),
+                    key.title,
                     stringResource(trigger.labelRes),
                 )
                 val actionCode = context.getConfigString(AppConfig.keyAction(key.keyCode, trigger.id), "none")

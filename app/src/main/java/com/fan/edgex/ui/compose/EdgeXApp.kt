@@ -329,7 +329,9 @@ private fun Context.readHomeStats(): HomeStats {
         ?.count { it.isNotBlank() }
         ?: 0
     val keyCount = if (getConfigBool(AppConfig.KEYS_ENABLED)) {
-        listOf(24, 25, 26).count { keyCode ->
+        com.fan.edgex.config.HardwareKeyConfig.configuredCodes(
+            prefs.all.mapValues { (_, value) -> value?.toString().orEmpty() }
+        ).count { keyCode ->
             val enabledKey = AppConfig.keyEnabled(keyCode)
             if (prefs.contains(enabledKey)) {
                 getConfigBool(enabledKey)

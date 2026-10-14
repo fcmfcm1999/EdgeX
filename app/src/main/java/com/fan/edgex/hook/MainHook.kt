@@ -71,6 +71,27 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
+            // Manufacturer buttons may never reach dispatching (for example assistant keys).
+            try {
+                XposedHelpers.findAndHookMethod(
+                    inputManagerService, "interceptKeyBeforeQueueing",
+                    KeyEvent::class.java, Int::class.javaPrimitiveType,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (isCalledByUs()) return
+                            val event = param.args[0] as KeyEvent
+                            val context = XposedHelpers.getObjectField(param.thisObject, "mContext") as android.content.Context
+                            if (GestureManager.handleKeyEvent(event, context, param, param.args[1] as Int, beforeQueueing = true)) {
+                                param.result = 0 // Do not pass the event to policy or the app.
+                            }
+                        }
+                    }
+                )
+                KeyManager.earlyKeyHookInstalled = true
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: Early key hook unavailable: ${t.message}")
+            }
+
             // Hook interceptKeyBeforeDispatching for key event interception
             // This is the primary method called by the input dispatcher for key events
             try {
@@ -90,7 +111,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                             
                             // Process key through KeyManager
                             val context = XposedHelpers.getObjectField(param.thisObject, "mContext") as android.content.Context
-                            val consumed = GestureManager.handleKeyEvent(keyEvent, context, param)
+                            val consumed = GestureManager.handleKeyEvent(keyEvent, context, param, param.args[2] as Int)
                             if (consumed) {
                                 // Return non-zero to consume the key (prevent system handling)
                                 param.result = -1L
