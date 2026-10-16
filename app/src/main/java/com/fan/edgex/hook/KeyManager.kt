@@ -3,11 +3,13 @@ package com.fan.edgex.hook
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.ViewConfiguration
 import com.fan.edgex.config.AppConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * KeyManager handles hardware key interception and action triggering.
@@ -59,9 +61,10 @@ object KeyManager {
     // Track if we consumed the key (should not forward)
     private val keyConsumed = mutableMapOf<Int, Boolean>()
     
-    // Track injected events to avoid infinite loop
-    // We store (downTime, eventTime) pairs of events we injected
-    private val injectedEventTimes = mutableSetOf<Long>()
+    private val heldVolumeKeys = ConcurrentHashMap.newKeySet<Int>()
+    private val injectedKeys = InjectedKeyRegistry(SystemClock::uptimeMillis)
+    @Volatile private var powerKeyConfig = PowerKeyGestureHandler.Config()
+    @Volatile private var powerKeyHandler: PowerKeyGestureHandler<KeyEvent>? = null
 
     // Volume key passthrough: after our action fires for a volume key,
     // the system volume panel is already showing (handled earlier in pipeline).
@@ -91,9 +94,30 @@ object KeyManager {
     /**
      * Initialize timeouts from system configuration.
      */
+    @Synchronized
     fun init(context: Context) {
         longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
         doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+        if (powerKeyHandler == null) {
+            powerKeyHandler = PowerKeyGestureHandler(
+                scheduler = object : PowerKeyGestureHandler.Scheduler {
+                    override fun now() = SystemClock.uptimeMillis()
+                    override fun postDelayed(task: Runnable, delayMillis: Long) {
+                        handler.postDelayed(task, delayMillis)
+                    }
+                    override fun removeCallbacks(task: Runnable) {
+                        handler.removeCallbacks(task)
+                    }
+                },
+                forwardEvent = { injectKeyEvent(it, context) },
+                executeAction = { action ->
+                    XposedBridge.log("$TAG: Power key -> $action")
+                    executeAction(action, context, KeyEvent.KEYCODE_POWER)
+                },
+                longPressTimeout = longPressTimeout,
+                doubleTapTimeout = PowerKeyGestureHandler.DOUBLE_TAP_TIMEOUT_MS,
+            )
+        }
     }
 
     /**
@@ -101,6 +125,16 @@ object KeyManager {
      */
     fun updateConfig(configCache: Map<String, String>) {
         keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+        val power = KeyEvent.KEYCODE_POWER
+        val click = configCache[AppConfig.keyAction(power, "click")].orEmpty()
+        val doubleClick = configCache[AppConfig.keyAction(power, "double_click")].orEmpty()
+        val longPress = configCache[AppConfig.keyAction(power, "long_press")].orEmpty()
+        powerKeyConfig = PowerKeyGestureHandler.Config(
+            enabled = keysEnabled && configCache[AppConfig.keyEnabled(power)] != "false",
+            click = click,
+            doubleClick = doubleClick,
+            longPress = longPress,
+        )
 
         for (keyCode in SUPPORTED_KEYS.keys) {
             keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
@@ -164,8 +198,6 @@ object KeyManager {
             volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
         }
         
-        // Clean up old entries (keep only last 10)
-        
         try {
             // Try InputManager.getInstance()
             val inputManager = context.getSystemService(Context.INPUT_SERVICE)
@@ -175,8 +207,8 @@ object KeyManager {
                     Class.forName("android.view.InputEvent"),
                     Int::class.javaPrimitiveType
                 )
-                injectMethod.invoke(inputManager, event, 0) // 0 = INJECT_INPUT_EVENT_MODE_ASYNC
-                return
+                if (injectMethod.invoke(inputManager, event, 0) == true) return
+                XposedBridge.log("$TAG: InputManager rejected key injection")
             }
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: InputManager inject failed: ${t.message}")
@@ -192,8 +224,8 @@ object KeyManager {
                 Class.forName("android.view.InputEvent"),
                 Int::class.javaPrimitiveType
             )
-            injectMethod.invoke(global, event, 0)
-            return
+            if (injectMethod.invoke(global, event, 0) == true) return
+            XposedBridge.log("$TAG: InputManagerGlobal rejected key injection")
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: InputManagerGlobal inject failed: ${t.message}")
         }
@@ -202,9 +234,44 @@ object KeyManager {
     }
 
     fun markInjectedEvent(event: KeyEvent) {
-        injectedEventTimes.add(event.eventTime)
+        injectedKeys.mark(event.injectionIdentity().asInjected())
     }
     
+    private fun KeyEvent.injectionIdentity() = InjectedKeyRegistry.Identity(
+        keyCode, action, downTime, eventTime, deviceId, repeatCount,
+    )
+
+    /** Called exclusively before native system power policy, not from late hooks. */
+    fun handlePowerKeyBeforeQueueing(event: KeyEvent, allowNewSequence: Boolean): Boolean {
+        if (injectedKeys.contains(event.injectionIdentity())) return false
+        if (isVolumeKey(event.keyCode)) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                heldVolumeKeys.add(event.keyCode)
+                // Injection runs queueing policy synchronously even in ASYNC mode,
+                // so native policy observes POWER down before this volume down.
+                powerKeyHandler?.handoffToNative()
+            } else if (event.action == KeyEvent.ACTION_UP) {
+                heldVolumeKeys.remove(event.keyCode)
+            }
+            return false // volume still uses its existing native/late hook path
+        }
+        if (event.keyCode != KeyEvent.KEYCODE_POWER) return false
+        if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
+        val detector = powerKeyHandler ?: return false
+        val config = powerKeyConfig
+        return detector.handle(
+            PowerKeyGestureHandler.Event(
+                original = KeyEvent(event),
+                downTime = event.downTime,
+                eventTime = event.eventTime,
+                isDown = event.action == KeyEvent.ACTION_DOWN,
+                repeatCount = event.repeatCount,
+                canceled = event.isCanceled,
+            ),
+            config.copy(enabled = config.enabled && allowNewSequence && heldVolumeKeys.isEmpty()),
+        )
+    }
+
     /**
      * Forward saved key events by injecting them.
      * This replaces the old forwardParam() approach which didn't work reliably.
@@ -236,15 +303,13 @@ object KeyManager {
      */
     fun handleKeyEvent(event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
         val keyCode = event.keyCode
-        val eventTime = event.eventTime
-        
-        
+        // Power has already been handled before PhoneWindowManager. Never feed
+        // it through a second state machine from filter/dispatch hooks.
+        if (keyCode == KeyEvent.KEYCODE_POWER) return false
+
         if (policyFlags and INJECTED_EVENT_FLAG != 0) return false
 
-        if (injectedEventTimes.contains(eventTime)) {
-            injectedEventTimes.remove(eventTime)
-            return false
-        }
+        if (injectedKeys.contains(event.injectionIdentity())) return false
 
         if (!keysEnabled) return false
         
@@ -535,7 +600,10 @@ object KeyManager {
         pendingDownEvents.clear()
         pendingUpEvents.clear()
         keyConsumed.clear()
-        injectedEventTimes.clear()
+        // Keep replay markers and an in-flight power sequence across SCREEN_OFF.
+        // The native system still needs a balanced release after a wake/sleep or
+        // lock action. Replay markers expire automatically instead of being lost
+        // between their queueing and filtering callbacks.
         volumePassthroughUntil = 0L
     }
 }

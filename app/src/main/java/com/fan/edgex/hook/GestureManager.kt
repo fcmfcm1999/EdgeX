@@ -541,6 +541,14 @@ object GestureManager {
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
     }
 
+    /** Power must be owned before PhoneWindowManager performs sleep/wake policy. */
+    fun handlePowerKeyBeforeQueueing(event: KeyEvent, context: Context): Boolean {
+        ensureSystemServerInitialized(context, initializeKeys = true)
+        return KeyManager.handlePowerKeyBeforeQueueing(
+            event, allowNewSequence = !GameModeManager.isActive,
+        )
+    }
+
     fun executeKeyAction(action: String, context: Context) {
         actionDispatcher.executeKeyAction(action, context)
     }

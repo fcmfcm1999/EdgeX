@@ -71,6 +71,38 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
+            // This native callback runs before WindowManagerCallbacks delegates to
+            // PhoneWindowManager (including OEM policy). Consuming later is too late:
+            // native power handling already sleeps the display and drops PASS_TO_USER.
+            try {
+                XposedHelpers.findAndHookMethod(
+                    inputManagerService, "interceptKeyBeforeQueueing",
+                    KeyEvent::class.java,
+                    Int::class.javaPrimitiveType,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            val keyEvent = param.args[0] as KeyEvent
+                            if (keyEvent.keyCode != KeyEvent.KEYCODE_POWER &&
+                                keyEvent.keyCode != KeyEvent.KEYCODE_VOLUME_UP &&
+                                keyEvent.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return
+                            try {
+                                val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
+                                    as android.content.Context
+                                if (GestureManager.handlePowerKeyBeforeQueueing(keyEvent, context)) {
+                                    param.result = 0 // int policy actions: skip native power handling
+                                }
+                            } catch (t: Throwable) {
+                                // Leave the original policy method available on hook failure.
+                                XposedBridge.log("$TAG: Power key early interception failed: ${t.message}")
+                            }
+                        }
+                    }
+                )
+                XposedBridge.log("$TAG: Power key interceptKeyBeforeQueueing hook installed")
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: Power key interceptKeyBeforeQueueing hook failed: ${t.message}")
+            }
+
             // Hook interceptKeyBeforeDispatching for key event interception
             // This is the primary method called by the input dispatcher for key events
             try {
