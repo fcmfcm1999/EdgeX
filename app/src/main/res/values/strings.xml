@@ -28,8 +28,8 @@
     <string name="menu_haptic_feedback">Haptic Feedback</string>
     <string name="menu_haptic_feedback_desc">Vibrate on action trigger</string>
     <string name="menu_haptic_feedback_desc_with_type">Vibrate on action trigger - %s</string>
-    <string name="menu_gesture_execute_on_release">Execute actions on release</string>
-    <string name="menu_gesture_execute_on_release_desc">Run on release; 3-second timeout</string>
+    <string name="menu_gesture_execute_on_release">Execute on release</string>
+    <string name="menu_gesture_execute_on_release_desc">Lift to run; hold 3 seconds to cancel.</string>
     <string name="menu_haptic_feedback_type">Haptic Type</string>
     <string name="haptic_feedback_type_dialog_title">Haptic Type</string>
     <string name="haptic_feedback_type_click">Click</string>
