@@ -28,8 +28,8 @@
     <string name="menu_haptic_feedback">震动反馈</string>
     <string name="menu_haptic_feedback_desc">触发动作时震动</string>
     <string name="menu_haptic_feedback_desc_with_type">触发动作时震动 - %s</string>
-    <string name="menu_gesture_execute_on_release">松手后执行动作</string>
-    <string name="menu_gesture_execute_on_release_desc">松手执行，超过 3 秒取消</string>
+    <string name="menu_gesture_execute_on_release">松手执行</string>
+    <string name="menu_gesture_execute_on_release_desc">松手触发；按住 3 秒取消。</string>
     <string name="menu_haptic_feedback_type">震动类型</string>
     <string name="haptic_feedback_type_dialog_title">震动类型</string>
     <string name="haptic_feedback_type_click">轻触</string>
