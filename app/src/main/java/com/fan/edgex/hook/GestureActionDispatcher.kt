@@ -281,7 +281,13 @@ internal class GestureActionDispatcher(
                 ClipboardOverlay.show(context)
             }
             action == "freezer_drawer" -> {
-                DrawerManager.showDrawer(context, resolveConfig)
+                DrawerManager.showDrawer(
+                    context = context,
+                    resolveConfig = resolveConfig,
+                    zone = zone,
+                    touchX = touchX,
+                    touchY = touchY,
+                )
             }
             action == AppConfig.CUSTOM_PANEL_ACTION -> {
                 PanelOverlayManager.showCustomPanel(context, resolveConfig) { selected ->

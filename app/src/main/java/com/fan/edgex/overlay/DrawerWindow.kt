@@ -2,7 +2,6 @@ package com.fan.edgex.overlay
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -32,6 +31,9 @@ import com.fan.edgex.hook.ModuleRes
 class DrawerWindow(
     private val context: Context,
     private val resolveConfig: (String) -> String,
+    private val zone: String?,
+    private val touchX: Float,
+    private val touchY: Float,
     private val onDismiss: (() -> Unit)? = null,
 ) {
 
@@ -40,8 +42,8 @@ class DrawerWindow(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var rootView: FrameLayout? = null
     private var drawerPanel: View? = null
-    private var contentLeftBound = 0
     private var drawerPanelWidth = 0
+    private var anchor: QuickSettingsAnchor? = null
     private var configReceiver: android.content.BroadcastReceiver? = null
 
     private val MOCK_MODE = false
@@ -66,11 +68,19 @@ class DrawerWindow(
 
         registerConfigReceiver()
 
-        val displayMetrics = context.resources.displayMetrics
+        val metrics = windowManager.currentWindowMetrics
+        val bounds = metrics.bounds
+        anchor = QuickSettingsAnchor.resolve(
+            zone = zone,
+            touchX = touchX,
+            touchY = touchY,
+            screenWidth = bounds.width().toFloat(),
+            screenHeight = bounds.height().toFloat(),
+        )
 
         rootView = object : FrameLayout(context) {
             override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
-                if (ev.action == android.view.MotionEvent.ACTION_DOWN && ev.x < contentLeftBound) {
+                if (ev.action == android.view.MotionEvent.ACTION_DOWN && !isInsidePanel(ev.x, ev.y)) {
                     animateOut()
                     return true
                 }
@@ -101,8 +111,9 @@ class DrawerWindow(
                 android.content.res.Configuration.ORIENTATION_LANDSCAPE
         // Portrait needs a wider panel (70%) to comfortably fit 3 columns
         val panelFraction = if (isLandscape) 0.62f else 0.70f
-        val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
-        contentLeftBound = displayMetrics.widthPixels - panelWidth
+        // Keep the drawer's original dimensions: only its horizontal placement
+        // follows the gesture anchor.
+        val panelWidth = (context.resources.displayMetrics.widthPixels * panelFraction).toInt()
         drawerPanelWidth = panelWidth
         setupModernLayout(displayApps, pm, panelWidth)
 
@@ -120,15 +131,7 @@ class DrawerWindow(
 
         try {
             windowManager.addView(rootView, params)
-            drawerPanel?.let { panel ->
-                panel.translationX = drawerPanelWidth.toFloat()
-                ValueAnimator.ofFloat(drawerPanelWidth.toFloat(), 0f).apply {
-                    duration = 340
-                    interpolator = DecelerateInterpolator(2.2f)
-                    addUpdateListener { panel.translationX = it.animatedValue as Float }
-                    start()
-                }
-            }
+            drawerPanel?.let(::animateIn)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -137,7 +140,7 @@ class DrawerWindow(
     private fun setupModernLayout(
         displayApps: List<AppEntry>,
         pm: android.content.pm.PackageManager,
-        panelWidth: Int
+        panelWidth: Int,
     ) {
         val dp = context.resources.displayMetrics.density
         val dark = isDarkMode
@@ -151,17 +154,18 @@ class DrawerWindow(
         val cornerRad     = OverlayTheme.CORNER_SHEET_DP * dp
 
         val panel = FrameLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(panelWidth, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                gravity = Gravity.END
-            }
+            layoutParams = FrameLayout.LayoutParams(
+                panelWidth,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                panelGravity(),
+            )
             background = GradientDrawable().apply {
                 setColor(surfaceBg)
-                // Only left corners rounded; right edge is off-screen
-                cornerRadii = floatArrayOf(cornerRad, cornerRad, 0f, 0f, 0f, 0f, cornerRad, cornerRad)
+                cornerRadii = drawerCornerRadii(cornerRad)
             }
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width + cornerRad.toInt(), view.height, cornerRad)
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRad)
                 }
             }
             clipToOutline = true
@@ -458,20 +462,75 @@ class DrawerWindow(
     private fun animateOut() {
         val panel = drawerPanel
         if (panel != null) {
-            val panelWidth = panel.width.takeIf { it > 0 }
-                ?: (context.resources.displayMetrics.widthPixels * 0.62f).toInt()
-            ValueAnimator.ofFloat(0f, panelWidth.toFloat()).apply {
-                duration = 260
-                interpolator = DecelerateInterpolator(1.8f)
-                addUpdateListener { panel.translationX = it.animatedValue as Float }
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) { dismiss() }
+            val (endX, endY) = animationOffset(panel)
+            panel.animate()
+                .alpha(0f)
+                .translationX(endX)
+                .translationY(endY)
+                .setDuration(220)
+                .setInterpolator(DecelerateInterpolator(1.8f))
+                .setListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) = dismiss()
                 })
-                start()
-            }
+                .start()
         } else {
             dismiss()
         }
+    }
+
+    private fun panelGravity(): Int {
+        val resolved = anchor ?: return Gravity.END or Gravity.TOP
+        val horizontal = when (resolved.horizontal) {
+            QuickSettingsHorizontalAnchor.START -> Gravity.START
+            QuickSettingsHorizontalAnchor.CENTER -> Gravity.CENTER_HORIZONTAL
+            QuickSettingsHorizontalAnchor.END -> Gravity.END
+        }
+        val vertical = when (resolved.vertical) {
+            QuickSettingsVerticalAnchor.TOP -> Gravity.TOP
+            QuickSettingsVerticalAnchor.CENTER -> Gravity.CENTER_VERTICAL
+            QuickSettingsVerticalAnchor.BOTTOM -> Gravity.BOTTOM
+        }
+        return horizontal or vertical
+    }
+
+    private fun isInsidePanel(x: Float, y: Float): Boolean = drawerPanel?.let { panel ->
+        x >= panel.left && x <= panel.right && y >= panel.top && y <= panel.bottom
+    } == true
+
+    private fun animateIn(panel: View) {
+        val (startX, startY) = animationOffset(panel)
+        panel.alpha = 0f
+        panel.translationX = startX
+        panel.translationY = startY
+        panel.animate()
+            .alpha(1f)
+            .translationX(0f)
+            .translationY(0f)
+            .setDuration(280)
+            .setInterpolator(DecelerateInterpolator(2.2f))
+            .start()
+    }
+
+    private fun animationOffset(panel: View): Pair<Float, Float> {
+        val resolved = anchor ?: return drawerPanelWidth.toFloat() to 0f
+        val x = when (resolved.horizontal) {
+            QuickSettingsHorizontalAnchor.START -> -panel.width.coerceAtLeast(drawerPanelWidth).toFloat()
+            QuickSettingsHorizontalAnchor.CENTER -> 0f
+            QuickSettingsHorizontalAnchor.END -> panel.width.coerceAtLeast(drawerPanelWidth).toFloat()
+        }
+        return x to 0f
+    }
+
+    private fun drawerCornerRadii(cornerRadius: Float): FloatArray = when (anchor?.horizontal) {
+        QuickSettingsHorizontalAnchor.START -> floatArrayOf(
+            0f, 0f, cornerRadius, cornerRadius,
+            cornerRadius, cornerRadius, 0f, 0f,
+        )
+        QuickSettingsHorizontalAnchor.CENTER -> FloatArray(8) { cornerRadius }
+        QuickSettingsHorizontalAnchor.END, null -> floatArrayOf(
+            cornerRadius, cornerRadius, 0f, 0f,
+            0f, 0f, cornerRadius, cornerRadius,
+        )
     }
 
     private fun loadMockApps(pm: android.content.pm.PackageManager): List<AppEntry> {
