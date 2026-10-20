@@ -65,12 +65,10 @@ data class HomeStats(
 data class HomeCallbacks(
     val openRoute: (EdgeXRoute) -> Unit,
     val showToast: (String) -> Unit,
-    val restartSystemUi: () -> Unit,
     val setDebug: (Boolean) -> Unit,
     val setHaptic: (Boolean) -> Unit,
     val setHapticType: (String) -> Unit,
     val setGestureExecuteOnRelease: (Boolean) -> Unit,
-    val setArcDrawer: (Boolean) -> Unit,
 )
 
 private data class HapticFeedbackType(
@@ -349,7 +347,6 @@ private fun SectionLabel(label: String) {
 
 @Composable
 private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
-    val restartToast = stringResource(R.string.compose_restart_sysui_toast)
     var showHapticTypeSheet by remember { mutableStateOf(false) }
     val hapticType = hapticFeedbackTypes.firstOrNull { it.value == state.hapticType }
         ?: hapticFeedbackTypes.first()
@@ -403,26 +400,6 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
             onCheckedChange = callbacks.setGestureExecuteOnRelease,
             icon = EdgeXIcons.Gesture,
         )
-        EdgeXDivider()
-        EdgeXSwitchRow(
-            title = stringResource(R.string.menu_arc_drawer),
-            subtitle = stringResource(R.string.compose_arc_drawer_desc),
-            checked = state.arcDrawer,
-            onCheckedChange = callbacks.setArcDrawer,
-            icon = EdgeXIcons.ArcDrawer,
-        )
-        EdgeXDivider()
-        EdgeXRow(
-            title = stringResource(R.string.menu_restart_sysui),
-            subtitle = stringResource(R.string.compose_restart_sysui_desc),
-            icon = EdgeXIcons.Restart,
-            onClick = {
-                callbacks.showToast(restartToast)
-                callbacks.restartSystemUi()
-            },
-        ) {
-            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
-        }
     }
 }
 

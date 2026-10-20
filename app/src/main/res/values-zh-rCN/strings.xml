@@ -23,8 +23,6 @@
     <string name="menu_advanced">高级选项</string>
     <string name="menu_debug_matrix">调试模式</string>
     <string name="menu_debug_matrix_desc">显示手势触发区域</string>
-    <string name="menu_arc_drawer">启用弧形冰箱</string>
-    <string name="menu_arc_drawer_desc">在屏幕右侧以弧形显示应用列表</string>
     <string name="menu_haptic_feedback">震动反馈</string>
     <string name="menu_haptic_feedback_desc">触发动作时震动</string>
     <string name="menu_haptic_feedback_desc_with_type">触发动作时震动 - %s</string>
@@ -36,7 +34,6 @@
     <string name="haptic_feedback_type_tick">短促</string>
     <string name="haptic_feedback_type_heavy_click">重按</string>
     <string name="haptic_feedback_type_double_click">双击</string>
-    <string name="menu_restart_sysui">重启 SystemUI</string>
     <string name="menu_premium">支持者附加功能</string>
     <string name="menu_premium_not_activated">未激活</string>
     <string name="menu_premium_reboot_required">已安装，重启后生效</string>
@@ -331,9 +328,6 @@
     <string name="content_desc_icon">图标</string>
 
     <!-- Toast 提示 -->
-    <string name="toast_restarting_sysui">正在重启 SystemUI…</string>
-    <string name="toast_restart_sysui_failed">重启 SystemUI 失败，需要 Root 权限。</string>
-    <string name="toast_restart_failed">重启失败: %s</string>
     <string name="toast_cannot_open_browser">无法打开浏览器</string>
     <string name="toast_star_reminder">如果你有 GitHub 账号，记得帮我点个 star 哦 ⭐</string>
     <string name="toast_frozen">已冻结 %s</string>
@@ -525,9 +519,6 @@
     <string name="compose_premium_subtitle_reboot">Supporter Extras · 重启后生效</string>
     <string name="compose_premium_subtitle_inactive">Supporter Extras · 未激活</string>
     <string name="compose_haptic_enabled_light">已启用 · 轻触</string>
-    <string name="compose_arc_drawer_desc">右侧弧形抽屉显示应用</string>
-    <string name="compose_restart_sysui_desc">应用部分系统级更改</string>
-    <string name="compose_restart_sysui_toast">正在重启 SystemUI…</string>
     <string name="compose_search_pending_toast">搜索即将迁移</string>
     <string name="compose_gestures_hero">点击屏幕\n边缘配置手势</string>
     <string name="compose_gestures_subtitle">%d 个手势 · 12 子区域 + 4 全边缘</string>

@@ -66,8 +66,6 @@ class DrawerWindow(
 
         registerConfigReceiver()
 
-        val useArcDrawer = resolveConfig(AppConfig.FREEZER_ARC_DRAWER).toBoolean()
-
         val displayMetrics = context.resources.displayMetrics
 
         rootView = object : FrameLayout(context) {
@@ -99,19 +97,14 @@ class DrawerWindow(
             loadConfiguredApps(pm)
         }
 
-        if (useArcDrawer) {
-            setupArcLayout(displayApps, pm, displayMetrics)
-            contentLeftBound = displayMetrics.widthPixels - (200 * displayMetrics.density).toInt()
-        } else {
-            val isLandscape = context.resources.configuration.orientation ==
-                    android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            // Portrait needs a wider panel (70%) to comfortably fit 3 columns
-            val panelFraction = if (isLandscape) 0.62f else 0.70f
-            val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
-            contentLeftBound = displayMetrics.widthPixels - panelWidth
-            drawerPanelWidth = panelWidth
-            setupModernLayout(displayApps, pm, panelWidth)
-        }
+        val isLandscape = context.resources.configuration.orientation ==
+                android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        // Portrait needs a wider panel (70%) to comfortably fit 3 columns
+        val panelFraction = if (isLandscape) 0.62f else 0.70f
+        val panelWidth = (displayMetrics.widthPixels * panelFraction).toInt()
+        contentLeftBound = displayMetrics.widthPixels - panelWidth
+        drawerPanelWidth = panelWidth
+        setupModernLayout(displayApps, pm, panelWidth)
 
         @Suppress("DEPRECATION")
         val params = WindowManager.LayoutParams().apply {
@@ -127,15 +120,13 @@ class DrawerWindow(
 
         try {
             windowManager.addView(rootView, params)
-            if (!useArcDrawer) {
-                drawerPanel?.let { panel ->
-                    panel.translationX = drawerPanelWidth.toFloat()
-                    ValueAnimator.ofFloat(drawerPanelWidth.toFloat(), 0f).apply {
-                        duration = 340
-                        interpolator = DecelerateInterpolator(2.2f)
-                        addUpdateListener { panel.translationX = it.animatedValue as Float }
-                        start()
-                    }
+            drawerPanel?.let { panel ->
+                panel.translationX = drawerPanelWidth.toFloat()
+                ValueAnimator.ofFloat(drawerPanelWidth.toFloat(), 0f).apply {
+                    duration = 340
+                    interpolator = DecelerateInterpolator(2.2f)
+                    addUpdateListener { panel.translationX = it.animatedValue as Float }
+                    start()
                 }
             }
         } catch (e: Exception) {
@@ -403,80 +394,6 @@ class DrawerWindow(
         root.addView(scrollView)
         panel.addView(root)
         rootView?.addView(panel)
-    }
-
-    private fun setupArcLayout(
-        displayApps: List<AppEntry>,
-        pm: android.content.pm.PackageManager,
-        displayMetrics: android.util.DisplayMetrics
-    ) {
-        val drawerContent = FrameLayout(context).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-            ).apply { gravity = Gravity.RIGHT }
-            isClickable = false
-        }
-
-        val arcLayout = ArcLayoutView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            onEmptySpaceClick = { animateOut() }
-        }
-
-        if (displayApps.isEmpty()) {
-            drawerContent.addView(TextView(context).apply {
-                text = ModuleRes.getString(R.string.label_empty_drawer)
-                textSize = 16f
-                setPadding(40, 40, 40, 40)
-                setTextColor(Color.DKGRAY)
-                gravity = Gravity.CENTER
-            })
-        } else {
-            val grayscaleFilter = android.graphics.ColorMatrixColorFilter(
-                android.graphics.ColorMatrix().apply { setSaturation(0f) }
-            )
-            val shownPackages = mutableSetOf<String>()
-
-            for ((ri, frozen) in displayApps) {
-                val pkg = ri.activityInfo.applicationInfo.packageName
-                if (!shownPackages.add(pkg)) continue
-
-                try {
-                    arcLayout.addItem(LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        gravity = Gravity.CENTER
-                        setPadding(12, 12, 12, 12)
-                        background = GradientDrawable().apply {
-                            setColor("#F0F0F0".toColorInt())
-                            cornerRadius = 24f
-                        }
-                        addView(ImageView(context).apply {
-                            setImageDrawable(ri.loadIcon(pm))
-                            layoutParams = LinearLayout.LayoutParams(55, 55)
-                            if (frozen) { colorFilter = grayscaleFilter; alpha = 0.5f }
-                        })
-                        addView(TextView(context).apply {
-                            text = ri.loadLabel(pm)
-                            textSize = 9f
-                            gravity = Gravity.CENTER
-                            maxLines = 1
-                            setTextColor(if (frozen) Color.GRAY else Color.DKGRAY)
-                        })
-                        setOnClickListener {
-                            if (frozen) threadUnfreeze(pkg, ri.loadLabel(pm).toString(), pm)
-                            else launchApp(context, pm, pkg)
-                        }
-                    })
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
-
-        drawerContent.addView(arcLayout)
-        rootView?.addView(drawerContent)
     }
 
     private fun threadUnfreeze(packageName: String, label: String, pm: android.content.pm.PackageManager) {

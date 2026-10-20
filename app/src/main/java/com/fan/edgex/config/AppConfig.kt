@@ -7,7 +7,6 @@ object AppConfig {
     const val GESTURES_ENABLED = "gestures_enabled"
     const val KEYS_ENABLED = "keys_enabled"
     const val DEBUG_MATRIX = "debug_matrix_enabled"
-    const val FREEZER_ARC_DRAWER = "freezer_arc_drawer_enabled"
     const val FREEZER_APP_LIST = "freezer_app_list"
     const val HAS_MIGRATED_FREEZER_LIST = "has_migrated_freezer_list"
     const val THEME_PRESET = "theme_preset"

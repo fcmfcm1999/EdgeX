@@ -52,7 +52,6 @@ object EdgeXIcons {
     @DrawableRes val SideBarRight = R.drawable.ic_side_bar_right
     @DrawableRes val Settings = R.drawable.ic_settings
     @DrawableRes val DeveloperMode = R.drawable.ic_developer_mode
-    @DrawableRes val ArcDrawer = R.drawable.ic_arc_drawer
     @DrawableRes val About = R.drawable.ic_about
     @DrawableRes val Person = R.drawable.ic_person
     @DrawableRes val EdgeLighting = R.drawable.ic_edge_lighting
@@ -62,7 +61,6 @@ object EdgeXIcons {
     @DrawableRes val Link = R.drawable.ic_link
     @DrawableRes val Terminal = R.drawable.ic_terminal
     @DrawableRes val Vibration = R.drawable.ic_vibration
-    @DrawableRes val Restart = R.drawable.ic_restart_alt
     @DrawableRes val SubGesture = R.drawable.ic_sub_gesture
     @DrawableRes val LaunchApp = R.drawable.ic_launch_app
     @DrawableRes val AppShortcut = R.drawable.ic_app_shortcut

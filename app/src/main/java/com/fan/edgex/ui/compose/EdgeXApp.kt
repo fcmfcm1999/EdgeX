@@ -2,8 +2,6 @@ package com.fan.edgex.ui.compose
 
 import android.app.Activity
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -51,7 +49,6 @@ import com.fan.edgex.ui.compose.theme.EdgeXAccent
 import com.fan.edgex.ui.compose.theme.EdgeXTheme
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
 import com.fan.edgex.utils.UpdateChecker
-import com.topjohnwu.superuser.Shell
 import kotlinx.coroutines.delay
 
 enum class EdgeXRoute(@StringRes val labelRes: Int) {
@@ -77,7 +74,6 @@ data class HomeUiState(
     val haptic: Boolean,
     val hapticType: String,
     val gestureExecuteOnRelease: Boolean,
-    val arcDrawer: Boolean,
     val keysEnabled: Boolean,
     val edgeLighting: Boolean,
     val moduleActive: Boolean,
@@ -89,7 +85,6 @@ data class HomeUiState(
 @Composable
 fun EdgeXApp() {
     val context = LocalContext.current
-    val restartSystemUiFailed = stringResource(R.string.toast_restart_sysui_failed)
     val updateChecking = stringResource(R.string.update_checking)
     val updateAlreadyLatest = stringResource(R.string.update_already_latest)
     val stack = remember { mutableStateListOf(EdgeXRoute.Home) }
@@ -170,11 +165,6 @@ fun EdgeXApp() {
                         callbacks = HomeCallbacks(
                             openRoute = { stack.add(it) },
                             showToast = ::showToast,
-                            restartSystemUi = {
-                                restartSystemUi {
-                                    showToast(restartSystemUiFailed)
-                                }
-                            },
                             setDebug = {
                                 context.putConfig(AppConfig.DEBUG_MATRIX, it)
                                 refresh()
@@ -189,10 +179,6 @@ fun EdgeXApp() {
                             },
                             setGestureExecuteOnRelease = {
                                 context.putConfig(AppConfig.GESTURE_EXECUTE_ON_RELEASE, it)
-                                refresh()
-                            },
-                            setArcDrawer = {
-                                context.putConfig(AppConfig.FREEZER_ARC_DRAWER, it)
                                 refresh()
                             },
                         ),
@@ -270,17 +256,6 @@ fun EdgeXApp() {
     }
 }
 
-private fun restartSystemUi(onFailure: () -> Unit) {
-    Thread {
-        val succeeded = runCatching {
-            Shell.cmd("killall com.android.systemui").exec().isSuccess
-        }.getOrDefault(false)
-        if (!succeeded) {
-            Handler(Looper.getMainLooper()).post(onFailure)
-        }
-    }.start()
-}
-
 private fun Context.readHomeUiState(): HomeUiState =
     HomeUiState(
         stats = readHomeStats(),
@@ -292,7 +267,6 @@ private fun Context.readHomeUiState(): HomeUiState =
             AppConfig.HAPTIC_FEEDBACK_TYPE_CLICK,
         ),
         gestureExecuteOnRelease = getConfigBool(AppConfig.GESTURE_EXECUTE_ON_RELEASE),
-        arcDrawer = getConfigBool(AppConfig.FREEZER_ARC_DRAWER),
         keysEnabled = getConfigBool(AppConfig.KEYS_ENABLED),
         edgeLighting = getConfigBool(AppConfig.EDGE_LIGHTING_ENABLED, default = true),
         moduleActive = ModuleActivationState.isActive(this),

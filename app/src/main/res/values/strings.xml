@@ -25,8 +25,6 @@
     <string name="menu_advanced">Advanced Options</string>
     <string name="menu_debug_matrix">Debug Mode</string>
     <string name="menu_debug_matrix_desc">Show gesture trigger area</string>
-    <string name="menu_arc_drawer">Enable Arc Freezer</string>
-    <string name="menu_arc_drawer_desc">Display app list in arc on right side</string>
     <string name="menu_haptic_feedback">Haptic Feedback</string>
     <string name="menu_haptic_feedback_desc">Vibrate on action trigger</string>
     <string name="menu_haptic_feedback_desc_with_type">Vibrate on action trigger - %s</string>
@@ -38,7 +36,6 @@
     <string name="haptic_feedback_type_tick">Tick</string>
     <string name="haptic_feedback_type_heavy_click">Heavy click</string>
     <string name="haptic_feedback_type_double_click">Double click</string>
-    <string name="menu_restart_sysui">Restart SystemUI</string>
     <string name="menu_premium">Supporter Extras</string>
     <string name="menu_premium_not_activated">Not activated</string>
     <string name="menu_premium_reboot_required">Installed - reboot to take effect</string>
@@ -328,9 +325,6 @@
     <string name="content_desc_icon">Icon</string>
 
     <!-- Toast Messages -->
-    <string name="toast_restarting_sysui">Restarting SystemUI…</string>
-    <string name="toast_restart_sysui_failed">Failed to restart SystemUI. Root access is required.</string>
-    <string name="toast_restart_failed">Restart failed: %s</string>
     <string name="toast_cannot_open_browser">Cannot open browser</string>
     <string name="toast_star_reminder">If you use GitHub, don\'t forget to give me a star ⭐</string>
     <string name="toast_frozen">Frozen %s</string>
@@ -524,9 +518,6 @@
     <string name="compose_premium_subtitle_reboot">Supporter Extras · Reboot required</string>
     <string name="compose_premium_subtitle_inactive">Supporter Extras · Not activated</string>
     <string name="compose_haptic_enabled_light">Enabled · Light</string>
-    <string name="compose_arc_drawer_desc">Show apps in right-side arc drawer</string>
-    <string name="compose_restart_sysui_desc">Apply some system-level changes</string>
-    <string name="compose_restart_sysui_toast">Restarting SystemUI…</string>
     <string name="compose_search_pending_toast">Search coming soon</string>
     <string name="compose_gestures_hero">Tap the screen\nedge to configure</string>
     <string name="compose_gestures_subtitle">%d gestures · 12 sub-zones + 4 full edges</string>
