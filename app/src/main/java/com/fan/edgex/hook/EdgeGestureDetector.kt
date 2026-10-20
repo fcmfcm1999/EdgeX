@@ -26,6 +26,10 @@ internal class EdgeGestureDetector(
         fun updatePie(x: Float, y: Float)
         fun commitPie(context: Context)
         fun cancelPie()
+        fun startGesturePointer(context: Context, x: Float, y: Float)
+        fun moveGesturePointer(x: Float, y: Float)
+        fun commitGesturePointer(context: Context, x: Float, y: Float)
+        fun cancelGesturePointer()
         fun onFluidEffectDown(zone: String, touchX: Float, touchY: Float, screenW: Float, screenH: Float) = Unit
         fun onFluidEffectMove(touchX: Float, touchY: Float) = Unit
         fun onFluidEffectUp() = Unit
@@ -65,6 +69,7 @@ internal class EdgeGestureDetector(
         var pendingReleaseGesture: String? = null,
         // Pie mode: finger holds to select, release to execute
         var pieMode: Boolean = false,
+        var gesturePointerMode: Boolean = false,
     )
 
     private var activeSession: GestureSession? = null
@@ -75,7 +80,7 @@ internal class EdgeGestureDetector(
 
     fun handle(event: MotionEvent, context: Context): Boolean {
         activeSession?.let { session ->
-            if (!session.pieMode && nowMillis() - session.startedAtMs > GESTURE_TIMEOUT_MS) reset()
+            if (!session.pieMode && !session.gesturePointerMode && nowMillis() - session.startedAtMs > GESTURE_TIMEOUT_MS) reset()
         }
 
         return when (event.actionMasked) {
@@ -101,6 +106,9 @@ internal class EdgeGestureDetector(
 
         if (previousSession?.pieMode == true) {
             callbacks.cancelPie()
+        }
+        if (previousSession?.gesturePointerMode == true) {
+            callbacks.cancelGesturePointer()
         }
 
         pendingLongPressRunnable?.let { handlerProvider().removeCallbacks(it) }
@@ -158,6 +166,11 @@ internal class EdgeGestureDetector(
             return session.handoff.consumeStream
         }
 
+        if (session.gesturePointerMode) {
+            callbacks.moveGesturePointer(event.rawX, event.rawY)
+            return session.handoff.consumeStream
+        }
+
         if (session.subGestureMode) {
             updateSubGestureAnchor(session, event.rawX, event.rawY, event.eventTime)
             return session.handoff.consumeStream
@@ -186,6 +199,12 @@ internal class EdgeGestureDetector(
                         cancelLongPressTimer()
                         session.pieMode = true
                         callbacks.showPie(context, session.downX, session.downY, session.edge.name.lowercase())
+                    }
+                    action == AppConfig.GESTURE_POINTER_ACTION -> {
+                        handoff.cancel(session.handoff, context)
+                        cancelLongPressTimer()
+                        session.gesturePointerMode = true
+                        callbacks.startGesturePointer(context, event.rawX, event.rawY)
                     }
                     hasConfiguredAction(action) -> {
                         handoff.cancel(session.handoff, context)
@@ -224,6 +243,11 @@ internal class EdgeGestureDetector(
 
         if (session.pieMode) {
             callbacks.commitPie(context)
+            return finishSession()
+        }
+
+        if (session.gesturePointerMode) {
+            callbacks.commitGesturePointer(context, event.rawX, event.rawY)
             return finishSession()
         }
 
@@ -320,6 +344,11 @@ internal class EdgeGestureDetector(
                     session.subGestureAnchorY = session.targetY
                     session.subGestureAnchorEventTime = nowMillis()
                     session.primaryGesture = "long_press"
+                }
+                action == AppConfig.GESTURE_POINTER_ACTION -> {
+                    handoff.cancel(session.handoff, context)
+                    session.gesturePointerMode = true
+                    callbacks.startGesturePointer(context, session.targetX, session.targetY)
                 }
                 hasConfiguredAction(action) -> {
                     handoff.cancel(session.handoff, context)

@@ -83,6 +83,7 @@ object AppConfig {
     val KEY_TRIGGERS = listOf("click", "double_click", "long_press")
 
     const val SUB_GESTURE_ACTION = "sub_gesture"
+    const val GESTURE_POINTER_ACTION = "gesture_pointer"
     val SUB_GESTURE_DIRECTIONS = listOf("hold", "swipe_left", "swipe_right", "swipe_up", "swipe_down")
 
     fun subGestureChildKey(parentKey: String, direction: String) = "${parentKey}_sub_${direction}"

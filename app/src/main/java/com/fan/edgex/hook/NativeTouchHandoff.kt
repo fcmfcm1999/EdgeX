@@ -49,6 +49,19 @@ internal class NativeTouchHandoff(
         }
     }
 
+    fun injectTap(context: Context, x: Float, y: Float) {
+        val downTime = SystemClock.uptimeMillis()
+        val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0)
+        val up = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, x, y, 0)
+        try {
+            injectEvent(context, down)
+            injectEvent(context, up)
+        } finally {
+            down.recycle()
+            up.recycle()
+        }
+    }
+
     fun dispose(session: Session) {
         session.savedDownEvent.recycle()
     }

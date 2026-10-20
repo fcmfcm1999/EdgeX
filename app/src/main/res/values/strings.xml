@@ -173,6 +173,7 @@
     <string name="action_app_shortcut">App Shortcut</string>
     <string name="action_shell_command">Shell Command</string>
     <string name="action_sub_gesture">Sub-gesture</string>
+    <string name="action_gesture_pointer">Gesture pointer</string>
     <string name="action_expand_notifications">Expand Notifications</string>
     <string name="action_expand_quick_settings">Quick Setting</string>
     <string name="action_clear_background">Clear Background Apps</string>

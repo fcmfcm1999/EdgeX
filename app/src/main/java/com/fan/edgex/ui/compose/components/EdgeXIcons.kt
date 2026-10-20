@@ -62,6 +62,7 @@ object EdgeXIcons {
     @DrawableRes val Terminal = R.drawable.ic_terminal
     @DrawableRes val Vibration = R.drawable.ic_vibration
     @DrawableRes val SubGesture = R.drawable.ic_sub_gesture
+    @DrawableRes val GesturePointer = R.drawable.ic_gesture_pointer
     @DrawableRes val LaunchApp = R.drawable.ic_launch_app
     @DrawableRes val AppShortcut = R.drawable.ic_app_shortcut
     @DrawableRes val Clipboard = R.drawable.ic_paste

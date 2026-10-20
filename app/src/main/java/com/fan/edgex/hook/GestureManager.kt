@@ -17,6 +17,7 @@ import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.GestureZoneGeometryCalculator
 import com.fan.edgex.config.HookConfigSnapshot
 import com.fan.edgex.config.ModuleActivationState
+import com.fan.edgex.config.ThemeColorResolver
 import com.fan.edgex.overlay.PanelOverlayManager
 import com.fan.edgex.overlay.PieManager
 import com.fan.edgex.overlay.QuickSettingsPanelManager
@@ -53,6 +54,13 @@ object GestureManager {
 
     private val nativeTouchHandoff = NativeTouchHandoff { message ->
         log(message)
+    }
+    private val gesturePointerController by lazy {
+        GesturePointerController(
+            handoff = nativeTouchHandoff,
+            log = ::log,
+            resolveThemeColor = { ThemeColorResolver.resolveThemeColor(configRepository::get) },
+        )
     }
     private val configRepository = HookConfigRepository(
         updateKeyConfig = KeyManager::updateConfig,
@@ -101,6 +109,7 @@ object GestureManager {
                     configRepository.get(AppConfig.GESTURE_EXECUTE_ON_RELEASE) == "true" &&
                         action != AppConfig.PIE_ACTION &&
                         action != AppConfig.SUB_GESTURE_ACTION &&
+                        action != AppConfig.GESTURE_POINTER_ACTION &&
                         action !in CONTINUOUS_GESTURE_ACTIONS
 
                 override fun dispatchAction(
@@ -148,6 +157,22 @@ object GestureManager {
 
                 override fun cancelPie() {
                     mainHandler().post { PieManager.dismiss() }
+                }
+
+                override fun startGesturePointer(context: Context, x: Float, y: Float) {
+                    mainHandler().post { gesturePointerController.start(context, x, y) }
+                }
+
+                override fun moveGesturePointer(x: Float, y: Float) {
+                    mainHandler().post { gesturePointerController.moveTo(x, y) }
+                }
+
+                override fun commitGesturePointer(context: Context, x: Float, y: Float) {
+                    mainHandler().post { gesturePointerController.tapAndFinish(context, x, y) }
+                }
+
+                override fun cancelGesturePointer() {
+                    mainHandler().post { gesturePointerController.finish() }
                 }
 
                 override fun onFluidEffectDown(

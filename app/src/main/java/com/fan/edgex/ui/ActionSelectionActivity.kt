@@ -36,6 +36,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == AppConfig.NATIVE_QUICK_SETTINGS_ACTION || code == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
             code.startsWith("shell:") -> R.drawable.ic_terminal
             code == "sub_gesture" -> R.drawable.ic_sub_gesture
+            code == AppConfig.GESTURE_POINTER_ACTION -> R.drawable.ic_gesture_pointer
             code == "pie" -> R.drawable.ic_pie_menu
             code.startsWith("launch_app:") -> R.drawable.ic_launch_app
             code.startsWith("app_shortcut:") -> R.drawable.ic_app_shortcut
@@ -139,6 +140,7 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "toggle_mobile_data" -> R.string.action_toggle_mobile_data
                 "game_mode" -> R.string.action_game_mode
                 "sub_gesture" -> R.string.action_sub_gesture
+                AppConfig.GESTURE_POINTER_ACTION -> R.string.action_gesture_pointer
                 "pie" -> R.string.action_pie
                 AppConfig.CUSTOM_PANEL_ACTION -> R.string.action_custom_panel
                 AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.string.action_quick_settings_panel
@@ -165,6 +167,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_expand_notifications), "expand_notifications", R.drawable.ic_notifications),
         ActionItem(getString(R.string.action_shell_command), "shell_command", R.drawable.ic_terminal),
         ActionItem(getString(R.string.action_sub_gesture), "sub_gesture", R.drawable.ic_sub_gesture),
+        ActionItem(getString(R.string.action_gesture_pointer), AppConfig.GESTURE_POINTER_ACTION, R.drawable.ic_gesture_pointer),
         ActionItem(getString(R.string.action_pie), "pie", R.drawable.ic_pie_menu),
         ActionItem(getString(R.string.action_launch_app), "launch_app", R.drawable.ic_launch_app),
         ActionItem(getString(R.string.action_app_shortcut), "app_shortcut", R.drawable.ic_app_shortcut),
