@@ -97,6 +97,12 @@ object GestureManager {
                     return configRepository.get(AppConfig.gestureAction(fallbackZone, gestureType), direct)
                 }
 
+                override fun shouldExecuteOnRelease(action: String): Boolean =
+                    configRepository.get(AppConfig.GESTURE_EXECUTE_ON_RELEASE) == "true" &&
+                        action != AppConfig.PIE_ACTION &&
+                        action != AppConfig.SUB_GESTURE_ACTION &&
+                        action !in CONTINUOUS_GESTURE_ACTIONS
+
                 override fun dispatchAction(
                     zone: String,
                     gestureType: String,
@@ -236,6 +242,13 @@ object GestureManager {
             },
         )
     }
+
+    private val CONTINUOUS_GESTURE_ACTIONS = setOf(
+        "brightness_up",
+        "brightness_down",
+        "volume_up",
+        "volume_down",
+    )
 
     private fun mainHandler(): Handler =
         mHandler ?: Handler(Looper.getMainLooper()).also { mHandler = it }

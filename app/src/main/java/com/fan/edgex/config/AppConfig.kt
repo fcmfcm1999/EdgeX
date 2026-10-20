@@ -17,6 +17,7 @@ object AppConfig {
     const val UI_DENSITY = "ui_density"
     const val HAPTIC_FEEDBACK = "haptic_feedback_enabled"
     const val HAPTIC_FEEDBACK_TYPE = "haptic_feedback_type"
+    const val GESTURE_EXECUTE_ON_RELEASE = "gesture_execute_on_release"
     const val EDGE_LIGHTING_ENABLED = "edge_lighting_enabled"
     const val EDGE_LIGHTING_AUTO_COLOR = "edge_lighting_auto_color"
     const val EDGE_LIGHTING_COLOR = "edge_lighting_color"

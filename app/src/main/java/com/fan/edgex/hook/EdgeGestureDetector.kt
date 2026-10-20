@@ -17,6 +17,7 @@ internal class EdgeGestureDetector(
     interface Callbacks {
         fun isZoneEnabled(zone: String): Boolean
         fun resolveAction(zone: String, gestureType: String): String
+        fun shouldExecuteOnRelease(action: String): Boolean
         fun dispatchAction(zone: String, gestureType: String, context: Context, touchX: Float, touchY: Float)
         fun performContinuousAdjustment(action: String, context: Context, levelDelta: Float)
         fun isGlobalCopyModeActive(): Boolean
@@ -61,6 +62,7 @@ internal class EdgeGestureDetector(
         var subGestureAnchorEventTime: Long = 0L,
         var subGestureAnchorLocked: Boolean = false,
         var primaryGesture: String = "",
+        var pendingReleaseGesture: String? = null,
         // Pie mode: finger holds to select, release to execute
         var pieMode: Boolean = false,
     )
@@ -193,6 +195,8 @@ internal class EdgeGestureDetector(
                             session.adjustmentAxis = resolveAdjustmentAxis(gestureType)
                             session.lastAdjustCoord =
                                 resolveAdjustCoord(session.adjustmentAxis ?: AdjustmentAxis.VERTICAL, event.rawX, event.rawY)
+                        } else if (callbacks.shouldExecuteOnRelease(action)) {
+                            session.pendingReleaseGesture = gestureType
                         } else {
                             callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
                         }
@@ -244,22 +248,37 @@ internal class EdgeGestureDetector(
             return finishSession()
         }
 
+        if (session.pendingReleaseGesture == "long_press") {
+            if (!hasReleaseExecutionTimedOut(session)) {
+                callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
+            }
+            return finishSession()
+        }
+
         if (session.isSwiping) {
+            session.pendingReleaseGesture?.let { gestureType ->
+                if (!hasReleaseExecutionTimedOut(session)) {
+                    callbacks.dispatchAction(session.zone, gestureType, context, session.targetX, session.targetY)
+                }
+            }
             handoff.forwardToNative(session.handoff, context, event)
             return finishSession()
         }
 
         val clickAction = callbacks.resolveAction(session.zone, "click")
         val hasClickAction = hasConfiguredAction(clickAction)
-        val hasDoubleClickAction = hasConfiguredAction(callbacks.resolveAction(session.zone, "double_click"))
+        val doubleClickAction = callbacks.resolveAction(session.zone, "double_click")
+        val hasDoubleClickAction = hasConfiguredAction(doubleClickAction)
+        val shouldCancelTimedOutTap =
+            callbacks.shouldExecuteOnRelease(clickAction) || callbacks.shouldExecuteOnRelease(doubleClickAction)
 
         if (hasClickAction || hasDoubleClickAction) {
             handoff.cancel(session.handoff, context)
             cancelLongPressTimer()
 
-            if (!hasDoubleClickAction) {
+            if (!hasDoubleClickAction && (!shouldCancelTimedOutTap || !hasReleaseExecutionTimedOut(session))) {
                 callbacks.dispatchAction(session.zone, "click", context, session.targetX, session.targetY)
-            } else {
+            } else if (!shouldCancelTimedOutTap || !hasReleaseExecutionTimedOut(session)) {
                 resolveTapAction(session, context, event.eventTime)
             }
         } else {
@@ -304,7 +323,11 @@ internal class EdgeGestureDetector(
                 }
                 hasConfiguredAction(action) -> {
                     handoff.cancel(session.handoff, context)
-                    callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
+                    if (callbacks.shouldExecuteOnRelease(action)) {
+                        session.pendingReleaseGesture = "long_press"
+                    } else {
+                        callbacks.dispatchAction(session.zone, "long_press", context, session.targetX, session.targetY)
+                    }
                 }
                 else -> {
                     handoff.dispatchSavedDownIfNeeded(session.handoff, context)
@@ -558,6 +581,9 @@ internal class EdgeGestureDetector(
     private fun hasConfiguredAction(action: String): Boolean =
         action.isNotEmpty() && action != "none"
 
+    private fun hasReleaseExecutionTimedOut(session: GestureSession): Boolean =
+        nowMillis() - session.startedAtMs > RELEASE_EXECUTION_TIMEOUT_MS
+
     private fun isContinuousAdjustmentAction(action: String): Boolean =
         action == "brightness_up" || action == "brightness_down" ||
                 action == "volume_up" || action == "volume_down"
@@ -601,6 +627,7 @@ internal class EdgeGestureDetector(
         const val CONTINUOUS_FULL_SCALE_PX = 320f
         const val CONTINUOUS_STEP_PX = 30
         const val GESTURE_TIMEOUT_MS = 5000L
+        const val RELEASE_EXECUTION_TIMEOUT_MS = 3000L
         const val DOUBLE_TAP_TIMEOUT_MS = 300L
         const val LONG_PRESS_TIMEOUT_MS = 500L
         const val EDGE_THRESHOLD_DP = 8f

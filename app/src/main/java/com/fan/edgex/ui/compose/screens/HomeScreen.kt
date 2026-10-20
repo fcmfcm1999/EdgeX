@@ -69,6 +69,7 @@ data class HomeCallbacks(
     val setDebug: (Boolean) -> Unit,
     val setHaptic: (Boolean) -> Unit,
     val setHapticType: (String) -> Unit,
+    val setGestureExecuteOnRelease: (Boolean) -> Unit,
     val setArcDrawer: (Boolean) -> Unit,
 )
 
@@ -394,6 +395,14 @@ private fun AdvancedSettings(state: HomeUiState, callbacks: HomeCallbacks) {
                 },
             )
         }
+        EdgeXDivider()
+        EdgeXSwitchRow(
+            title = stringResource(R.string.menu_gesture_execute_on_release),
+            subtitle = stringResource(R.string.menu_gesture_execute_on_release_desc),
+            checked = state.gestureExecuteOnRelease,
+            onCheckedChange = callbacks.setGestureExecuteOnRelease,
+            icon = EdgeXIcons.Gesture,
+        )
         EdgeXDivider()
         EdgeXSwitchRow(
             title = stringResource(R.string.menu_arc_drawer),
