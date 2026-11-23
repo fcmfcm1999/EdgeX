@@ -328,6 +328,9 @@ internal class GestureActionDispatcher(
             action == "toggle_mobile_data" -> {
                 toggleMobileData(context)
             }
+            action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> {
+                toggleImmersiveMode(context)
+            }
             action == "game_mode" -> {
                 GameModeManager.enable(context, handlerProvider())
             }
@@ -514,6 +517,7 @@ internal class GestureActionDispatcher(
         action == "toggle_flashlight"            -> R.drawable.ic_flashlight
         action == "toggle_wifi"                  -> R.drawable.ic_wifi
         action == "toggle_mobile_data"           -> R.drawable.ic_mobile_data
+        action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> R.drawable.ic_immersive_mode
         action == "game_mode"                    -> R.drawable.ic_game_mode
         else                                 -> 0
     }
@@ -557,8 +561,19 @@ internal class GestureActionDispatcher(
         action == "toggle_flashlight" -> "Flashlight"
         action == "toggle_wifi"       -> "Wi-Fi"
         action == "toggle_mobile_data" -> "Data"
+        action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> "Immersive"
         action == "game_mode"         -> "GameMode"
         else                          -> action.take(8)
+    }
+
+    private fun toggleImmersiveMode(context: Context) {
+        val enabled = SystemBarController.toggleImmersiveMode()
+        val messageRes = when (enabled) {
+            true -> R.string.immersive_mode_toast_on
+            false -> R.string.immersive_mode_toast_off
+            null -> R.string.toast_immersive_mode_toggle_failed
+        }
+        showToast(context, ModuleRes.getString(messageRes))
     }
 
     @Suppress("DEPRECATION")

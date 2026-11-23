@@ -335,6 +335,7 @@ class PanelConfigActivity : AppCompatActivity() {
         action == AppConfig.SIDE_BAR_RIGHT_ACTION -> R.drawable.ic_side_bar_right
         action == "toggle_wifi" -> R.drawable.ic_wifi
         action == "toggle_mobile_data" -> R.drawable.ic_mobile_data
+        action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> R.drawable.ic_immersive_mode
         else -> R.drawable.ic_action_dot
     }
 

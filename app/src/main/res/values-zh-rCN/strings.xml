@@ -235,6 +235,10 @@
     <string name="action_right_side_bar">右侧边栏</string>
     <string name="action_toggle_wifi">开关 Wi-Fi</string>
     <string name="action_toggle_mobile_data">开关移动数据</string>
+    <string name="action_toggle_immersive_mode">沉浸式模式</string>
+    <string name="immersive_mode_toast_on">沉浸式模式已开启</string>
+    <string name="immersive_mode_toast_off">沉浸式模式已关闭</string>
+    <string name="toast_immersive_mode_toggle_failed">切换沉浸式模式失败</string>
     <string name="wifi_toast_on">Wi-Fi 已开启</string>
     <string name="wifi_toast_off">Wi-Fi 已关闭</string>
     <string name="mobile_data_toast_on">移动数据已开启</string>
