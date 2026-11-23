@@ -69,6 +69,7 @@ val allActionSelectionItems = listOf(
     ActionSelectionItem("toggle_flashlight", R.string.action_toggle_flashlight, EdgeXIcons.Flashlight),
     ActionSelectionItem("toggle_wifi", R.string.action_toggle_wifi, EdgeXIcons.Wifi),
     ActionSelectionItem("toggle_mobile_data", R.string.action_toggle_mobile_data, EdgeXIcons.MobileData),
+    ActionSelectionItem(AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION, R.string.action_toggle_immersive_mode, EdgeXIcons.ImmersiveMode),
     ActionSelectionItem("game_mode", R.string.action_game_mode, EdgeXIcons.GameMode),
 )
 

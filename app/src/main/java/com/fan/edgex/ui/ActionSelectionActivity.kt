@@ -70,6 +70,7 @@ class ActionSelectionActivity : AppCompatActivity() {
             code == "toggle_flashlight" -> R.drawable.ic_flashlight
             code == "toggle_wifi" -> R.drawable.ic_wifi
             code == "toggle_mobile_data" -> R.drawable.ic_mobile_data
+            code == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> R.drawable.ic_immersive_mode
             code == "game_mode" -> R.drawable.ic_game_mode
             else -> R.drawable.ic_action_dot
         }
@@ -138,6 +139,7 @@ class ActionSelectionActivity : AppCompatActivity() {
                 "toggle_flashlight" -> R.string.action_toggle_flashlight
                 "toggle_wifi" -> R.string.action_toggle_wifi
                 "toggle_mobile_data" -> R.string.action_toggle_mobile_data
+                AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> R.string.action_toggle_immersive_mode
                 "game_mode" -> R.string.action_game_mode
                 "sub_gesture" -> R.string.action_sub_gesture
                 AppConfig.GESTURE_POINTER_ACTION -> R.string.action_gesture_pointer
@@ -196,6 +198,7 @@ class ActionSelectionActivity : AppCompatActivity() {
         ActionItem(getString(R.string.action_toggle_flashlight), "toggle_flashlight", R.drawable.ic_flashlight),
         ActionItem(getString(R.string.action_toggle_wifi), "toggle_wifi", R.drawable.ic_wifi),
         ActionItem(getString(R.string.action_toggle_mobile_data), "toggle_mobile_data", R.drawable.ic_mobile_data),
+        ActionItem(getString(R.string.action_toggle_immersive_mode), AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION, R.drawable.ic_immersive_mode),
         ActionItem(getString(R.string.action_game_mode), "game_mode", R.drawable.ic_game_mode),
     ).filter { it.code !in excludedCodes }
 

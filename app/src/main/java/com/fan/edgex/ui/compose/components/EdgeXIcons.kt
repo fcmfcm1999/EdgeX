@@ -73,6 +73,7 @@ object EdgeXIcons {
     @DrawableRes val If = R.drawable.ic_if
     @DrawableRes val Wifi = R.drawable.ic_wifi
     @DrawableRes val MobileData = R.drawable.ic_mobile_data
+    @DrawableRes val ImmersiveMode = R.drawable.ic_immersive_mode
     @DrawableRes val GooglePlay = R.drawable.ic_google_play
     @DrawableRes val GameMode = R.drawable.ic_game_mode
     @DrawableRes val Refreeze = R.drawable.ic_refreeze

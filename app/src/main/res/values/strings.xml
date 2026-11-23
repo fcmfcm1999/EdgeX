@@ -239,6 +239,10 @@
     <string name="action_toggle_flashlight">Flashlight</string>
     <string name="action_toggle_wifi">Toggle Wi-Fi</string>
     <string name="action_toggle_mobile_data">Toggle Mobile Data</string>
+    <string name="action_toggle_immersive_mode">Immersive Mode</string>
+    <string name="immersive_mode_toast_on">Immersive mode on</string>
+    <string name="immersive_mode_toast_off">Immersive mode off</string>
+    <string name="toast_immersive_mode_toggle_failed">Failed to toggle immersive mode</string>
     <string name="flashlight_toast_on">Flashlight turned on</string>
     <string name="flashlight_toast_off">Flashlight turned off</string>
     <string name="wifi_toast_on">Wi-Fi on</string>

@@ -387,6 +387,7 @@ private class PanelOverlayWindow(
         action == "condition" -> "Condition"
         action == "toggle_wifi" -> "Wi-Fi"
         action == "toggle_mobile_data" -> "Data"
+        action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> "Immersive"
         action.startsWith("launch_app:") -> "App"
         action.startsWith("app_shortcut:") -> "Shortcut"
         action.startsWith("shell:") -> "Shell"
@@ -504,6 +505,7 @@ private class PanelOverlayWindow(
         action == "toggle_flashlight" -> R.drawable.ic_flashlight
         action == "toggle_wifi" -> R.drawable.ic_wifi
         action == "toggle_mobile_data" -> R.drawable.ic_mobile_data
+        action == AppConfig.TOGGLE_IMMERSIVE_MODE_ACTION -> R.drawable.ic_immersive_mode
         action == "game_mode" -> R.drawable.ic_game_mode
         action == AppConfig.PARTIAL_SCREENSHOT_ACTION -> R.drawable.ic_partial_screenshot
         action == "sub_gesture" -> R.drawable.ic_sub_gesture

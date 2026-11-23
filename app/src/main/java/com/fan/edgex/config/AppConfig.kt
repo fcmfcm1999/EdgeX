@@ -90,6 +90,7 @@ object AppConfig {
 
     const val PIE_ACTION = "pie"
     const val PARTIAL_SCREENSHOT_ACTION = "partial_screenshot"
+    const val TOGGLE_IMMERSIVE_MODE_ACTION = "toggle_immersive_mode"
     const val PIE_RINGS = 2
     const val PIE_SLOTS_PER_RING = 6
     const val PIE_SIZE_SCALE = "pie_size_scale"
