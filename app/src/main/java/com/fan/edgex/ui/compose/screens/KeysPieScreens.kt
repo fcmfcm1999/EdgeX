@@ -126,6 +126,12 @@ fun KeysScreen(
     val keysEnabledToast = stringResource(R.string.compose_keys_enabled_toast)
     val keysDisabledToast = stringResource(R.string.compose_keys_disabled_toast)
     var masterEnabled by remember { mutableStateOf(context.getConfigBool(AppConfig.KEYS_ENABLED)) }
+    var triggerScreenOff by remember { mutableStateOf(context.getConfigBool(AppConfig.KEYS_TRIGGER_SCREEN_OFF, default = true)) }
+    var triggerLocked by remember {
+        mutableStateOf(
+            triggerScreenOff || context.getConfigBool(AppConfig.KEYS_TRIGGER_LOCKED, default = true),
+        )
+    }
     var selectedKey by remember { mutableStateOf<KeyUiItem?>(null) }
     var refreshTick by remember { mutableStateOf(0) }
     var pickingTrigger by remember { mutableStateOf<Pair<KeyUiItem, KeyTrigger>?>(null) }
@@ -151,7 +157,7 @@ fun KeysScreen(
                 lineHeight = 32.sp,
             )
         }
-        EdgeXListGroup(modifier = Modifier.padding(16.dp)) {
+        EdgeXListGroup(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
             EdgeXSwitchRow(
                 title = stringResource(R.string.keys_global_switch),
                 subtitle = stringResource(R.string.keys_global_switch_desc),
@@ -160,6 +166,44 @@ fun KeysScreen(
                     masterEnabled = it
                     context.putConfig(AppConfig.KEYS_ENABLED, it)
                     showToast(if (it) keysEnabledToast else keysDisabledToast)
+                },
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        EdgeXListGroup(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+            EdgeXSwitchRow(
+                title = stringResource(R.string.trigger_allow_screen_off),
+                subtitle = stringResource(R.string.trigger_keys_allow_screen_off_desc),
+                checked = triggerScreenOff,
+                onCheckedChange = { enabled ->
+                    triggerScreenOff = enabled
+                    if (enabled) {
+                        triggerLocked = true
+                        context.putConfigsSync(
+                            AppConfig.KEYS_TRIGGER_SCREEN_OFF to "true",
+                            AppConfig.KEYS_TRIGGER_LOCKED to "true",
+                        )
+                    } else {
+                        context.putConfig(AppConfig.KEYS_TRIGGER_SCREEN_OFF, false)
+                    }
+                },
+            )
+            EdgeXDivider()
+            EdgeXSwitchRow(
+                title = stringResource(R.string.trigger_allow_lockscreen),
+                subtitle = stringResource(R.string.trigger_keys_allow_lockscreen_desc),
+                checked = triggerLocked,
+                onCheckedChange = { enabled ->
+                    triggerLocked = enabled
+                    if (!enabled && triggerScreenOff) {
+                        triggerScreenOff = false
+                        context.putConfigsSync(
+                            AppConfig.KEYS_TRIGGER_LOCKED to "false",
+                            AppConfig.KEYS_TRIGGER_SCREEN_OFF to "false",
+                        )
+                    } else {
+                        context.putConfig(AppConfig.KEYS_TRIGGER_LOCKED, enabled)
+                    }
                 },
             )
         }
@@ -182,6 +226,7 @@ fun KeysScreen(
                 if (index != keyItems.lastIndex) EdgeXDivider()
             }
         }
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     KeyDetailSheet(

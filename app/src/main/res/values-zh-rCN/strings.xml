@@ -644,4 +644,11 @@
     <string name="action_cat_advanced">高级面板</string>
     <string name="action_cat_apps">应用与工具</string>
     <string name="compose_action_needs_config">配置</string>
+
+    <!-- Trigger Conditions -->
+    <string name="trigger_allow_lockscreen">允许在锁屏状态下触发</string>
+    <string name="trigger_allow_screen_off">允许在息屏状态下触发</string>
+    <string name="trigger_gestures_allow_lockscreen_desc">在锁屏界面上也可以触发边缘手势</string>
+    <string name="trigger_keys_allow_screen_off_desc">在息屏状态下触发实体按键动作</string>
+    <string name="trigger_keys_allow_lockscreen_desc">在锁屏界面上触发实体按键动作</string>
 </resources>
