@@ -31,4 +31,16 @@ class AppConfigContractTest {
         assertEquals(null, AppConfig.gestureActionParts("right_mid_swipe_left_label"))
         assertEquals(null, AppConfig.keyActionParts("key_24_double_click_label"))
     }
+
+    @Test
+    fun triggerConditionKeysAreRuntimeHookKeys() {
+        val keys = listOf(
+            AppConfig.GESTURES_TRIGGER_LOCKED,
+            AppConfig.KEYS_TRIGGER_SCREEN_OFF,
+            AppConfig.KEYS_TRIGGER_LOCKED,
+        )
+        keys.forEach { key ->
+            assertTrue("Expected $key to be exported to hook snapshot", HookConfigSnapshot.isHookRuntimeKey(key))
+        }
+    }
 }
