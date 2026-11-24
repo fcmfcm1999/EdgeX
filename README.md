@@ -13,6 +13,8 @@
 </p>
 
 <p align="center">
+  <strong><a href="https://edgexy.app/">Website</a></strong>
+  &nbsp;·&nbsp;
   <strong><a href="README_CN.md">中文</a></strong>
 </p>
 

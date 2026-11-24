@@ -13,6 +13,8 @@
 </p>
 
 <p align="center">
+  <strong><a href="https://edgexy.app/">官网</a></strong>
+  &nbsp;·&nbsp;
   <strong><a href="README.md">English</a></strong>
 </p>
 
