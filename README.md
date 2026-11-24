@@ -93,6 +93,7 @@ If you want edge gestures without root or LSPosed, try EdgeY, the non-root versi
 |------------------------|---------|----------------------------------------------------------------|-----------------------------------------------|
 | Pixel 9                | 16      | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
 | Android Virtual Device | 16      | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
+| Android Virtual Device | 17      | [`Vector 2.2(3080)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
 
 These are the setups tested during development. Other devices and ROMs are not excluded, though some may need extra adaptation.
 

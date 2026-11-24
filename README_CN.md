@@ -93,6 +93,7 @@ EdgeX 不是普通的悬浮窗工具，而是运行在 LSPosed/Xposed 中的系�
 |------------------------|---------|----------------------------------------------------------------|-----------------------------------------------|
 | Pixel 9                | 16      | [`LSPosed 1.9.2-it(7455)`](https://github.com/LSPosed/Lsposed) | [KernelSU](https://github.com/tiann/KernelSU) |
 | Android Virtual Device | 16      | [`Vector 2.0(3021)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
+| Android Virtual Device | 17      | [`Vector 2.2(3080)`](https://github.com/JingMatrix/Vector)     | [Magisk](https://github.com/topjohnwu/Magisk) |
 
 以上只是当前开发验证环境，不代表唯一支持组合。其他设备和 ROM 可能需要额外适配。
 
