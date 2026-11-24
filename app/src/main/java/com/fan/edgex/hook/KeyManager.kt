@@ -8,534 +8,642 @@ import android.view.ViewConfiguration
 import com.fan.edgex.config.AppConfig
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import java.lang.reflect.Method
 
 /**
- * KeyManager handles hardware key interception and action triggering.
+ * Pure key interception state machine for hardware keys (Volume Up/Down, Power).
+ * Extracted from [KeyManager] so all state transitions, timeouts, passthrough, and
+ * loop-prevention logic can be unit-tested on the JVM without Android framework hooks.
+ */
+internal class KeyInterceptStateMachine<E>(
+    private val scheduleDelay: (delayMs: Long, runnable: Runnable) -> Unit,
+    private val cancelDelay: (runnable: Runnable) -> Unit,
+    private val onExecuteAction: (action: String, keyCode: Int) -> Unit,
+    private val onForwardEvents: (events: List<E>) -> Unit,
+    private val rebaseEvent: (event: E, downTime: Long, eventTime: Long) -> E = { event, _, _ -> event },
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
+    private val uptimeMs: () -> Long = nowMs,
+    private val log: (String) -> Unit = {},
+) {
+    data class EventInfo(
+        val keyCode: Int,
+        val action: Int,
+        val repeatCount: Int,
+        val downTime: Long,
+        val eventTime: Long,
+        val policyFlags: Int,
+    )
+
+    private data class InjectedEventKey(
+        val keyCode: Int,
+        val action: Int,
+        val eventTime: Long,
+    )
+
+    companion object {
+        const val MODE_CLICK = 0
+        const val MODE_DOUBLE_CLICK = 1
+        const val MODE_LONG_PRESS = 2
+
+        const val KEYCODE_VOLUME_UP = KeyEvent.KEYCODE_VOLUME_UP
+        const val KEYCODE_VOLUME_DOWN = KeyEvent.KEYCODE_VOLUME_DOWN
+        const val KEYCODE_POWER = KeyEvent.KEYCODE_POWER
+
+        // WindowManagerPolicy.FLAG_FILTERED (0x04000000) — marks events re-injected by InputFilter
+        const val POLICY_FLAG_FILTERED = 0x04000000
+
+        // WindowManagerPolicy.FLAG_INTERACTIVE (0x20000000) — set when screen is awake/interactive
+        const val POLICY_FLAG_INTERACTIVE = 0x20000000
+
+        private const val STATE_IDLE = 0
+        private const val STATE_PRESSED = 1
+        private const val STATE_WAITING_DOUBLE = 2
+        private const val STATE_PASSTHROUGH = 3
+
+        private const val VOLUME_PASSTHROUGH_DURATION = 3000L
+        private const val MAX_INJECTED_ENTRIES = 32
+
+        val SUPPORTED_KEYS = mapOf(
+            KEYCODE_VOLUME_UP to 0,
+            KEYCODE_VOLUME_DOWN to 1,
+            KEYCODE_POWER to 2,
+        )
+    }
+
+    private val lock = Any()
+
+    private val keyStates = mutableMapOf<Int, Int>()
+    private val keyDownTimes = mutableMapOf<Int, Long>()
+    private val passthroughDownTimes = mutableMapOf<Int, Long>()
+    private val pendingDownEvents = mutableMapOf<Int, E>()
+    private val pendingUpEvents = mutableMapOf<Int, E>()
+    private val pendingUpEventTimes = mutableMapOf<Int, Long>()
+    private val keyConsumed = mutableMapOf<Int, Boolean>()
+    private val injectedEvents = ArrayDeque<InjectedEventKey>()
+
+    private var volumePassthroughUntil = 0L
+
+    @Volatile
+    var longPressTimeout: Long = 500L
+
+    @Volatile
+    var doubleTapTimeout: Long = 300L
+
+    private val longPressRunnables = mutableMapOf<Int, Runnable>()
+    private val doubleTapRunnables = mutableMapOf<Int, Runnable>()
+
+    private var keysEnabled = false
+    private val keyEnabled = mutableMapOf<Int, Boolean>()
+    private val keyActions = mutableMapOf<String, String>()
+
+    private fun isVolumeKey(keyCode: Int): Boolean =
+        keyCode == KEYCODE_VOLUME_UP || keyCode == KEYCODE_VOLUME_DOWN
+
+    fun updateConfig(configCache: Map<String, String>) {
+        synchronized(lock) {
+            keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+
+            for (keyCode in SUPPORTED_KEYS.keys) {
+                keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
+                keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "double_click")] ?: ""
+                keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
+                val enabledValue = configCache[AppConfig.keyEnabled(keyCode)]
+                keyEnabled[keyCode] = if (enabledValue != null) {
+                    enabledValue == "true"
+                } else {
+                    hasAnyActionLocked(keyCode)
+                }
+            }
+        }
+    }
+
+    fun markInjectedEvent(keyCode: Int, action: Int, eventTime: Long) {
+        synchronized(lock) {
+            if (injectedEvents.size >= MAX_INJECTED_ENTRIES) {
+                injectedEvents.removeFirst()
+            }
+            injectedEvents.addLast(InjectedEventKey(keyCode, action, eventTime))
+        }
+    }
+
+    fun handleKeyEvent(
+        info: EventInfo,
+        copyEvent: () -> E,
+        fromBeforeQueueing: Boolean = false,
+    ): Boolean {
+        var actionToExecute: Pair<String, Int>? = null
+        var eventsToForward: List<E>? = null
+        val consumed: Boolean
+
+        synchronized(lock) {
+            val keyCode = info.keyCode
+
+            if (info.policyFlags and POLICY_FLAG_FILTERED != 0) return false
+
+            val injectedKey = InjectedEventKey(keyCode, info.action, info.eventTime)
+            if (injectedEvents.remove(injectedKey)) {
+                return false
+            }
+
+            if (!keysEnabled) return false
+            if (!SUPPORTED_KEYS.containsKey(keyCode)) return false
+            if (keyEnabled[keyCode] != true) return false
+            if (!hasAnyActionLocked(keyCode)) return false
+
+            // Never intercept KEYCODE_POWER while the screen is off (non-interactive)
+            // when idle so the power button always wakes the device.
+            if (fromBeforeQueueing &&
+                keyCode == KEYCODE_POWER &&
+                (info.policyFlags and POLICY_FLAG_INTERACTIVE) == 0 &&
+                (keyStates[keyCode] ?: STATE_IDLE) == STATE_IDLE
+            ) {
+                return false
+            }
+
+            if (isVolumeKey(keyCode) &&
+                (keyStates[keyCode] ?: STATE_IDLE) == STATE_IDLE &&
+                nowMs() < volumePassthroughUntil
+            ) {
+                volumePassthroughUntil = nowMs() + VOLUME_PASSTHROUGH_DURATION
+                return false
+            }
+
+            consumed = when (info.action) {
+                KeyEvent.ACTION_DOWN -> handleKeyDownLocked(
+                    info = info,
+                    copyEvent = copyEvent,
+                    setAction = { actionToExecute = it },
+                    setForward = { eventsToForward = it },
+                )
+                KeyEvent.ACTION_UP -> handleKeyUpLocked(
+                    info = info,
+                    copyEvent = copyEvent,
+                    setAction = { actionToExecute = it },
+                    setForward = { eventsToForward = it },
+                )
+                else -> false
+            }
+        }
+
+        eventsToForward?.let { forwardList ->
+            if (forwardList.isNotEmpty()) {
+                onForwardEvents(forwardList)
+            }
+        }
+        actionToExecute?.let { (action, keyCode) ->
+            dispatchAction(action, keyCode)
+        }
+        return consumed
+    }
+
+    fun reset() {
+        val runnablesToCancel: List<Runnable>
+        synchronized(lock) {
+            runnablesToCancel = buildList {
+                addAll(longPressRunnables.values)
+                addAll(doubleTapRunnables.values)
+            }
+            longPressRunnables.clear()
+            doubleTapRunnables.clear()
+            keyStates.clear()
+            keyDownTimes.clear()
+            passthroughDownTimes.clear()
+            pendingDownEvents.clear()
+            pendingUpEvents.clear()
+            pendingUpEventTimes.clear()
+            keyConsumed.clear()
+            injectedEvents.clear()
+            volumePassthroughUntil = 0L
+        }
+        runnablesToCancel.forEach(cancelDelay)
+    }
+
+    private fun hasAnyActionLocked(keyCode: Int): Boolean =
+        hasActionLocked(keyCode, MODE_CLICK) ||
+            hasActionLocked(keyCode, MODE_DOUBLE_CLICK) ||
+            hasActionLocked(keyCode, MODE_LONG_PRESS)
+
+    private fun getActionLocked(keyCode: Int, mode: Int): String =
+        keyActions["${keyCode}_$mode"] ?: ""
+
+    private fun hasActionLocked(keyCode: Int, mode: Int): Boolean {
+        val action = getActionLocked(keyCode, mode)
+        return action.isNotEmpty() && action != "none"
+    }
+
+    private fun handleKeyDownLocked(
+        info: EventInfo,
+        copyEvent: () -> E,
+        setAction: (Pair<String, Int>) -> Unit,
+        setForward: (List<E>) -> Unit,
+    ): Boolean {
+        val keyCode = info.keyCode
+        val currentState = keyStates[keyCode] ?: STATE_IDLE
+
+        if (currentState == STATE_PASSTHROUGH) {
+            // Keep consuming repeats so they don't race ahead of the replayed DOWN;
+            // matching UP will be serialized through onForwardEvents.
+            return true
+        }
+
+        if (info.repeatCount > 0) {
+            if (currentState == STATE_PRESSED) {
+                return true
+            }
+            if (currentState == STATE_IDLE) {
+                return startNewPressLocked(info, copyEvent)
+            }
+            return false
+        }
+
+        return when (currentState) {
+            STATE_IDLE -> startNewPressLocked(info, copyEvent)
+            STATE_WAITING_DOUBLE -> {
+                cancelDoubleTapTimeoutLocked(keyCode)
+
+                val firstUpTime = pendingUpEventTimes[keyCode]
+                val timeDiff = if (firstUpTime != null) info.eventTime - firstUpTime else Long.MAX_VALUE
+
+                if (timeDiff < doubleTapTimeout && hasActionLocked(keyCode, MODE_DOUBLE_CLICK)) {
+                    keyStates[keyCode] = STATE_PRESSED
+                    keyConsumed[keyCode] = true
+                    clearPendingLocked(keyCode)
+
+                    val action = getActionLocked(keyCode, MODE_DOUBLE_CLICK)
+                    log("Key $keyCode double-click -> $action")
+                    setAction(action to keyCode)
+                    true
+                } else {
+                    setForward(drainPendingForForwardLocked(keyCode))
+                    startNewPressLocked(info, copyEvent)
+                }
+            }
+            STATE_PRESSED -> true
+            else -> keyConsumed[keyCode] == true
+        }
+    }
+
+    private fun startNewPressLocked(info: EventInfo, copyEvent: () -> E): Boolean {
+        val keyCode = info.keyCode
+        keyStates[keyCode] = STATE_PRESSED
+        keyDownTimes[keyCode] = info.downTime
+        pendingDownEvents[keyCode] = copyEvent()
+        pendingUpEvents.remove(keyCode)
+        pendingUpEventTimes.remove(keyCode)
+        keyConsumed[keyCode] = false
+
+        // Always start the long-press timer: if MODE_LONG_PRESS is configured it fires
+        // the configured action; otherwise it hands the held key back to the system
+        // (e.g., native power menu / assistant or continuous volume adjustment).
+        startLongPressTimeoutLocked(keyCode)
+        return true
+    }
+
+    private fun handleKeyUpLocked(
+        info: EventInfo,
+        copyEvent: () -> E,
+        setAction: (Pair<String, Int>) -> Unit,
+        setForward: (List<E>) -> Unit,
+    ): Boolean {
+        val keyCode = info.keyCode
+        val currentState = keyStates[keyCode] ?: STATE_IDLE
+
+        if (currentState == STATE_PASSTHROUGH) {
+            keyStates[keyCode] = STATE_IDLE
+            keyConsumed[keyCode] = false
+            clearPendingLocked(keyCode)
+            val rebasedDownTime = passthroughDownTimes.remove(keyCode)
+            val upEvent = if (rebasedDownTime != null) {
+                val nowUptime = maxOf(uptimeMs(), rebasedDownTime)
+                rebaseEvent(copyEvent(), rebasedDownTime, nowUptime)
+            } else {
+                copyEvent()
+            }
+            // Serialize the release through the same FIFO forward path as the replayed DOWN
+            // so the physical UP can never overtake the injected DOWN in PhoneWindowManager.
+            setForward(listOf(upEvent))
+            return true
+        }
+
+        if (currentState != STATE_PRESSED) {
+            return keyConsumed[keyCode] == true
+        }
+
+        cancelLongPressTimeoutLocked(keyCode)
+
+        val downTime = keyDownTimes[keyCode] ?: info.eventTime
+        val pressDuration = info.eventTime - downTime
+
+        if (keyConsumed[keyCode] == true) {
+            keyStates[keyCode] = STATE_IDLE
+            keyConsumed[keyCode] = false
+            clearPendingLocked(keyCode)
+            return true
+        }
+
+        if (pressDuration < longPressTimeout) {
+            if (hasActionLocked(keyCode, MODE_DOUBLE_CLICK)) {
+                keyStates[keyCode] = STATE_WAITING_DOUBLE
+                pendingUpEvents[keyCode] = copyEvent()
+                pendingUpEventTimes[keyCode] = info.eventTime
+                startDoubleTapTimeoutLocked(keyCode)
+                return true
+            }
+
+            if (hasActionLocked(keyCode, MODE_CLICK)) {
+                keyStates[keyCode] = STATE_IDLE
+                keyConsumed[keyCode] = false
+                clearPendingLocked(keyCode)
+
+                val action = getActionLocked(keyCode, MODE_CLICK)
+                log("Key $keyCode click -> $action")
+                setAction(action to keyCode)
+                return true
+            }
+
+            pendingUpEvents[keyCode] = copyEvent()
+            pendingUpEventTimes[keyCode] = info.eventTime
+            setForward(drainPendingForForwardLocked(keyCode))
+            keyStates[keyCode] = STATE_IDLE
+            keyConsumed[keyCode] = false
+            return true
+        } else {
+            // Held past long-press threshold without timeout consuming it
+            if (hasActionLocked(keyCode, MODE_LONG_PRESS)) {
+                keyStates[keyCode] = STATE_IDLE
+                keyConsumed[keyCode] = false
+                clearPendingLocked(keyCode)
+
+                val action = getActionLocked(keyCode, MODE_LONG_PRESS)
+                log("Key $keyCode long-press (on release) -> $action")
+                setAction(action to keyCode)
+                return true
+            }
+
+            pendingUpEvents[keyCode] = copyEvent()
+            pendingUpEventTimes[keyCode] = info.eventTime
+            setForward(drainPendingForForwardLocked(keyCode))
+            keyStates[keyCode] = STATE_IDLE
+            keyConsumed[keyCode] = false
+            return true
+        }
+    }
+
+    private fun startLongPressTimeoutLocked(keyCode: Int) {
+        cancelLongPressTimeoutLocked(keyCode)
+
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            var actionToExecute: Pair<String, Int>? = null
+            var eventToForward: List<E>? = null
+
+            synchronized(lock) {
+                if (longPressRunnables[keyCode] !== runnable) return@Runnable
+                longPressRunnables.remove(keyCode)
+
+                if (keyStates[keyCode] == STATE_PRESSED && keyConsumed[keyCode] != true) {
+                    if (hasActionLocked(keyCode, MODE_LONG_PRESS)) {
+                        keyConsumed[keyCode] = true
+                        clearPendingLocked(keyCode)
+
+                        val action = getActionLocked(keyCode, MODE_LONG_PRESS)
+                        log("Key $keyCode long-press -> $action")
+                        actionToExecute = action to keyCode
+                    } else {
+                        val downEvent = pendingDownEvents.remove(keyCode)
+                        pendingUpEvents.remove(keyCode)
+                        pendingUpEventTimes.remove(keyCode)
+                        keyStates[keyCode] = STATE_PASSTHROUGH
+                        if (downEvent != null) {
+                            if (isVolumeKey(keyCode)) {
+                                volumePassthroughUntil = nowMs() + VOLUME_PASSTHROUGH_DURATION
+                            }
+                            val handoffTime = uptimeMs()
+                            passthroughDownTimes[keyCode] = handoffTime
+                            eventToForward = listOf(rebaseEvent(downEvent, handoffTime, handoffTime))
+                        }
+                    }
+                }
+            }
+
+            eventToForward?.let(onForwardEvents)
+            actionToExecute?.let { (action, code) -> dispatchAction(action, code) }
+        }
+        longPressRunnables[keyCode] = runnable
+        scheduleDelay(longPressTimeout, runnable)
+    }
+
+    private fun cancelLongPressTimeoutLocked(keyCode: Int) {
+        longPressRunnables.remove(keyCode)?.let(cancelDelay)
+    }
+
+    private fun startDoubleTapTimeoutLocked(keyCode: Int) {
+        cancelDoubleTapTimeoutLocked(keyCode)
+
+        lateinit var runnable: Runnable
+        runnable = Runnable {
+            var actionToExecute: Pair<String, Int>? = null
+            var eventsToForward: List<E>? = null
+
+            synchronized(lock) {
+                if (doubleTapRunnables[keyCode] !== runnable) return@Runnable
+                doubleTapRunnables.remove(keyCode)
+
+                if (keyStates[keyCode] == STATE_WAITING_DOUBLE) {
+                    keyStates[keyCode] = STATE_IDLE
+                    keyConsumed[keyCode] = false
+
+                    if (hasActionLocked(keyCode, MODE_CLICK)) {
+                        clearPendingLocked(keyCode)
+                        val action = getActionLocked(keyCode, MODE_CLICK)
+                        log("Key $keyCode click (after double-tap timeout) -> $action")
+                        actionToExecute = action to keyCode
+                    } else {
+                        eventsToForward = drainPendingForForwardLocked(keyCode)
+                    }
+                }
+            }
+
+            eventsToForward?.let { list ->
+                if (list.isNotEmpty()) onForwardEvents(list)
+            }
+            actionToExecute?.let { (action, code) -> dispatchAction(action, code) }
+        }
+        doubleTapRunnables[keyCode] = runnable
+        scheduleDelay(doubleTapTimeout, runnable)
+    }
+
+    private fun cancelDoubleTapTimeoutLocked(keyCode: Int) {
+        doubleTapRunnables.remove(keyCode)?.let(cancelDelay)
+    }
+
+    private fun drainPendingForForwardLocked(keyCode: Int): List<E> {
+        val list = mutableListOf<E>()
+        pendingDownEvents.remove(keyCode)?.let(list::add)
+        pendingUpEvents.remove(keyCode)?.let(list::add)
+        pendingUpEventTimes.remove(keyCode)
+        if (list.isNotEmpty() && isVolumeKey(keyCode)) {
+            volumePassthroughUntil = nowMs() + VOLUME_PASSTHROUGH_DURATION
+        }
+        return list
+    }
+
+    private fun clearPendingLocked(keyCode: Int) {
+        pendingDownEvents.remove(keyCode)
+        pendingUpEvents.remove(keyCode)
+        pendingUpEventTimes.remove(keyCode)
+    }
+
+    private fun dispatchAction(action: String, keyCode: Int) {
+        if (action.isEmpty() || action == "none") return
+        onExecuteAction(action, keyCode)
+    }
+}
+
+/**
+ * KeyManager handles hardware key interception and action triggering in system_server.
  * Keys are trigger sources parallel to gestures.
- * 
- * Following Xposed Edge Pro's approach:
- * - Save MethodHookParam to forward events later if needed
- * - Use g(param) to invoke original method when we don't want to consume
- * 
- * Supported interaction modes:
- * - click (0): Quick press and release
- * - double_click (1): Two quick presses  
- * - long_press (2): Hold beyond threshold
+ *
+ * - Power key (`KEYCODE_POWER`): intercepted in `InputManagerService.interceptKeyBeforeQueueing`
+ *   because `PhoneWindowManager` handles power key there and strips `ACTION_PASS_TO_USER`.
+ * - Volume keys (`KEYCODE_VOLUME_UP` / `KEYCODE_VOLUME_DOWN`): intercepted in
+ *   `filterInputEvent` / `interceptKeyBeforeDispatching`.
  */
 object KeyManager {
 
     private const val TAG = "EdgeX"
 
-    // Interaction modes (matching Xposed Edge Pro)
-    const val MODE_CLICK = 0
-    const val MODE_DOUBLE_CLICK = 1
-    const val MODE_LONG_PRESS = 2
+    const val MODE_CLICK = KeyInterceptStateMachine.MODE_CLICK
+    const val MODE_DOUBLE_CLICK = KeyInterceptStateMachine.MODE_DOUBLE_CLICK
+    const val MODE_LONG_PRESS = KeyInterceptStateMachine.MODE_LONG_PRESS
 
-    // Supported keys (keyCode -> config index)
-    val SUPPORTED_KEYS = mapOf(
-        KeyEvent.KEYCODE_VOLUME_UP to 0,
-        KeyEvent.KEYCODE_VOLUME_DOWN to 1,
-        KeyEvent.KEYCODE_POWER to 2
-    )
-
-    // State machine states
-    private const val STATE_IDLE = 0
-    private const val STATE_PRESSED = 1
-    private const val STATE_WAITING_DOUBLE = 2
-    
-    private val needsCopyEvent = true
-
-    // Current state per key
-    private val keyStates = mutableMapOf<Int, Int>()
-    
-    // Track press times for timing calculations
-    private val keyDownTimes = mutableMapOf<Int, Long>()
-    
-    // Store pending KeyEvents for forwarding (like Xposed Edge Pro's H and I)
-    // H = DOWN event, I = UP event (for double-tap waiting)
-    private val pendingDownEvents = mutableMapOf<Int, KeyEvent>()
-    private val pendingUpEvents = mutableMapOf<Int, KeyEvent>()
-    
-    // Track if we consumed the key (should not forward)
-    private val keyConsumed = mutableMapOf<Int, Boolean>()
-    
-    // Track injected events to avoid infinite loop
-    // We store (downTime, eventTime) pairs of events we injected
-    private val injectedEventTimes = mutableSetOf<Long>()
-
-    // Volume key passthrough: after our action fires for a volume key,
-    // the system volume panel is already showing (handled earlier in pipeline).
-    // Subsequent volume presses should pass through for normal volume control.
-    private var volumePassthroughUntil = 0L
-    private const val VOLUME_PASSTHROUGH_DURATION = 3000L  // matches volume panel auto-hide
-
-    private fun isVolumeKey(keyCode: Int): Boolean {
-        return keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-    }
-
-    // Timeouts
-    private var longPressTimeout = 500L
-    private var doubleTapTimeout = 300L
+    val SUPPORTED_KEYS = KeyInterceptStateMachine.SUPPORTED_KEYS
 
     private val handler = Handler(Looper.getMainLooper())
-    
-    // Runnables for timeouts
-    private val longPressRunnables = mutableMapOf<Int, Runnable>()
-    private val doubleTapRunnables = mutableMapOf<Int, Runnable>()
 
-    // Config cache
-    private var keysEnabled = false
-    private val keyEnabled = mutableMapOf<Int, Boolean>()
-    private val keyActions = mutableMapOf<String, String>() // "keyCode_mode" -> action
+    @Volatile
+    private var lastContext: Context? = null
 
-    /**
-     * Initialize timeouts from system configuration.
-     */
-    fun init(context: Context) {
-        longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
-        doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
-    }
+    @Volatile
+    private var cachedInputManagerInject: Method? = null
 
-    /**
-     * Update configuration from cache.
-     */
-    fun updateConfig(configCache: Map<String, String>) {
-        keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+    @Volatile
+    private var cachedGlobalInject: Pair<Any, Method>? = null
 
-        for (keyCode in SUPPORTED_KEYS.keys) {
-            keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
-            keyActions["${keyCode}_$MODE_DOUBLE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "double_click")] ?: ""
-            keyActions["${keyCode}_$MODE_LONG_PRESS"] = configCache[AppConfig.keyAction(keyCode, "long_press")] ?: ""
-            val enabledValue = configCache[AppConfig.keyEnabled(keyCode)]
-            keyEnabled[keyCode] = if (enabledValue != null) {
-                enabledValue == "true"
+    private val stateMachine = KeyInterceptStateMachine<KeyEvent>(
+        scheduleDelay = { delayMs, runnable -> handler.postDelayed(runnable, delayMs) },
+        cancelDelay = { runnable -> handler.removeCallbacks(runnable) },
+        onExecuteAction = { action, _ ->
+            val ctx = lastContext ?: return@KeyInterceptStateMachine
+            GestureManager.executeKeyAction(action, ctx)
+        },
+        onForwardEvents = { events ->
+            val ctx = lastContext ?: return@KeyInterceptStateMachine
+            // Mark injected events synchronously before posting so any immediate
+            // dispatch is recognized, and perform reflection/JNI injection on main thread
+            // off the InputDispatcher thread in strict FIFO order.
+            events.forEach(::markInjectedEvent)
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                events.forEach { injectKeyEvent(it, ctx) }
             } else {
-                hasAnyAction(keyCode)
+                handler.post {
+                    events.forEach { injectKeyEvent(it, ctx) }
+                }
             }
-        }
-        
+        },
+        rebaseEvent = { event, downTime, eventTime ->
+            KeyEvent(
+                downTime,
+                eventTime,
+                event.action,
+                event.keyCode,
+                event.repeatCount,
+                event.metaState,
+                event.deviceId,
+                event.scanCode,
+                event.flags,
+                event.source,
+            )
+        },
+        uptimeMs = { android.os.SystemClock.uptimeMillis() },
+        log = { message -> XposedBridge.log("$TAG: $message") },
+    )
+
+    fun init(context: Context) {
+        lastContext = context
+        stateMachine.longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
+        stateMachine.doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
     }
 
-    /**
-     * Check if this key has any action configured.
-     */
-    private fun hasAnyAction(keyCode: Int): Boolean {
-        return keyActions["${keyCode}_$MODE_CLICK"]?.isNotEmpty() == true ||
-               keyActions["${keyCode}_$MODE_DOUBLE_CLICK"]?.isNotEmpty() == true ||
-               keyActions["${keyCode}_$MODE_LONG_PRESS"]?.isNotEmpty() == true
+    fun updateConfig(configCache: Map<String, String>) {
+        stateMachine.updateConfig(configCache)
     }
 
-    /**
-     * Get action for key and mode.
-     */
-    private fun getAction(keyCode: Int, mode: Int): String {
-        return keyActions["${keyCode}_$mode"] ?: ""
+    fun markInjectedEvent(event: KeyEvent) {
+        stateMachine.markInjectedEvent(event.keyCode, event.action, event.eventTime)
     }
 
-    /**
-     * Check if key has action for specific mode.
-     */
-    private fun hasAction(keyCode: Int, mode: Int): Boolean {
-        val action = getAction(keyCode, mode)
-        return action.isNotEmpty() && action != "none"
+    fun handleKeyEvent(
+        event: KeyEvent,
+        context: Context,
+        param: XC_MethodHook.MethodHookParam,
+        policyFlags: Int = 0,
+        fromBeforeQueueing: Boolean = false,
+    ): Boolean {
+        lastContext = context
+        val info = KeyInterceptStateMachine.EventInfo(
+            keyCode = event.keyCode,
+            action = event.action,
+            repeatCount = event.repeatCount,
+            downTime = event.downTime,
+            eventTime = event.eventTime,
+            policyFlags = policyFlags,
+        )
+        return stateMachine.handleKeyEvent(
+            info = info,
+            copyEvent = { KeyEvent(event) },
+            fromBeforeQueueing = fromBeforeQueueing,
+        )
     }
 
-    /**
-     * Copy KeyEvent for later forwarding (like Xposed Edge Pro's s() method).
-     * On Android 10+, we need to copy the KeyEvent to avoid issues.
-     */
-    private fun copyKeyEvent(event: KeyEvent): KeyEvent {
-        return if (needsCopyEvent) KeyEvent(event) else event
+    fun reset() {
+        stateMachine.reset()
     }
-    
-    /**
-     * Forward key events by injecting them via InputManager.
-     * This is more reliable than invokeOriginalMethod, especially for delayed forwarding.
-     * Like Xposed Edge Pro's approach using InputManager.injectInputEvent.
-     */
+
     private fun injectKeyEvent(event: KeyEvent, context: Context) {
-        // Mark this event as injected by us (using eventTime as identifier)
-        markInjectedEvent(event)
-        
-        // Volume key passthrough: if we inject a volume key, it means we didn't consume it
-        // and it's falling back to the system behavior (bringing up the volume UI).
-        // We activate passthrough so subsequent presses control volume normally.
-        if (isVolumeKey(event.keyCode)) {
-            volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
-        }
-        
-        // Clean up old entries (keep only last 10)
-        
         try {
-            // Try InputManager.getInstance()
             val inputManager = context.getSystemService(Context.INPUT_SERVICE)
             if (inputManager != null) {
-                val injectMethod = inputManager.javaClass.getMethod(
+                val injectMethod = cachedInputManagerInject ?: inputManager.javaClass.getMethod(
                     "injectInputEvent",
                     Class.forName("android.view.InputEvent"),
-                    Int::class.javaPrimitiveType
-                )
+                    Int::class.javaPrimitiveType,
+                ).also { cachedInputManagerInject = it }
                 injectMethod.invoke(inputManager, event, 0) // 0 = INJECT_INPUT_EVENT_MODE_ASYNC
                 return
             }
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: InputManager inject failed: ${t.message}")
         }
-        
-        // Fallback: try InputManagerGlobal
+
         try {
-            val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
-            val getInstance = globalCls.getMethod("getInstance")
-            val global = getInstance.invoke(null)
-            val injectMethod = globalCls.getMethod(
-                "injectInputEvent",
-                Class.forName("android.view.InputEvent"),
-                Int::class.javaPrimitiveType
-            )
+            val (global, injectMethod) = cachedGlobalInject ?: run {
+                val globalCls = Class.forName("android.hardware.input.InputManagerGlobal")
+                val globalObj = globalCls.getMethod("getInstance").invoke(null)
+                    ?: throw IllegalStateException("InputManagerGlobal.getInstance() returned null")
+                val method = globalCls.getMethod(
+                    "injectInputEvent",
+                    Class.forName("android.view.InputEvent"),
+                    Int::class.javaPrimitiveType,
+                )
+                (globalObj to method).also { cachedGlobalInject = it }
+            }
             injectMethod.invoke(global, event, 0)
             return
         } catch (t: Throwable) {
             XposedBridge.log("$TAG: InputManagerGlobal inject failed: ${t.message}")
         }
-        
+
         XposedBridge.log("$TAG: Failed to inject key event - no method worked")
-    }
-
-    fun markInjectedEvent(event: KeyEvent) {
-        injectedEventTimes.add(event.eventTime)
-    }
-    
-    /**
-     * Forward saved key events by injecting them.
-     * This replaces the old forwardParam() approach which didn't work reliably.
-     */
-    private fun forwardKeyEvents(keyCode: Int, context: Context) {
-        val downEvent = pendingDownEvents[keyCode]
-        val upEvent = pendingUpEvents[keyCode]
-        
-        
-        if (downEvent != null) {
-            injectKeyEvent(downEvent, context)
-        }
-        
-        if (upEvent != null) {
-            injectKeyEvent(upEvent, context)
-        }
-        
-        pendingDownEvents.remove(keyCode)
-        pendingUpEvents.remove(keyCode)
-    }
-
-    // Policy flag used to mark injected events (to avoid infinite loop)
-    // Following Xposed Edge Pro's approach with 0x4000000
-    private const val INJECTED_EVENT_FLAG = 0x4000000
-    
-    /**
-     * Handle key event from interceptKeyBeforeDispatching hook.
-     * Returns true if event should be consumed (not forwarded to system).
-     */
-    fun handleKeyEvent(event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
-        val keyCode = event.keyCode
-        val eventTime = event.eventTime
-        
-        
-        if (policyFlags and INJECTED_EVENT_FLAG != 0) return false
-
-        if (injectedEventTimes.contains(eventTime)) {
-            injectedEventTimes.remove(eventTime)
-            return false
-        }
-
-        if (!keysEnabled) return false
-        
-        // Check if this key is supported
-        if (!SUPPORTED_KEYS.containsKey(keyCode)) {
-            return false
-        }
-        
-        // Check if this specific key is enabled
-        if (keyEnabled[keyCode] != true) {
-            return false
-        }
-        
-        // Check if key has any action configured - if not, don't intercept
-        if (!hasAnyAction(keyCode)) {
-            return false
-        }
-
-        // Volume key passthrough: if volume panel is likely showing
-        // (we recently executed an action for a volume key), let
-        // subsequent volume presses pass through for normal volume control.
-        if (isVolumeKey(keyCode) && System.currentTimeMillis() < volumePassthroughUntil) {
-            volumePassthroughUntil = System.currentTimeMillis() + VOLUME_PASSTHROUGH_DURATION
-            return false
-        }
-
-        return when (event.action) {
-            KeyEvent.ACTION_DOWN -> handleKeyDown(keyCode, event, context, param)
-            KeyEvent.ACTION_UP -> handleKeyUp(keyCode, event, context, param)
-            else -> false
-        }
-    }
-
-    /**
-     * Handle KEY_DOWN event.
-     * 
-     * Key insight from Xposed Edge Pro:
-     * - Use repeatCount to detect if this is a new press or a repeat
-     * - repeatCount == 0 means first press
-     * - repeatCount > 0 means key is being held down
-     */
-    private fun handleKeyDown(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
-        val repeatCount = event.repeatCount
-        val currentState = keyStates[keyCode] ?: STATE_IDLE
-        
-        // If this is a repeat event (key held down)
-        if (repeatCount > 0) {
-            // If we're already tracking, keep consuming
-            if (currentState == STATE_PRESSED) {
-                return true
-            }
-            // If we're not tracking but this is the first event we see (missed repeat=0),
-            // treat the first repeat as a new press
-            if (currentState == STATE_IDLE) {
-                return startNewPress(keyCode, event, context, param)
-            }
-            return false
-        }
-        
-        // First press (repeatCount == 0)
-        when (currentState) {
-            STATE_IDLE -> {
-                return startNewPress(keyCode, event, context, param)
-            }
-            STATE_WAITING_DOUBLE -> {
-                // Second press within double-tap window
-                cancelDoubleTapTimeout(keyCode)
-                
-                // Check if event times match double-tap timing
-                val firstUpEvent = pendingUpEvents[keyCode]
-                val timeDiff = if (firstUpEvent != null) event.eventTime - firstUpEvent.eventTime else Long.MAX_VALUE
-                
-                if (timeDiff < doubleTapTimeout && hasAction(keyCode, MODE_DOUBLE_CLICK)) {
-                    // Execute double-click action
-                    keyStates[keyCode] = STATE_PRESSED
-                    keyConsumed[keyCode] = true
-                    pendingDownEvents.remove(keyCode)
-                    pendingUpEvents.remove(keyCode)
-                    
-                    val action = getAction(keyCode, MODE_DOUBLE_CLICK)
-                    XposedBridge.log("$TAG: Key $keyCode double-click -> $action")
-                    executeAction(action, context, keyCode)
-                    return true
-                } else {
-                    // No double-click action or timing didn't match
-                    // Forward the pending events via injection and start new press
-                    forwardKeyEvents(keyCode, context)
-                    return startNewPress(keyCode, event, context, param)
-                }
-            }
-            STATE_PRESSED -> {
-                // Still in pressed state, probably a duplicate event
-                return true
-            }
-            else -> return keyConsumed[keyCode] == true
-        }
-    }
-
-    /**
-     * Start tracking a new key press.
-     */
-    private fun startNewPress(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
-        keyStates[keyCode] = STATE_PRESSED
-        // Use downTime for more accurate timing - this is the time the key was originally pressed
-        keyDownTimes[keyCode] = event.downTime
-        // Save param for potential forwarding (like Xposed Edge Pro's H)
-        pendingDownEvents[keyCode] = copyKeyEvent(event)
-        keyConsumed[keyCode] = false
-
-        // Start long-press timeout if long-press action exists
-        if (hasAction(keyCode, MODE_LONG_PRESS)) {
-            startLongPressTimeout(keyCode, context)
-        }
-
-        // Always intercept initially to detect the gesture type
-        return true
-    }
-
-    /**
-     * Handle KEY_UP event.
-     * Following Xposed Edge Pro's v() method logic.
-     */
-    private fun handleKeyUp(keyCode: Int, event: KeyEvent, context: Context, param: XC_MethodHook.MethodHookParam): Boolean {
-        val currentState = keyStates[keyCode] ?: STATE_IDLE
-        
-        if (currentState != STATE_PRESSED) {
-            return keyConsumed[keyCode] == true
-        }
-
-        cancelLongPressTimeout(keyCode)
-
-        val downTime = keyDownTimes[keyCode] ?: event.eventTime
-        val pressDuration = event.eventTime - downTime
-
-        // Check if it was a long press (timeout would have fired)
-        if (keyConsumed[keyCode] == true) {
-            // Long press already executed
-            keyStates[keyCode] = STATE_IDLE
-            pendingDownEvents.remove(keyCode)
-            pendingUpEvents.remove(keyCode)
-            return true
-        }
-
-        // Short press - check if we need to wait for double-tap
-        if (pressDuration < longPressTimeout) {
-            // Check if double-click action exists (like Xposed Edge Pro's D(keyCode).z != 0)
-            if (hasAction(keyCode, MODE_DOUBLE_CLICK)) {
-                // Wait for potential double-tap - save UP event param (like Xposed Edge Pro's I)
-                keyStates[keyCode] = STATE_WAITING_DOUBLE
-                pendingUpEvents[keyCode] = copyKeyEvent(event)
-                startDoubleTapTimeout(keyCode, context)
-                return true
-            }
-            
-            // No double-click action - check for click action (like Xposed Edge Pro's q(keyCode, 0).z != 0)
-            if (hasAction(keyCode, MODE_CLICK)) {
-                // Execute click immediately
-                keyStates[keyCode] = STATE_IDLE
-                pendingDownEvents.remove(keyCode)
-                pendingUpEvents.remove(keyCode)
-                
-                val action = getAction(keyCode, MODE_CLICK)
-                XposedBridge.log("$TAG: Key $keyCode click -> $action")
-                executeAction(action, context, keyCode)
-                return true
-            }
-            
-            pendingUpEvents[keyCode] = copyKeyEvent(event)
-            forwardKeyEvents(keyCode, context)
-            keyStates[keyCode] = STATE_IDLE
-            return true
-        } else {
-            // Key was held past long-press threshold but long-press timeout didn't consume
-            // If the DOWN event was already injected (because no long press action),
-            // we should NOT execute the click action on release to avoid stuck keys.
-            if (hasAction(keyCode, MODE_CLICK) && pendingDownEvents.containsKey(keyCode)) {
-                // Execute click on release
-                keyStates[keyCode] = STATE_IDLE
-                pendingDownEvents.remove(keyCode)
-                pendingUpEvents.remove(keyCode)
-                
-                val action = getAction(keyCode, MODE_CLICK)
-                executeAction(action, context, keyCode)
-                return true
-            }
-            pendingUpEvents[keyCode] = copyKeyEvent(event)
-            forwardKeyEvents(keyCode, context)
-            keyStates[keyCode] = STATE_IDLE
-            return true
-        }
-    }
-
-    /**
-     * Start long-press timeout.
-     */
-    private fun startLongPressTimeout(keyCode: Int, context: Context) {
-        cancelLongPressTimeout(keyCode)
-        
-        val runnable = Runnable {
-            synchronized(this) {
-                if (keyStates[keyCode] == STATE_PRESSED && keyConsumed[keyCode] != true) {
-                    if (hasAction(keyCode, MODE_LONG_PRESS)) {
-                        keyConsumed[keyCode] = true
-                        pendingDownEvents.remove(keyCode)
-                        
-                        val action = getAction(keyCode, MODE_LONG_PRESS)
-                        XposedBridge.log("$TAG: Key $keyCode long-press -> $action")
-                        executeAction(action, context, keyCode)
-                    } else {
-                        val downEvent = pendingDownEvents.remove(keyCode)
-                        if (downEvent != null) {
-                            injectKeyEvent(downEvent, context)
-                        }
-                    }
-                }
-            }
-        }
-        longPressRunnables[keyCode] = runnable
-        handler.postDelayed(runnable, longPressTimeout)
-    }
-
-    /**
-     * Cancel long-press timeout.
-     */
-    private fun cancelLongPressTimeout(keyCode: Int) {
-        longPressRunnables[keyCode]?.let { handler.removeCallbacks(it) }
-        longPressRunnables.remove(keyCode)
-    }
-
-    /**
-     * Start double-tap timeout.
-     * Like Xposed Edge Pro's e() callback - when timeout fires, execute click or forward.
-     */
-    private fun startDoubleTapTimeout(keyCode: Int, context: Context) {
-        cancelDoubleTapTimeout(keyCode)
-        
-        val runnable = Runnable {
-            synchronized(this) {
-                if (keyStates[keyCode] == STATE_WAITING_DOUBLE) {
-                    keyStates[keyCode] = STATE_IDLE
-                    
-                    if (hasAction(keyCode, MODE_CLICK)) {
-                        // Double-tap timed out, execute single click
-                        pendingDownEvents.remove(keyCode)
-                        pendingUpEvents.remove(keyCode)
-                        
-                        val action = getAction(keyCode, MODE_CLICK)
-                        XposedBridge.log("$TAG: Key $keyCode click (after double-tap timeout) -> $action")
-                        executeAction(action, context, keyCode)
-                    } else {
-                        forwardKeyEvents(keyCode, context)
-                    }
-                }
-            }
-        }
-        doubleTapRunnables[keyCode] = runnable
-        handler.postDelayed(runnable, doubleTapTimeout)
-    }
-
-    /**
-     * Cancel double-tap timeout.
-     */
-    private fun cancelDoubleTapTimeout(keyCode: Int) {
-        doubleTapRunnables[keyCode]?.let { handler.removeCallbacks(it) }
-        doubleTapRunnables.remove(keyCode)
-    }
-
-    /**
-     * Execute action (delegate to GestureManager's action system).
-     */
-    private fun executeAction(action: String, context: Context, keyCode: Int = -1) {
-        if (action.isEmpty() || action == "none") return
-
-        GestureManager.executeKeyAction(action, context)
-    }
-
-    /**
-     * Reset all state (e.g., on screen off or config change).
-     * Ensures no stale key tracking survives a lock/unlock cycle.
-     */
-    fun reset() {
-        for (keyCode in SUPPORTED_KEYS.keys) {
-            cancelLongPressTimeout(keyCode)
-            cancelDoubleTapTimeout(keyCode)
-        }
-        keyStates.clear()
-        keyDownTimes.clear()
-        pendingDownEvents.clear()
-        pendingUpEvents.clear()
-        keyConsumed.clear()
-        injectedEventTimes.clear()
-        volumePassthroughUntil = 0L
     }
 }

@@ -569,7 +569,7 @@ object GestureManager {
     }
 
     /**
-     * Called from system_server (filterInputEvent hook) for KeyEvents.
+     * Called from system_server (filterInputEvent / interceptKeyBeforeDispatching hook) for non-power KeyEvents.
      * Delegates to KeyManager for state machine processing.
      */
     fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
@@ -577,6 +577,29 @@ object GestureManager {
 
         if (GameModeManager.isActive) return false
         return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
+    }
+
+    /**
+     * Called from system_server (interceptKeyBeforeQueueing hook) for KEYCODE_POWER.
+     * Power key never reaches filterInputEvent or interceptKeyBeforeDispatching because
+     * PhoneWindowManager strips ACTION_PASS_TO_USER during interceptKeyBeforeQueueing.
+     */
+    fun handlePowerKeyBeforeQueueing(
+        event: KeyEvent,
+        context: Context,
+        hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam,
+        policyFlags: Int,
+    ): Boolean {
+        ensureSystemServerInitialized(context, initializeKeys = true)
+
+        if (GameModeManager.isActive) return false
+        return KeyManager.handleKeyEvent(
+            event = event,
+            context = context,
+            param = hookParam,
+            policyFlags = policyFlags,
+            fromBeforeQueueing = true,
+        )
     }
 
     fun executeKeyAction(action: String, context: Context) {
