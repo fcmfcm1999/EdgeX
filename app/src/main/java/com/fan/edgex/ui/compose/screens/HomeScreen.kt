@@ -29,8 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import java.util.Locale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -438,8 +441,22 @@ private fun HapticFeedbackTypeSheet(
     }
 }
 
+internal fun resolveGuideDisplayUrl(locale: Locale): String =
+    if (locale.language.equals("zh", ignoreCase = true)) {
+        "edgexy.app/zh/guide"
+    } else {
+        "edgexy.app/guide"
+    }
+
+internal fun resolveGuideUrl(locale: Locale): String =
+    "https://${resolveGuideDisplayUrl(locale)}"
+
 @Composable
 private fun AboutSettings(callbacks: HomeCallbacks, premiumStatus: PremiumActivator.Status) {
+    val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+    val guideDisplayUrl = resolveGuideDisplayUrl(locale)
+    val guideUrl = resolveGuideUrl(locale)
     EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp)) {
         EdgeXRow(
             title = stringResource(R.string.compose_about_support_author),
@@ -451,10 +468,21 @@ private fun AboutSettings(callbacks: HomeCallbacks, premiumStatus: PremiumActiva
         }
         EdgeXDivider()
         EdgeXRow(
+            title = stringResource(R.string.compose_about_guide),
+            subtitle = guideDisplayUrl,
+            icon = EdgeXIcons.Guide,
+            onClick = { context.openUrl(guideUrl) },
+            modifier = Modifier.testTag("home_about_guide"),
+        ) {
+            EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
+        }
+        EdgeXDivider()
+        EdgeXRow(
             title = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
             subtitle = stringResource(R.string.value_project_url),
             icon = EdgeXIcons.About,
             onClick = { callbacks.openRoute(EdgeXRoute.About) },
+            modifier = Modifier.testTag("home_about_detail"),
         ) {
             EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurfaceDim)
         }

@@ -56,6 +56,18 @@ class EdgeXComposeSmokeTest {
         composeRule.onNodeWithText(appContext.getString(R.string.compose_home_hero_title)).assertIsDisplayed()
         composeRule.onNodeWithText(appContext.getString(R.string.header_pie_settings)).assertIsDisplayed()
         composeRule.onNodeWithText(appContext.getString(R.string.compose_about_support_author)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("home_about_guide").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_about_guide)).assertIsDisplayed()
+    }
+
+    @Test
+    fun aboutScreenShowsWebsiteAndGithub() {
+        composeRule.onNodeWithTag("home_about_detail").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_author)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_website)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.value_website_url)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_project_url)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.value_project_url)).assertIsDisplayed()
     }
 
     @Test
