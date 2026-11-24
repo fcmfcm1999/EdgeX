@@ -630,9 +630,7 @@ internal object PartialScreenshotOverlay {
     }
 
     private fun showToast(context: Context, text: String) {
-        handler.post {
-            try { Toast.makeText(context, text, Toast.LENGTH_SHORT).show() } catch (_: Throwable) {}
-        }
+        EdgeXSystemToast.show(context, text)
     }
 
     // ---- Combined view ----

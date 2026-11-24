@@ -361,7 +361,9 @@ fun EdgeXToast(
 ) {
     val colors = LocalEdgeXColors.current
     Box(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedVisibility(visible = !message.isNullOrBlank()) {
@@ -369,13 +371,35 @@ fun EdgeXToast(
                 color = colors.onSurface,
                 contentColor = colors.surface,
                 shape = RoundedCornerShape(999.dp),
+                shadowElevation = 4.dp,
             ) {
-                Text(
-                    text = message.orEmpty(),
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Row(
+                    modifier = Modifier.padding(start = 10.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(colors.accent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EdgeXIcon(
+                            imageVector = R.drawable.ic_launcher_foreground,
+                            contentDescription = null,
+                            tint = colors.onAccent,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    Text(
+                        text = message.orEmpty(),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
