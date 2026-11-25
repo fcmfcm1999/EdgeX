@@ -71,6 +71,37 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
+            // Hook interceptKeyBeforeQueueing for screen-off hardware key interception.
+            // Screen-on keys continue through filterInputEvent / interceptKeyBeforeDispatching.
+            try {
+                XposedHelpers.findAndHookMethod(
+                    inputManagerService, "interceptKeyBeforeQueueing",
+                    KeyEvent::class.java,
+                    Int::class.javaPrimitiveType,
+                    object : XC_MethodHook() {
+                        override fun beforeHookedMethod(param: MethodHookParam) {
+                            if (isCalledByUs()) return
+
+                            val keyEvent = param.args[0] as KeyEvent
+                            val policyFlags = param.args[1] as Int
+                            val context = XposedHelpers.getObjectField(param.thisObject, "mContext") as android.content.Context
+                            val consumed = GestureManager.handleKeyEvent(
+                                keyEvent,
+                                context,
+                                param,
+                                policyFlags,
+                                KeyInterceptionPath.QUEUEING,
+                            )
+                            if (consumed) {
+                                param.result = 0
+                            }
+                        }
+                    }
+                )
+            } catch (t: Throwable) {
+                XposedBridge.log("$TAG: interceptKeyBeforeQueueing hook failed: ${t.message}")
+            }
+
             // Hook interceptKeyBeforeDispatching for key event interception
             // This is the primary method called by the input dispatcher for key events
             try {
