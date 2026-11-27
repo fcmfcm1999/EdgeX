@@ -264,4 +264,105 @@ class KeyManagerTest {
         assertTrue(machine.handleKeyEvent(nextUp, copyEvent = { nextUp }))
         assertEquals(listOf("back" to KeyEvent.KEYCODE_VOLUME_UP), executedActions)
     }
+
+    @Test
+    fun powerKeyRespectsLockscreenTriggerConditionWhenScreenIsOn() {
+        machine.updateConfig(
+            mapOf(
+                AppConfig.KEYS_ENABLED to "true",
+                AppConfig.KEYS_TRIGGER_SCREEN_OFF to "false",
+                AppConfig.KEYS_TRIGGER_LOCKED to "false",
+                AppConfig.keyEnabled(KeyEvent.KEYCODE_POWER) to "true",
+                AppConfig.keyAction(KeyEvent.KEYCODE_POWER, "click") to "back",
+            ),
+        )
+
+        val lockedDown = powerEvent(KeyEvent.ACTION_DOWN, downTime = 1000L, eventTime = 1000L, interactive = true)
+        assertFalse(
+            machine.handleKeyEvent(
+                info = lockedDown,
+                copyEvent = { lockedDown },
+                source = KeyInterceptionPath.QUEUEING,
+                isScreenInteractive = true,
+                isKeyguardLocked = true,
+            ),
+        )
+        assertTrue(executedActions.isEmpty())
+
+        // Unlocked screen-on power click still triggers
+        val unlockedDown = powerEvent(KeyEvent.ACTION_DOWN, downTime = 2000L, eventTime = 2000L, interactive = true)
+        val unlockedUp = powerEvent(KeyEvent.ACTION_UP, downTime = 2000L, eventTime = 2060L, interactive = true)
+        assertTrue(
+            machine.handleKeyEvent(
+                info = unlockedDown,
+                copyEvent = { unlockedDown },
+                source = KeyInterceptionPath.QUEUEING,
+                isScreenInteractive = true,
+                isKeyguardLocked = false,
+            ),
+        )
+        assertTrue(
+            machine.handleKeyEvent(
+                info = unlockedUp,
+                copyEvent = { unlockedUp },
+                source = KeyInterceptionPath.QUEUEING,
+                isScreenInteractive = true,
+                isKeyguardLocked = false,
+            ),
+        )
+        assertEquals(listOf("back" to KeyEvent.KEYCODE_POWER), executedActions)
+    }
+
+    @Test
+    fun screenOffVolumeKeyUsesQueueingPathAndSurvivesMidPressWake() {
+        machine.updateConfig(
+            mapOf(
+                AppConfig.KEYS_ENABLED to "true",
+                AppConfig.KEYS_TRIGGER_SCREEN_OFF to "true",
+                AppConfig.keyEnabled(KeyEvent.KEYCODE_VOLUME_DOWN) to "true",
+                AppConfig.keyAction(KeyEvent.KEYCODE_VOLUME_DOWN, "click") to "flashlight",
+            ),
+        )
+
+        val down = KeyInterceptStateMachine.EventInfo(
+            keyCode = KeyEvent.KEYCODE_VOLUME_DOWN,
+            action = KeyEvent.ACTION_DOWN,
+            repeatCount = 0,
+            downTime = 1000L,
+            eventTime = 1000L,
+            policyFlags = 0,
+        )
+        val up = down.copy(action = KeyEvent.ACTION_UP, eventTime = 1080L)
+
+        assertTrue(
+            machine.handleKeyEvent(
+                info = down,
+                copyEvent = { down },
+                source = KeyInterceptionPath.QUEUEING,
+                isScreenInteractive = false,
+                isKeyguardLocked = true,
+            ),
+        )
+        // DISPATCH must not steal the active QUEUEING press even if screen wakes
+        assertFalse(
+            machine.handleKeyEvent(
+                info = up,
+                copyEvent = { up },
+                source = KeyInterceptionPath.DISPATCH,
+                isScreenInteractive = true,
+                isKeyguardLocked = true,
+            ),
+        )
+        // QUEUEING completes the press and executes the action
+        assertTrue(
+            machine.handleKeyEvent(
+                info = up,
+                copyEvent = { up },
+                source = KeyInterceptionPath.QUEUEING,
+                isScreenInteractive = true,
+                isKeyguardLocked = true,
+            ),
+        )
+        assertEquals(listOf("flashlight" to KeyEvent.KEYCODE_VOLUME_DOWN), executedActions)
+    }
 }

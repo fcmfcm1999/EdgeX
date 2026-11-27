@@ -645,4 +645,11 @@
     <string name="action_cat_advanced">Advanced</string>
     <string name="action_cat_apps">Apps &amp; Tools</string>
     <string name="compose_action_needs_config">Configure</string>
+
+    <!-- Trigger Conditions -->
+    <string name="trigger_allow_lockscreen">Allow on lock screen</string>
+    <string name="trigger_allow_screen_off">Allow when screen is off</string>
+    <string name="trigger_gestures_allow_lockscreen_desc">Trigger edge gestures on the lock screen</string>
+    <string name="trigger_keys_allow_screen_off_desc">Trigger key actions when the screen is off</string>
+    <string name="trigger_keys_allow_lockscreen_desc">Trigger key actions on the lock screen</string>
 </resources>

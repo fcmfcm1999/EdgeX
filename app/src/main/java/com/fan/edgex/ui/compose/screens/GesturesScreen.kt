@@ -177,6 +177,7 @@ fun GesturesScreen(
     val context = LocalContext.current
     var state by remember { mutableStateOf(context.readGestureScreenState()) }
     var gesturesEnabled by remember { mutableStateOf(context.getConfigBool(AppConfig.GESTURES_ENABLED)) }
+    var triggerLocked by remember { mutableStateOf(context.getConfigBool(AppConfig.GESTURES_TRIGGER_LOCKED, default = true)) }
     var filter by remember { mutableStateOf(GestureFilter.Visual) }
     var selectedZoneId by rememberSaveable { mutableStateOf<String?>(null) }
     var pickingActionForId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -214,7 +215,7 @@ fun GesturesScreen(
             onBack = onBack,
         )
         GestureHeader(state)
-        EdgeXListGroup(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        EdgeXListGroup(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
             EdgeXSwitchRow(
                 title = stringResource(R.string.compose_gestures_enabled),
                 subtitle = stringResource(R.string.compose_gestures_enabled_desc),
@@ -223,6 +224,18 @@ fun GesturesScreen(
                     gesturesEnabled = it
                     context.putConfig(AppConfig.GESTURES_ENABLED, it)
                     showToast(context.getString(if (it) R.string.compose_gestures_enabled_toast else R.string.compose_gestures_disabled_toast))
+                },
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        EdgeXListGroup(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+            EdgeXSwitchRow(
+                title = stringResource(R.string.trigger_allow_lockscreen),
+                subtitle = stringResource(R.string.trigger_gestures_allow_lockscreen_desc),
+                checked = triggerLocked,
+                onCheckedChange = {
+                    triggerLocked = it
+                    context.putConfig(AppConfig.GESTURES_TRIGGER_LOCKED, it)
                 },
             )
         }

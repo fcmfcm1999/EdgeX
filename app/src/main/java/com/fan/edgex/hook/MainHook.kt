@@ -71,17 +71,15 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 "com.android.server.input.InputManagerService", lpparam.classLoader
             )
 
-            // Hook interceptKeyBeforeQueueing for power key interception.
-            // KEYCODE_POWER is consumed by PhoneWindowManager.interceptKeyBeforeQueueing
-            // (ACTION_PASS_TO_USER is stripped), so it never reaches filterInputEvent or
-            // interceptKeyBeforeDispatching.
+            // Hook interceptKeyBeforeQueueing for:
+            // 1) Power key interception (PhoneWindowManager strips ACTION_PASS_TO_USER here, so
+            //    KEYCODE_POWER never reaches filterInputEvent or interceptKeyBeforeDispatching).
+            // 2) Screen-off hardware key interception (Volume keys while non-interactive).
             val beforeQueueingHook = object : XC_MethodHook() {
                 override fun beforeHookedMethod(param: MethodHookParam) {
                     if (isCalledByUs()) return
 
                     val keyEvent = param.args[0] as? KeyEvent ?: return
-                    if (keyEvent.keyCode != KeyEvent.KEYCODE_POWER) return
-
                     val policyFlags = if (param.args.size > 1 && param.args[1] is Int) {
                         param.args[1] as Int
                     } else {
@@ -89,7 +87,14 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                     }
                     val context = XposedHelpers.getObjectField(param.thisObject, "mContext")
                         as android.content.Context
-                    if (GestureManager.handlePowerKeyBeforeQueueing(keyEvent, context, param, policyFlags)) {
+                    val consumed = GestureManager.handleKeyEvent(
+                        event = keyEvent,
+                        context = context,
+                        hookParam = param,
+                        policyFlags = policyFlags,
+                        source = KeyInterceptionPath.QUEUEING,
+                    )
+                    if (consumed) {
                         // Return 0 (no ACTION_PASS_TO_USER, no ACTION_WAKE_UP) to consume the event
                         // before KeyGestureController and PhoneWindowManager handle it.
                         param.result = 0
@@ -128,7 +133,7 @@ class MainHook : IXposedHookLoadPackage, IXposedHookZygoteInit {
                 XposedBridge.log("$TAG: ERROR - Failed to hook interceptKeyBeforeQueueing")
             }
 
-            // Hook interceptKeyBeforeDispatching for non-power key event interception
+            // Hook interceptKeyBeforeDispatching for screen-on non-power key event interception
             // This is the primary method called by the input dispatcher for volume/other key events
             try {
                 XposedHelpers.findAndHookMethod(

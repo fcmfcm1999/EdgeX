@@ -3,23 +3,32 @@ package com.fan.edgex.hook
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.view.KeyEvent
 import android.view.ViewConfiguration
 import com.fan.edgex.config.AppConfig
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import java.lang.reflect.Method
 
+internal enum class KeyWakeLockAction {
+    NONE,
+    ACQUIRE_RECOGNITION,
+    ACQUIRE_DISPATCH_GRACE,
+    RELEASE,
+}
+
 /**
  * Pure key interception state machine for hardware keys (Volume Up/Down, Power).
- * Extracted from [KeyManager] so all state transitions, timeouts, passthrough, and
- * loop-prevention logic can be unit-tested on the JVM without Android framework hooks.
+ * Extracted from [KeyManager] so all state transitions, timeouts, passthrough,
+ * trigger conditions, wake-lock transitions, and loop-prevention logic can be
+ * unit-tested on the JVM without Android framework hooks.
  */
 internal class KeyInterceptStateMachine<E>(
     private val scheduleDelay: (delayMs: Long, runnable: Runnable) -> Unit,
     private val cancelDelay: (runnable: Runnable) -> Unit,
     private val onExecuteAction: (action: String, keyCode: Int) -> Unit,
     private val onForwardEvents: (events: List<E>) -> Unit,
+    private val onWakeLockAction: (KeyWakeLockAction) -> Unit = {},
     private val rebaseEvent: (event: E, downTime: Long, eventTime: Long) -> E = { event, _, _ -> event },
     private val nowMs: () -> Long = { System.currentTimeMillis() },
     private val uptimeMs: () -> Long = nowMs,
@@ -73,6 +82,7 @@ internal class KeyInterceptStateMachine<E>(
     private val lock = Any()
 
     private val keyStates = mutableMapOf<Int, Int>()
+    private val activeKeyPaths = mutableMapOf<Int, KeyInterceptionPath>()
     private val keyDownTimes = mutableMapOf<Int, Long>()
     private val passthroughDownTimes = mutableMapOf<Int, Long>()
     private val pendingDownEvents = mutableMapOf<Int, E>()
@@ -93,15 +103,26 @@ internal class KeyInterceptStateMachine<E>(
     private val doubleTapRunnables = mutableMapOf<Int, Runnable>()
 
     private var keysEnabled = false
+    private var allowScreenOff = true
+    private var allowLocked = true
     private val keyEnabled = mutableMapOf<Int, Boolean>()
     private val keyActions = mutableMapOf<String, String>()
 
     private fun isVolumeKey(keyCode: Int): Boolean =
         keyCode == KEYCODE_VOLUME_UP || keyCode == KEYCODE_VOLUME_DOWN
 
+    private fun needsScreenOffWakeLock(keyCode: Int, path: KeyInterceptionPath?): Boolean =
+        path == KeyInterceptionPath.QUEUEING && keyCode != KEYCODE_POWER
+
     fun updateConfig(configCache: Map<String, String>) {
         synchronized(lock) {
             keysEnabled = configCache[AppConfig.KEYS_ENABLED] == "true"
+            allowScreenOff = TriggerConditionPolicy.parseTriggerEnabled(
+                configCache[AppConfig.KEYS_TRIGGER_SCREEN_OFF],
+            )
+            allowLocked = allowScreenOff || TriggerConditionPolicy.parseTriggerEnabled(
+                configCache[AppConfig.KEYS_TRIGGER_LOCKED],
+            )
 
             for (keyCode in SUPPORTED_KEYS.keys) {
                 keyActions["${keyCode}_$MODE_CLICK"] = configCache[AppConfig.keyAction(keyCode, "click")] ?: ""
@@ -130,9 +151,13 @@ internal class KeyInterceptStateMachine<E>(
         info: EventInfo,
         copyEvent: () -> E,
         fromBeforeQueueing: Boolean = false,
+        source: KeyInterceptionPath = if (fromBeforeQueueing) KeyInterceptionPath.QUEUEING else KeyInterceptionPath.DISPATCH,
+        isScreenInteractive: Boolean? = null,
+        isKeyguardLocked: Boolean = false,
     ): Boolean {
         var actionToExecute: Pair<String, Int>? = null
         var eventsToForward: List<E>? = null
+        var wakeLockAction = KeyWakeLockAction.NONE
         val consumed: Boolean
 
         synchronized(lock) {
@@ -145,22 +170,56 @@ internal class KeyInterceptStateMachine<E>(
                 return false
             }
 
-            if (!keysEnabled) return false
             if (!SUPPORTED_KEYS.containsKey(keyCode)) return false
-            if (keyEnabled[keyCode] != true) return false
-            if (!hasAnyActionLocked(keyCode)) return false
 
-            // Never intercept KEYCODE_POWER while the screen is off (non-interactive)
-            // when idle so the power button always wakes the device.
-            if (fromBeforeQueueing &&
-                keyCode == KEYCODE_POWER &&
-                (info.policyFlags and POLICY_FLAG_INTERACTIVE) == 0 &&
-                (keyStates[keyCode] ?: STATE_IDLE) == STATE_IDLE
-            ) {
-                return false
+            val activePath = activeKeyPaths[keyCode]
+            if (activePath == null) {
+                if (!keysEnabled) return false
+                if (keyEnabled[keyCode] != true) return false
+                if (!hasAnyActionLocked(keyCode)) return false
             }
 
-            if (isVolumeKey(keyCode) &&
+            val effectiveInteractive = when {
+                keyCode == KEYCODE_POWER -> {
+                    val policyInteractive = (info.policyFlags and POLICY_FLAG_INTERACTIVE) != 0
+                    (isScreenInteractive ?: true) && policyInteractive
+                }
+                isScreenInteractive != null -> isScreenInteractive
+                source == KeyInterceptionPath.QUEUEING -> (info.policyFlags and POLICY_FLAG_INTERACTIVE) != 0
+                else -> true
+            }
+
+            val accepted = if (keyCode == KEYCODE_POWER) {
+                if (activePath != null) {
+                    activePath == source
+                } else {
+                    // Power key is handled exclusively in interceptKeyBeforeQueueing.
+                    // Never intercept while screen is off (non-interactive) so the power button
+                    // always wakes the device.
+                    source == KeyInterceptionPath.QUEUEING &&
+                        effectiveInteractive &&
+                        TriggerConditionPolicy.shouldTriggerKey(
+                            isScreenInteractive = true,
+                            isKeyguardLocked = isKeyguardLocked,
+                            allowScreenOff = allowScreenOff,
+                            allowLocked = allowLocked,
+                        )
+                }
+            } else {
+                TriggerConditionPolicy.canAcceptKeyEvent(
+                    source = source,
+                    activePath = activePath,
+                    isScreenInteractive = effectiveInteractive,
+                    isKeyguardLocked = isKeyguardLocked,
+                    allowScreenOff = allowScreenOff,
+                    allowLocked = allowLocked,
+                )
+            }
+            if (!accepted) return false
+
+            if (activePath == null &&
+                effectiveInteractive &&
+                isVolumeKey(keyCode) &&
                 (keyStates[keyCode] ?: STATE_IDLE) == STATE_IDLE &&
                 nowMs() < volumePassthroughUntil
             ) {
@@ -168,9 +227,11 @@ internal class KeyInterceptStateMachine<E>(
                 return false
             }
 
+            val wasScreenOffQueueing = needsScreenOffWakeLock(keyCode, activePath)
             consumed = when (info.action) {
                 KeyEvent.ACTION_DOWN -> handleKeyDownLocked(
                     info = info,
+                    source = source,
                     copyEvent = copyEvent,
                     setAction = { actionToExecute = it },
                     setForward = { eventsToForward = it },
@@ -183,6 +244,10 @@ internal class KeyInterceptStateMachine<E>(
                 )
                 else -> false
             }
+            wakeLockAction = computeWakeLockActionLocked(
+                wasScreenOffQueueing = wasScreenOffQueueing,
+                dispatchedAction = actionToExecute != null,
+            )
         }
 
         eventsToForward?.let { forwardList ->
@@ -192,6 +257,9 @@ internal class KeyInterceptStateMachine<E>(
         }
         actionToExecute?.let { (action, keyCode) ->
             dispatchAction(action, keyCode)
+        }
+        if (wakeLockAction != KeyWakeLockAction.NONE) {
+            onWakeLockAction(wakeLockAction)
         }
         return consumed
     }
@@ -206,6 +274,7 @@ internal class KeyInterceptStateMachine<E>(
             longPressRunnables.clear()
             doubleTapRunnables.clear()
             keyStates.clear()
+            activeKeyPaths.clear()
             keyDownTimes.clear()
             passthroughDownTimes.clear()
             pendingDownEvents.clear()
@@ -216,6 +285,7 @@ internal class KeyInterceptStateMachine<E>(
             volumePassthroughUntil = 0L
         }
         runnablesToCancel.forEach(cancelDelay)
+        onWakeLockAction(KeyWakeLockAction.RELEASE)
     }
 
     private fun hasAnyActionLocked(keyCode: Int): Boolean =
@@ -233,6 +303,7 @@ internal class KeyInterceptStateMachine<E>(
 
     private fun handleKeyDownLocked(
         info: EventInfo,
+        source: KeyInterceptionPath,
         copyEvent: () -> E,
         setAction: (Pair<String, Int>) -> Unit,
         setForward: (List<E>) -> Unit,
@@ -251,13 +322,13 @@ internal class KeyInterceptStateMachine<E>(
                 return true
             }
             if (currentState == STATE_IDLE) {
-                return startNewPressLocked(info, copyEvent)
+                return startNewPressLocked(info, source, copyEvent)
             }
             return false
         }
 
         return when (currentState) {
-            STATE_IDLE -> startNewPressLocked(info, copyEvent)
+            STATE_IDLE -> startNewPressLocked(info, source, copyEvent)
             STATE_WAITING_DOUBLE -> {
                 cancelDoubleTapTimeoutLocked(keyCode)
 
@@ -275,7 +346,7 @@ internal class KeyInterceptStateMachine<E>(
                     true
                 } else {
                     setForward(drainPendingForForwardLocked(keyCode))
-                    startNewPressLocked(info, copyEvent)
+                    startNewPressLocked(info, source, copyEvent)
                 }
             }
             STATE_PRESSED -> true
@@ -283,9 +354,14 @@ internal class KeyInterceptStateMachine<E>(
         }
     }
 
-    private fun startNewPressLocked(info: EventInfo, copyEvent: () -> E): Boolean {
+    private fun startNewPressLocked(
+        info: EventInfo,
+        source: KeyInterceptionPath,
+        copyEvent: () -> E,
+    ): Boolean {
         val keyCode = info.keyCode
         keyStates[keyCode] = STATE_PRESSED
+        activeKeyPaths[keyCode] = source
         keyDownTimes[keyCode] = info.downTime
         pendingDownEvents[keyCode] = copyEvent()
         pendingUpEvents.remove(keyCode)
@@ -309,9 +385,7 @@ internal class KeyInterceptStateMachine<E>(
         val currentState = keyStates[keyCode] ?: STATE_IDLE
 
         if (currentState == STATE_PASSTHROUGH) {
-            keyStates[keyCode] = STATE_IDLE
-            keyConsumed[keyCode] = false
-            clearPendingLocked(keyCode)
+            clearKeyStateLocked(keyCode)
             val rebasedDownTime = passthroughDownTimes.remove(keyCode)
             val upEvent = if (rebasedDownTime != null) {
                 val nowUptime = maxOf(uptimeMs(), rebasedDownTime)
@@ -335,9 +409,7 @@ internal class KeyInterceptStateMachine<E>(
         val pressDuration = info.eventTime - downTime
 
         if (keyConsumed[keyCode] == true) {
-            keyStates[keyCode] = STATE_IDLE
-            keyConsumed[keyCode] = false
-            clearPendingLocked(keyCode)
+            clearKeyStateLocked(keyCode)
             return true
         }
 
@@ -351,9 +423,7 @@ internal class KeyInterceptStateMachine<E>(
             }
 
             if (hasActionLocked(keyCode, MODE_CLICK)) {
-                keyStates[keyCode] = STATE_IDLE
-                keyConsumed[keyCode] = false
-                clearPendingLocked(keyCode)
+                clearKeyStateLocked(keyCode)
 
                 val action = getActionLocked(keyCode, MODE_CLICK)
                 log("Key $keyCode click -> $action")
@@ -364,15 +434,12 @@ internal class KeyInterceptStateMachine<E>(
             pendingUpEvents[keyCode] = copyEvent()
             pendingUpEventTimes[keyCode] = info.eventTime
             setForward(drainPendingForForwardLocked(keyCode))
-            keyStates[keyCode] = STATE_IDLE
-            keyConsumed[keyCode] = false
+            clearKeyStateLocked(keyCode)
             return true
         } else {
             // Held past long-press threshold without timeout consuming it
             if (hasActionLocked(keyCode, MODE_LONG_PRESS)) {
-                keyStates[keyCode] = STATE_IDLE
-                keyConsumed[keyCode] = false
-                clearPendingLocked(keyCode)
+                clearKeyStateLocked(keyCode)
 
                 val action = getActionLocked(keyCode, MODE_LONG_PRESS)
                 log("Key $keyCode long-press (on release) -> $action")
@@ -383,8 +450,7 @@ internal class KeyInterceptStateMachine<E>(
             pendingUpEvents[keyCode] = copyEvent()
             pendingUpEventTimes[keyCode] = info.eventTime
             setForward(drainPendingForForwardLocked(keyCode))
-            keyStates[keyCode] = STATE_IDLE
-            keyConsumed[keyCode] = false
+            clearKeyStateLocked(keyCode)
             return true
         }
     }
@@ -396,11 +462,13 @@ internal class KeyInterceptStateMachine<E>(
         runnable = Runnable {
             var actionToExecute: Pair<String, Int>? = null
             var eventToForward: List<E>? = null
+            var wakeLockAction = KeyWakeLockAction.NONE
 
             synchronized(lock) {
                 if (longPressRunnables[keyCode] !== runnable) return@Runnable
                 longPressRunnables.remove(keyCode)
 
+                val wasScreenOffQueueing = needsScreenOffWakeLock(keyCode, activeKeyPaths[keyCode])
                 if (keyStates[keyCode] == STATE_PRESSED && keyConsumed[keyCode] != true) {
                     if (hasActionLocked(keyCode, MODE_LONG_PRESS)) {
                         keyConsumed[keyCode] = true
@@ -423,11 +491,18 @@ internal class KeyInterceptStateMachine<E>(
                             eventToForward = listOf(rebaseEvent(downEvent, handoffTime, handoffTime))
                         }
                     }
+                    wakeLockAction = computeWakeLockActionLocked(
+                        wasScreenOffQueueing = wasScreenOffQueueing,
+                        dispatchedAction = actionToExecute != null,
+                    )
                 }
             }
 
             eventToForward?.let(onForwardEvents)
             actionToExecute?.let { (action, code) -> dispatchAction(action, code) }
+            if (wakeLockAction != KeyWakeLockAction.NONE) {
+                onWakeLockAction(wakeLockAction)
+            }
         }
         longPressRunnables[keyCode] = runnable
         scheduleDelay(longPressTimeout, runnable)
@@ -444,23 +519,27 @@ internal class KeyInterceptStateMachine<E>(
         runnable = Runnable {
             var actionToExecute: Pair<String, Int>? = null
             var eventsToForward: List<E>? = null
+            var wakeLockAction = KeyWakeLockAction.NONE
 
             synchronized(lock) {
                 if (doubleTapRunnables[keyCode] !== runnable) return@Runnable
                 doubleTapRunnables.remove(keyCode)
 
                 if (keyStates[keyCode] == STATE_WAITING_DOUBLE) {
-                    keyStates[keyCode] = STATE_IDLE
-                    keyConsumed[keyCode] = false
-
+                    val wasScreenOffQueueing = needsScreenOffWakeLock(keyCode, activeKeyPaths[keyCode])
                     if (hasActionLocked(keyCode, MODE_CLICK)) {
-                        clearPendingLocked(keyCode)
+                        clearKeyStateLocked(keyCode)
                         val action = getActionLocked(keyCode, MODE_CLICK)
                         log("Key $keyCode click (after double-tap timeout) -> $action")
                         actionToExecute = action to keyCode
                     } else {
                         eventsToForward = drainPendingForForwardLocked(keyCode)
+                        clearKeyStateLocked(keyCode)
                     }
+                    wakeLockAction = computeWakeLockActionLocked(
+                        wasScreenOffQueueing = wasScreenOffQueueing,
+                        dispatchedAction = actionToExecute != null,
+                    )
                 }
             }
 
@@ -468,6 +547,9 @@ internal class KeyInterceptStateMachine<E>(
                 if (list.isNotEmpty()) onForwardEvents(list)
             }
             actionToExecute?.let { (action, code) -> dispatchAction(action, code) }
+            if (wakeLockAction != KeyWakeLockAction.NONE) {
+                onWakeLockAction(wakeLockAction)
+            }
         }
         doubleTapRunnables[keyCode] = runnable
         scheduleDelay(doubleTapTimeout, runnable)
@@ -494,6 +576,25 @@ internal class KeyInterceptStateMachine<E>(
         pendingUpEventTimes.remove(keyCode)
     }
 
+    private fun clearKeyStateLocked(keyCode: Int) {
+        keyStates[keyCode] = STATE_IDLE
+        activeKeyPaths.remove(keyCode)
+        keyDownTimes.remove(keyCode)
+        keyConsumed[keyCode] = false
+        clearPendingLocked(keyCode)
+    }
+
+    private fun computeWakeLockActionLocked(
+        wasScreenOffQueueing: Boolean,
+        dispatchedAction: Boolean,
+    ): KeyWakeLockAction {
+        if (activeKeyPaths.entries.any { (code, path) -> needsScreenOffWakeLock(code, path) }) {
+            return KeyWakeLockAction.ACQUIRE_RECOGNITION
+        }
+        if (!wasScreenOffQueueing) return KeyWakeLockAction.NONE
+        return if (dispatchedAction) KeyWakeLockAction.ACQUIRE_DISPATCH_GRACE else KeyWakeLockAction.RELEASE
+    }
+
     private fun dispatchAction(action: String, keyCode: Int) {
         if (action.isEmpty() || action == "none") return
         onExecuteAction(action, keyCode)
@@ -505,13 +606,16 @@ internal class KeyInterceptStateMachine<E>(
  * Keys are trigger sources parallel to gestures.
  *
  * - Power key (`KEYCODE_POWER`): intercepted in `InputManagerService.interceptKeyBeforeQueueing`
- *   because `PhoneWindowManager` handles power key there and strips `ACTION_PASS_TO_USER`.
+ *   while interactive because `PhoneWindowManager` strips `ACTION_PASS_TO_USER` there.
  * - Volume keys (`KEYCODE_VOLUME_UP` / `KEYCODE_VOLUME_DOWN`): intercepted in
- *   `filterInputEvent` / `interceptKeyBeforeDispatching`.
+ *   `interceptKeyBeforeQueueing` while screen-off (when enabled) and in
+ *   `filterInputEvent` / `interceptKeyBeforeDispatching` while screen-on.
  */
 object KeyManager {
 
     private const val TAG = "EdgeX"
+    private const val WAKE_LOCK_EXTRA_MS = 2000L
+    private const val WAKE_LOCK_DISPATCH_GRACE_MS = 500L
 
     const val MODE_CLICK = KeyInterceptStateMachine.MODE_CLICK
     const val MODE_DOUBLE_CLICK = KeyInterceptStateMachine.MODE_DOUBLE_CLICK
@@ -529,6 +633,11 @@ object KeyManager {
 
     @Volatile
     private var cachedGlobalInject: Pair<Any, Method>? = null
+
+    // Partial wake lock for screen-off deferred recognition (long-press / double-tap)
+    @Volatile
+    private var recognitionWakeLock: PowerManager.WakeLock? = null
+    private val wakeLockMonitor = Any()
 
     private val stateMachine = KeyInterceptStateMachine<KeyEvent>(
         scheduleDelay = { delayMs, runnable -> handler.postDelayed(runnable, delayMs) },
@@ -550,6 +659,9 @@ object KeyManager {
                     events.forEach { injectKeyEvent(it, ctx) }
                 }
             }
+        },
+        onWakeLockAction = { action ->
+            applyWakeLock(lastContext, action)
         },
         rebaseEvent = { event, downTime, eventTime ->
             KeyEvent(
@@ -573,6 +685,7 @@ object KeyManager {
         lastContext = context
         stateMachine.longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
         stateMachine.doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+        ensureWakeLock(context)
     }
 
     fun updateConfig(configCache: Map<String, String>) {
@@ -586,9 +699,10 @@ object KeyManager {
     fun handleKeyEvent(
         event: KeyEvent,
         context: Context,
-        param: XC_MethodHook.MethodHookParam,
         policyFlags: Int = 0,
-        fromBeforeQueueing: Boolean = false,
+        source: KeyInterceptionPath = KeyInterceptionPath.DISPATCH,
+        isScreenInteractive: Boolean = true,
+        isKeyguardLocked: Boolean = false,
     ): Boolean {
         lastContext = context
         val info = KeyInterceptStateMachine.EventInfo(
@@ -602,12 +716,52 @@ object KeyManager {
         return stateMachine.handleKeyEvent(
             info = info,
             copyEvent = { KeyEvent(event) },
-            fromBeforeQueueing = fromBeforeQueueing,
+            source = source,
+            isScreenInteractive = isScreenInteractive,
+            isKeyguardLocked = isKeyguardLocked,
         )
     }
 
     fun reset() {
         stateMachine.reset()
+    }
+
+    private fun ensureWakeLock(context: Context?): PowerManager.WakeLock? {
+        recognitionWakeLock?.let { return it }
+        val ctx = context ?: return null
+        return synchronized(wakeLockMonitor) {
+            recognitionWakeLock ?: runCatching {
+                val pm = ctx.getSystemService(PowerManager::class.java) ?: return@runCatching null
+                pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "EdgeX:KeyRecognition").apply {
+                    setReferenceCounted(false)
+                }
+            }.getOrNull()?.also { recognitionWakeLock = it }
+        }
+    }
+
+    private fun applyWakeLock(context: Context?, action: KeyWakeLockAction) {
+        if (action == KeyWakeLockAction.NONE) return
+        val wl = ensureWakeLock(context) ?: return
+        runCatching {
+            synchronized(wakeLockMonitor) {
+                when (action) {
+                    KeyWakeLockAction.ACQUIRE_RECOGNITION -> {
+                        val timeout = maxOf(
+                            stateMachine.longPressTimeout,
+                            stateMachine.doubleTapTimeout,
+                        ) + WAKE_LOCK_EXTRA_MS
+                        wl.acquire(timeout)
+                    }
+                    KeyWakeLockAction.ACQUIRE_DISPATCH_GRACE -> {
+                        wl.acquire(WAKE_LOCK_DISPATCH_GRACE_MS)
+                    }
+                    KeyWakeLockAction.RELEASE -> {
+                        if (wl.isHeld) wl.release()
+                    }
+                    KeyWakeLockAction.NONE -> Unit
+                }
+            }
+        }
     }
 
     private fun injectKeyEvent(event: KeyEvent, context: Context) {

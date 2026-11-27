@@ -1,6 +1,7 @@
 package com.fan.edgex.hook
 
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -8,6 +9,7 @@ import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -565,30 +567,33 @@ object GestureManager {
         if (!configRepository.isGesturesEnabled()) return false
         if (GameModeManager.isActive) return false
 
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            val allowLocked = TriggerConditionPolicy.parseTriggerEnabled(
+                configRepository.get(AppConfig.GESTURES_TRIGGER_LOCKED),
+            )
+            if (!TriggerConditionPolicy.shouldTriggerGesture(
+                    isKeyguardLocked = isKeyguardLocked(context),
+                    allowLocked = allowLocked,
+                )
+            ) {
+                return false
+            }
+        }
+
         return gestureDetector.handle(event, context)
     }
 
     /**
-     * Called from system_server (filterInputEvent / interceptKeyBeforeDispatching hook) for non-power KeyEvents.
+     * Called from system_server (interceptKeyBeforeQueueing / filterInputEvent /
+     * interceptKeyBeforeDispatching hooks) for KeyEvents.
      * Delegates to KeyManager for state machine processing.
      */
-    fun handleKeyEvent(event: KeyEvent, context: Context, hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam, policyFlags: Int = 0): Boolean {
-        ensureSystemServerInitialized(context, initializeKeys = true)
-
-        if (GameModeManager.isActive) return false
-        return KeyManager.handleKeyEvent(event, context, hookParam, policyFlags)
-    }
-
-    /**
-     * Called from system_server (interceptKeyBeforeQueueing hook) for KEYCODE_POWER.
-     * Power key never reaches filterInputEvent or interceptKeyBeforeDispatching because
-     * PhoneWindowManager strips ACTION_PASS_TO_USER during interceptKeyBeforeQueueing.
-     */
-    fun handlePowerKeyBeforeQueueing(
+    fun handleKeyEvent(
         event: KeyEvent,
         context: Context,
         hookParam: de.robv.android.xposed.XC_MethodHook.MethodHookParam,
-        policyFlags: Int,
+        policyFlags: Int = 0,
+        source: KeyInterceptionPath = KeyInterceptionPath.DISPATCH,
     ): Boolean {
         ensureSystemServerInitialized(context, initializeKeys = true)
 
@@ -596,11 +601,22 @@ object GestureManager {
         return KeyManager.handleKeyEvent(
             event = event,
             context = context,
-            param = hookParam,
             policyFlags = policyFlags,
-            fromBeforeQueueing = true,
+            source = source,
+            isScreenInteractive = isScreenInteractive(context),
+            isKeyguardLocked = isKeyguardLocked(context),
         )
     }
+
+    private fun isScreenInteractive(context: Context): Boolean =
+        runCatching {
+            context.getSystemService(PowerManager::class.java)?.isInteractive != false
+        }.getOrDefault(true)
+
+    private fun isKeyguardLocked(context: Context): Boolean =
+        runCatching {
+            context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+        }.getOrDefault(false)
 
     fun executeKeyAction(action: String, context: Context) {
         actionDispatcher.executeKeyAction(action, context)
