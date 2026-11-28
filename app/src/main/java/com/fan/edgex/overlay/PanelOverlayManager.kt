@@ -21,6 +21,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ThemeColorResolver
 import com.fan.edgex.hook.ModuleRes
@@ -398,6 +399,10 @@ private class PanelOverlayWindow(
             else -> "Scroll"
         }
         action.startsWith("multi_action:") -> "Multi"
+        ActionFlowStore.isDelay(action) -> "Delay"
+        action.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> "Repeat"
+        action == ActionFlowStore.ACTION_ABORT -> "Abort"
+        action == ActionFlowStore.ACTION_STOP_ALL -> "Stop All"
         else -> action
     }
 
@@ -502,6 +507,10 @@ private class PanelOverlayWindow(
             else -> R.drawable.ic_fast_scroll
         }
         action.startsWith("multi_action:") -> R.drawable.ic_multi_action
+        ActionFlowStore.isDelay(action) -> R.drawable.ic_delay
+        action.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> R.drawable.ic_repeat
+        action == ActionFlowStore.ACTION_ABORT -> R.drawable.ic_abort
+        action == ActionFlowStore.ACTION_STOP_ALL -> R.drawable.ic_stop_all
         action == "toggle_flashlight" -> R.drawable.ic_flashlight
         action == "toggle_wifi" -> R.drawable.ic_wifi
         action == "toggle_mobile_data" -> R.drawable.ic_mobile_data

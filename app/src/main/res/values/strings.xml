@@ -408,6 +408,17 @@
     <string name="multi_action_step_move_down">Move down</string>
     <string name="multi_action_execute_not_supported">Cannot execute \"%s\" from app context</string>
     <string name="multi_action_step_count">%d step(s)</string>
+    <string name="action_delay">Delay</string>
+    <string name="action_repeat">Repeat</string>
+    <string name="action_abort">Abort</string>
+    <string name="action_stop_all">Stop All</string>
+    <string name="delay_duration_label">Duration (ms)</string>
+    <string name="delay_duration_hint">e.g. 1000</string>
+    <string name="delay_summary">%1$s: %2$s</string>
+    <string name="repeat_count_label">Repeat Count</string>
+    <string name="repeat_count_hint">Enter repeat count</string>
+    <string name="repeat_action_label">Action</string>
+    <string name="repeat_summary">%1$s (%2$d): %3$s</string>
     <string name="icon_picker_title">Choose Icon</string>
     <string name="icon_picker_from_gallery">Choose from Gallery</string>
 

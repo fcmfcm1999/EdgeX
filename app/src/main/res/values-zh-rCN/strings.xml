@@ -428,6 +428,17 @@
     <string name="multi_action_step_move_down">下移</string>
     <string name="multi_action_execute_not_supported">无法在应用上下文中执行「%s」</string>
     <string name="multi_action_step_count">%d 个步骤</string>
+    <string name="action_delay">延时</string>
+    <string name="action_repeat">重复</string>
+    <string name="action_abort">终止</string>
+    <string name="action_stop_all">全部停止</string>
+    <string name="delay_duration_label">等待时长（毫秒）</string>
+    <string name="delay_duration_hint">例如 1000</string>
+    <string name="delay_summary">%1$s: %2$s</string>
+    <string name="repeat_count_label">重复次数</string>
+    <string name="repeat_count_hint">输入重复次数</string>
+    <string name="repeat_action_label">执行动作</string>
+    <string name="repeat_summary">%1$s (%2$d): %3$s</string>
     <string name="icon_picker_title">选择图标</string>
     <string name="icon_picker_from_gallery">从相册选择</string>
 

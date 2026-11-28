@@ -31,6 +31,7 @@ fun ConditionSheet(
     prefKey: String,
     title: String,
     excludedCodes: Set<String> = emptySet(),
+    includeMultiActionFlowControls: Boolean = false,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -157,6 +158,7 @@ fun ConditionSheet(
                 secondarySheet = null
             },
             excludedCodes = excludedCodes,
+            includeMultiActionFlowControls = includeMultiActionFlowControls,
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
@@ -188,6 +190,7 @@ fun ConditionSheet(
             prefKey = branchPrefKey,
             title = branchTitle,
             excludedCodes = excludedCodes,
+            includeMultiActionFlowControls = includeMultiActionFlowControls,
             onDismiss = {
                 secondarySheet = null
                 pickingBranch = null

@@ -26,6 +26,10 @@ object EdgeXIcons {
     @DrawableRes val Keys = R.drawable.ic_keyboard
     @DrawableRes val Pie = R.drawable.ic_pie_menu
     @DrawableRes val Multi = R.drawable.ic_multi_action
+    @DrawableRes val Delay = R.drawable.ic_delay
+    @DrawableRes val Repeat = R.drawable.ic_repeat
+    @DrawableRes val Abort = R.drawable.ic_abort
+    @DrawableRes val StopAll = R.drawable.ic_stop_all
     @DrawableRes val Theme = R.drawable.ic_theme
     @DrawableRes val DarkMode = R.drawable.ic_dark_mode
     @DrawableRes val Sparkle = R.drawable.ic_supporter_extra

@@ -2,10 +2,13 @@ package com.fan.edgex.ui.compose.components
 
 import androidx.compose.runtime.Composable
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.MultiActionStore
+import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfigsSync
 import com.fan.edgex.ui.compose.screens.ConditionSheet
 import com.fan.edgex.ui.compose.screens.MultiActionPickerSheet
+import com.fan.edgex.ui.compose.screens.RepeatSheet
 import com.fan.edgex.ui.compose.screens.SubGestureSheet
 
 enum class SecondaryType {
@@ -17,6 +20,8 @@ enum class SecondaryType {
     SubGesture,
     Condition,
     MultiAction,
+    Delay,
+    Repeat,
     ;
 
     companion object {
@@ -29,6 +34,8 @@ enum class SecondaryType {
             "sub_gesture" -> SubGesture
             "condition" -> Condition
             "multi_action" -> MultiAction
+            ActionFlowStore.ACTION_DELAY_MENU -> Delay
+            ActionFlowStore.ACTION_REPEAT_MENU -> Repeat
             else -> null
         }
     }
@@ -40,6 +47,7 @@ fun SecondaryActionDispatcher(
     prefKey: String,
     title: String,
     excludedCodes: Set<String> = emptySet(),
+    includeMultiActionFlowControls: Boolean = false,
     onCreateMultiAction: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
@@ -133,6 +141,7 @@ fun SecondaryActionDispatcher(
                 prefKey = prefKey,
                 title = title,
                 excludedCodes = excludedCodes,
+                includeMultiActionFlowControls = includeMultiActionFlowControls,
                 onDismiss = onDismiss,
                 onSaved = onSaved,
             )
@@ -152,6 +161,41 @@ fun SecondaryActionDispatcher(
                     )
                     onSaved()
                 },
+            )
+        }
+
+        SecondaryType.Delay -> {
+            val initialMs = ActionFlowStore.parseDelayMs(context.getConfigString(prefKey, ""))
+                ?: ActionFlowStore.DEFAULT_DELAY_MS
+            DelaySheet(
+                open = true,
+                initialDurationMs = initialMs,
+                onDismiss = onDismiss,
+                onSave = { durationMs ->
+                    val label = context.getString(
+                        R.string.delay_summary,
+                        context.getString(R.string.action_delay),
+                        ActionFlowStore.formatDelayDuration(durationMs),
+                    )
+                    context.putConfigsSync(
+                        prefKey to ActionFlowStore.buildDelayCode(durationMs),
+                        "${prefKey}_label" to label,
+                        "${prefKey}_title" to label,
+                    )
+                    onSaved()
+                },
+            )
+        }
+
+        SecondaryType.Repeat -> {
+            RepeatSheet(
+                open = true,
+                prefKey = prefKey,
+                title = title,
+                excludedCodes = excludedCodes,
+                includeMultiActionFlowControls = includeMultiActionFlowControls,
+                onDismiss = onDismiss,
+                onSaved = onSaved,
             )
         }
 

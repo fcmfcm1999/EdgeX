@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -62,6 +63,10 @@ val allActionSelectionItems = listOf(
     ActionSelectionItem("music_control", R.string.action_music_control, EdgeXIcons.Music, needsSecondary = true),
     ActionSelectionItem("fast_scroll", R.string.action_fast_scroll, EdgeXIcons.FastScroll, needsSecondary = true),
     ActionSelectionItem("multi_action", R.string.action_multi_action, EdgeXIcons.Multi, needsSecondary = true),
+    ActionSelectionItem(ActionFlowStore.ACTION_DELAY_MENU, R.string.action_delay, EdgeXIcons.Delay, needsSecondary = true),
+    ActionSelectionItem(ActionFlowStore.ACTION_REPEAT_MENU, R.string.action_repeat, EdgeXIcons.Repeat, needsSecondary = true),
+    ActionSelectionItem(ActionFlowStore.ACTION_ABORT, R.string.action_abort, EdgeXIcons.Abort),
+    ActionSelectionItem(ActionFlowStore.ACTION_STOP_ALL, R.string.action_stop_all, EdgeXIcons.StopAll),
     ActionSelectionItem("condition", R.string.action_condition, EdgeXIcons.Condition, needsSecondary = true),
     ActionSelectionItem(AppConfig.CUSTOM_PANEL_ACTION, R.string.action_custom_panel, EdgeXIcons.CustomPanel),
     ActionSelectionItem(AppConfig.SIDE_BAR_LEFT_ACTION, R.string.action_left_side_bar, EdgeXIcons.SideBarLeft),
@@ -79,13 +84,19 @@ fun ActionSelectionSheet(
     title: String,
     onDismiss: () -> Unit,
     excludedCodes: Set<String>,
+    includeMultiActionFlowControls: Boolean = false,
     onSelect: (ActionSelectionItem) -> Unit,
 ) {
     val colors = LocalEdgeXColors.current
     var searchQuery by remember { mutableStateOf("") }
 
-    val items = remember(excludedCodes) {
-        allActionSelectionItems.filter { it.code !in excludedCodes }
+    val effectiveExcluded = remember(excludedCodes, includeMultiActionFlowControls) {
+        if (includeMultiActionFlowControls) excludedCodes
+        else excludedCodes + ActionFlowStore.MULTI_ACTION_ONLY_FLOW_CODES
+    }
+
+    val items = remember(effectiveExcluded) {
+        allActionSelectionItems.filter { it.code !in effectiveExcluded }
     }
 
     val query = searchQuery.trim()

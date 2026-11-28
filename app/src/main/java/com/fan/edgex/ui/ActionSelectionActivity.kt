@@ -18,6 +18,7 @@ import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.putConfig
 
@@ -63,6 +64,10 @@ class ActionSelectionActivity : AppCompatActivity() {
             }
             code.startsWith("multi_action:") -> R.drawable.ic_multi_action
             code.startsWith("condition:") -> R.drawable.ic_condition
+            ActionFlowStore.isDelay(code) -> R.drawable.ic_delay
+            code.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> R.drawable.ic_repeat
+            code == ActionFlowStore.ACTION_ABORT -> R.drawable.ic_abort
+            code == ActionFlowStore.ACTION_STOP_ALL -> R.drawable.ic_stop_all
             code == AppConfig.CUSTOM_PANEL_ACTION -> R.drawable.ic_apps
             code == AppConfig.QUICK_SETTINGS_PANEL_ACTION -> R.drawable.ic_quick_settings
             code == AppConfig.SIDE_BAR_LEFT_ACTION -> R.drawable.ic_side_bar_left
@@ -115,7 +120,16 @@ class ActionSelectionActivity : AppCompatActivity() {
                 }
                 return context.getString(resId)
             }
+            ActionFlowStore.parseDelayMs(code)?.let { durationMs ->
+                return context.getString(
+                    R.string.delay_summary,
+                    context.getString(R.string.action_delay),
+                    ActionFlowStore.formatDelayDuration(durationMs),
+                )
+            }
             val resId = when (code) {
+                ActionFlowStore.ACTION_ABORT -> R.string.action_abort
+                ActionFlowStore.ACTION_STOP_ALL -> R.string.action_stop_all
                 "back" -> R.string.action_back
                 "home" -> R.string.action_home
                 "recents" -> R.string.action_recents

@@ -2,6 +2,7 @@ package com.fan.edgex.hook
 
 import android.annotation.SuppressLint
 import android.app.ActivityManager
+import android.app.AlarmManager
 import android.app.KeyguardManager
 import android.content.ComponentName
 import android.content.Context
@@ -13,6 +14,7 @@ import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.UserHandle
 import android.os.VibrationEffect
@@ -24,6 +26,7 @@ import com.fan.edgex.BuildConfig
 import com.fan.edgex.IShellCallback
 import com.fan.edgex.IShellExecutor
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ThemeColorResolver
 import com.fan.edgex.config.HookConfigSnapshot
@@ -313,11 +316,16 @@ internal class GestureActionDispatcher(
                     dispatchAction(selected, context, touchX, touchY, zone)
                 }
             }
-            action.startsWith("multi_action:") -> {
-                executeMultiAction(action, context, touchX, touchY, zone)
+            action == ActionFlowStore.ACTION_STOP_ALL -> {
+                actionQueueCoordinator?.stopAll()
             }
-            action.startsWith("condition:") -> {
-                executeConditionAction(action, context, touchX, touchY, zone)
+            action == ActionFlowStore.ACTION_ABORT || ActionFlowStore.isDelay(action) -> {
+                // Only active inside a running ActionQueueCoordinator queue (matches XposedEdge).
+            }
+            action.startsWith("multi_action:") ||
+                action.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) ||
+                action.startsWith("condition:") -> {
+                executeQueuedAction(action, context, touchX, touchY, zone)
             }
             action == "toggle_flashlight" -> {
                 FlashlightManager.toggle(context, handlerProvider())
@@ -370,17 +378,107 @@ internal class GestureActionDispatcher(
         false
     }
 
-    private fun executeConditionAction(
-        action: String,
-        context: Context,
-        touchX: Float,
-        touchY: Float,
-        zone: String?,
-    ) {
-        val id = action.removePrefix("condition:")
-        if (id.isBlank()) return
+    @Volatile private var actionQueueCoordinator: ActionQueueCoordinator? = null
+
+    private fun getOrCreateQueueCoordinator(context: Context): ActionQueueCoordinator {
+        actionQueueCoordinator?.let { return it }
+        synchronized(this) {
+            actionQueueCoordinator?.let { return it }
+            val appContext = context.applicationContext ?: context
+            val coordinator = ActionQueueCoordinator(
+                clock = object : ActionClock {
+                    override fun uptimeMillis(): Long = SystemClock.uptimeMillis()
+                },
+                scheduler = object : ActionQueueScheduler {
+                    override fun scheduleShort(delayMs: Long, task: () -> Unit): ActionCancellable {
+                        val handler = handlerProvider()
+                        val runnable = Runnable { task() }
+                        handler.postDelayed(runnable, delayMs.coerceAtLeast(0L))
+                        return object : ActionCancellable {
+                            override fun cancel() {
+                                handler.removeCallbacks(runnable)
+                            }
+                        }
+                    }
+
+                    override fun scheduleLong(delayMs: Long, task: () -> Unit): ActionCancellable {
+                        val handler = handlerProvider()
+                        val alarmManager = runCatching {
+                            appContext.getSystemService(AlarmManager::class.java)
+                        }.getOrNull()
+                        if (alarmManager != null) {
+                            val listener = AlarmManager.OnAlarmListener { task() }
+                            val scheduled = runCatching {
+                                alarmManager.setExact(
+                                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                    SystemClock.elapsedRealtime() + delayMs,
+                                    "EdgeX:ActionQueue",
+                                    listener,
+                                    handler,
+                                )
+                                true
+                            }.getOrElse {
+                                runCatching {
+                                    alarmManager.set(
+                                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                                        SystemClock.elapsedRealtime() + delayMs,
+                                        "EdgeX:ActionQueue",
+                                        listener,
+                                        handler,
+                                    )
+                                    true
+                                }.getOrDefault(false)
+                            }
+                            if (scheduled) {
+                                return object : ActionCancellable {
+                                    override fun cancel() {
+                                        runCatching { alarmManager.cancel(listener) }
+                                    }
+                                }
+                            }
+                        }
+                        return scheduleShort(delayMs, task)
+                    }
+                },
+                wakeLockFactory = { tag ->
+                    val pm = runCatching {
+                        appContext.getSystemService(PowerManager::class.java)
+                    }.getOrNull()
+                    val wl = runCatching {
+                        pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, tag)?.apply {
+                            setReferenceCounted(false)
+                        }
+                    }.getOrNull()
+                    if (wl == null) {
+                        NoOpWakeLock
+                    } else {
+                        object : ActionWakeLock {
+                            override fun acquire() {
+                                runCatching { wl.acquire(ActionQueueCoordinator.SHORT_DELAY_THRESHOLD_MS + 10_000L) }
+                            }
+
+                            override fun release() {
+                                runCatching { if (wl.isHeld) wl.release() }
+                            }
+                        }
+                    }
+                },
+                onError = { failedAction, t ->
+                    log("queued action '$failedAction' failed: ${t.message}")
+                },
+                log = { msg ->
+                    XposedBridge.log("EdgeX: $msg")
+                },
+            )
+            actionQueueCoordinator = coordinator
+            return coordinator
+        }
+    }
+
+    private fun evaluateConditionById(id: String, context: Context): Boolean {
+        if (id.isBlank()) return false
         val condCode = resolveConfig(ConditionStore.condIfKey(id))
-        if (condCode.isBlank()) return
+        if (condCode.isBlank()) return false
         val foregroundAppConfig = if (condCode == ConditionStore.FOREGROUND_APP) {
             ForegroundAppConditionConfig(
                 packageNames = ConditionStore.decodePackageNames(
@@ -390,44 +488,28 @@ internal class GestureActionDispatcher(
         } else {
             null
         }
-        val result = ConditionEvaluator.evaluate(condCode, context, foregroundAppConfig)
-        val nextAction = if (result) {
-            resolveConfig(ConditionStore.condThenKey(id))
-        } else {
-            resolveConfig(ConditionStore.condElseKey(id))
-        }
-        if (nextAction.isNotBlank() && nextAction != "none") {
-            dispatchAction(nextAction, context, touchX, touchY, zone)
-        }
+        return ConditionEvaluator.evaluate(condCode, context, foregroundAppConfig)
     }
 
-    private fun executeMultiAction(
+    private fun executeQueuedAction(
         action: String,
         context: Context,
         touchX: Float,
         touchY: Float,
         zone: String?,
     ) {
-        val id = action.removePrefix("multi_action:")
-        if (id.isBlank()) return
-        val steps = com.fan.edgex.config.MultiActionStore.getStepsFromConfig(resolveConfig, id)
-        if (steps.isEmpty()) return
-        val handler = handlerProvider()
-        var delay = 0L
-        for (step in steps) {
-            if (step.code.isBlank() || step.code == "none") continue
-            val code = step.code
-            de.robv.android.xposed.XposedBridge.log("EdgeX: multi_action step='$code' scheduledAt=${delay}ms")
-            handler.postDelayed({
-                try {
-                    de.robv.android.xposed.XposedBridge.log("EdgeX: multi_action executing step='$code'")
-                    dispatchAction(code, context, touchX, touchY, zone)
-                } catch (t: Throwable) {
-                    log("multi_action step '$code' failed: ${t.message}")
-                }
-            }, delay)
-            delay += stepSettleDuration(code)
-        }
+        val coordinator = getOrCreateQueueCoordinator(context)
+        val factory = ActionCursorFactory(
+            resolveConfig = resolveConfig,
+            evaluateCondition = { condId -> evaluateConditionById(condId, context) },
+        )
+        coordinator.start(
+            actionCode = action,
+            runCursorFactory = factory,
+            runDispatchLeaf = { leafCode ->
+                dispatchAction(leafCode, context, touchX, touchY, zone)
+            },
+        )
     }
 
     // How long to wait after this action before firing the next step.

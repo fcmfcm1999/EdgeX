@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionFlowStore
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.MultiAction
@@ -345,8 +346,31 @@ private fun MultiActionEditorScreen(
                         index = index,
                         step = step,
                         onEdit = {
-                            editingStepIndex = index
-                            choosingAction = true
+                            val tempKey = MultiActionStore.tempStepKey()
+                            when {
+                                ActionFlowStore.isDelay(step.code) -> {
+                                    context.putConfig(tempKey, step.code)
+                                    context.putConfig("${tempKey}_label", step.label)
+                                    secondaryTargetIndex = index
+                                    secondaryType = SecondaryType.Delay
+                                }
+                                step.code.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> {
+                                    context.putConfig(tempKey, step.code)
+                                    context.putConfig("${tempKey}_label", step.label)
+                                    secondaryTargetIndex = index
+                                    secondaryType = SecondaryType.Repeat
+                                }
+                                step.code.startsWith("condition:") -> {
+                                    context.putConfig(tempKey, step.code)
+                                    context.putConfig("${tempKey}_label", step.label)
+                                    conditionTargetIndex = index
+                                    showConditionSheet = true
+                                }
+                                else -> {
+                                    editingStepIndex = index
+                                    choosingAction = true
+                                }
+                            }
                         },
                         onMore = { optionsStepIndex = index },
                     )
@@ -473,7 +497,8 @@ private fun MultiActionEditorScreen(
             choosingAction = false
             editingStepIndex = null
         },
-        excludedCodes = setOf("multi_action"),
+        excludedCodes = setOf("none", "multi_action"),
+        includeMultiActionFlowControls = true,
         onSelect = { action ->
             val targetIndex = editingStepIndex
             when (action.code) {
@@ -499,7 +524,8 @@ private fun MultiActionEditorScreen(
                     showConditionSheet = true
                     choosingAction = false
                 }
-                "shell_command", "music_control", "fast_scroll", "app_shortcut", "sub_gesture" -> {
+                "shell_command", "music_control", "fast_scroll", "app_shortcut", "sub_gesture",
+                ActionFlowStore.ACTION_DELAY_MENU, ActionFlowStore.ACTION_REPEAT_MENU -> {
                     val tempKey = MultiActionStore.tempStepKey()
                     val current = targetIndex?.let { steps.getOrNull(it) }
                     context.putConfig(tempKey, current?.code.orEmpty())
@@ -517,6 +543,8 @@ private fun MultiActionEditorScreen(
         open = showConditionSheet,
         prefKey = MultiActionStore.tempStepKey(),
         title = stringResource(R.string.action_condition),
+        excludedCodes = setOf("multi_action"),
+        includeMultiActionFlowControls = true,
         onDismiss = { showConditionSheet = false; conditionTargetIndex = null },
         onSaved = {
             val tempKey = MultiActionStore.tempStepKey()
@@ -541,6 +569,8 @@ private fun MultiActionEditorScreen(
             type = activeSecondaryType,
             prefKey = MultiActionStore.tempStepKey(),
             title = stringResource(R.string.header_action_selection),
+            excludedCodes = setOf("multi_action"),
+            includeMultiActionFlowControls = true,
             onDismiss = {
                 secondaryType = null
                 secondaryTargetIndex = null
@@ -956,6 +986,13 @@ private data class MultiActionStepPresentation(
 )
 
 private fun Context.multiActionPreviewLabel(step: MultiActionStep): String {
+    ActionFlowStore.parseDelayMs(step.code)?.let { ms ->
+        return getString(
+            R.string.delay_summary,
+            getString(R.string.action_delay),
+            ActionFlowStore.formatDelayDuration(ms),
+        )
+    }
     val presentation = presentMultiStep(step)
     return presentation.subtitle ?: presentation.title
 }
@@ -1007,6 +1044,22 @@ private fun Context.presentMultiStep(step: MultiActionStep): MultiActionStepPres
         }
         step.code.startsWith("condition:") -> {
             MultiActionStepPresentation(getString(R.string.action_condition), step.label)
+        }
+        ActionFlowStore.parseDelayMs(step.code) != null -> {
+            val ms = ActionFlowStore.parseDelayMs(step.code) ?: 0L
+            MultiActionStepPresentation(
+                title = getString(R.string.action_delay),
+                subtitle = ActionFlowStore.formatDelayDuration(ms),
+            )
+        }
+        step.code.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> {
+            MultiActionStepPresentation(getString(R.string.action_repeat), step.label)
+        }
+        step.code == ActionFlowStore.ACTION_ABORT -> {
+            MultiActionStepPresentation(getString(R.string.action_abort), null)
+        }
+        step.code == ActionFlowStore.ACTION_STOP_ALL -> {
+            MultiActionStepPresentation(getString(R.string.action_stop_all), null)
         }
         else -> MultiActionStepPresentation(step.label, null)
     }
@@ -1219,6 +1272,10 @@ private fun iconForStep(step: MultiActionStep): Int = when {
     step.code.startsWith("shell:") -> R.drawable.ic_terminal
     step.code.startsWith("multi_action:") -> R.drawable.ic_multi_action
     step.code.startsWith("condition:") -> R.drawable.ic_condition
+    ActionFlowStore.isDelay(step.code) -> R.drawable.ic_delay
+    step.code.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> R.drawable.ic_repeat
+    step.code == ActionFlowStore.ACTION_ABORT -> R.drawable.ic_abort
+    step.code == ActionFlowStore.ACTION_STOP_ALL -> R.drawable.ic_stop_all
     else -> R.drawable.ic_action_dot
 }
 
