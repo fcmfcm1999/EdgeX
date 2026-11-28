@@ -527,12 +527,19 @@ internal class GestureActionDispatcher(
                 else {
                     val label = resolveConfig(AppConfig.pieSlotLabel(edge, ring, slot)).ifEmpty { pieActionToLabel(action) }
                     val icon = loadActionIcon(context, action)
-                    PieView.Slot(label, action, icon)
+                    val isFrozen = isLaunchAppFrozen(context, action)
+                    PieView.Slot(label, action, icon, isFrozen)
                 }
             })
         }
         if (rings.all { it.slots.isEmpty() }) return
         PieManager.show(context, anchorX, anchorY, edge, rings, resolvePieColor(), resolvePieSizeScale())
+    }
+
+    private fun isLaunchAppFrozen(context: Context, action: String): Boolean {
+        if (!action.startsWith("launch_app:")) return false
+        val pkg = action.removePrefix("launch_app:").trim()
+        return FreezerAppLauncher.isPackageFrozen(context.packageManager, pkg)
     }
 
     private fun resolvePieColor(): Int {
@@ -548,7 +555,7 @@ internal class GestureActionDispatcher(
     private fun loadActionIcon(context: Context, action: String): Drawable? {
         if (action.startsWith("launch_app:")) {
             val pkg = action.substringAfter("launch_app:")
-            try { return context.packageManager.getApplicationIcon(pkg) } catch (_: Exception) {}
+            try { return context.packageManager.getApplicationIcon(pkg).mutate() } catch (_: Exception) {}
         }
         val resId = actionToIconRes(action)
         if (resId == 0) return null
@@ -986,15 +993,14 @@ internal class GestureActionDispatcher(
 
     private fun launchApp(context: Context, action: String) {
         try {
-            val packageName = action.removePrefix("launch_app:")
+            val packageName = action.removePrefix("launch_app:").trim()
             if (packageName.isBlank()) return
-            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            } else {
-                showToast(context, ModuleRes.getString(R.string.toast_app_not_found))
-            }
+            FreezerAppLauncher.launchOrUnfreeze(
+                context = context,
+                packageName = packageName,
+                handler = handlerProvider(),
+                log = log,
+            )
         } catch (e: Throwable) {
             log("launchApp failed: ${e.message}")
         }

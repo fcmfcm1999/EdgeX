@@ -401,58 +401,20 @@ class DrawerWindow(
     }
 
     private fun threadUnfreeze(packageName: String, label: String, pm: android.content.pm.PackageManager) {
-        de.robv.android.xposed.XposedBridge.log("EdgeX: DrawerWindow.threadUnfreeze - packageName: $packageName")
-        Thread {
-            var success = false
-            try {
-                pm.setApplicationEnabledSetting(
-                    packageName,
-                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    0
-                )
-                success = true
-                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze SUCCESS for $packageName")
-            } catch (e: Exception) {
-                de.robv.android.xposed.XposedBridge.log("EdgeX: PM API unfreeze FAILED for $packageName: ${e.message}")
-            }
-
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                if (success) launchApp(context, pm, packageName)
-                else com.fan.edgex.hook.EdgeXSystemToast.show(
-                    context,
-                    ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
-                )
-            }
-        }.start()
+        com.fan.edgex.hook.FreezerAppLauncher.unfreezeAndLaunch(
+            context = context,
+            packageName = packageName,
+            onLaunched = { dismiss() },
+        )
     }
 
     private fun launchApp(context: Context, pm: android.content.pm.PackageManager, packageName: String) {
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        var retries = 0
-        var task: Runnable? = null
-        task = Runnable {
-            try {
-                val intent = pm.getLaunchIntentForPackage(packageName)
-                if (intent != null) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                    context.startActivity(intent)
-                    dismiss()
-                } else if (++retries < 10) {
-                    handler.postDelayed(task!!, 200)
-                } else {
-                    com.fan.edgex.hook.EdgeXSystemToast.show(
-                        context,
-                        ModuleRes.getString(R.string.toast_launch_timeout),
-                    )
-                }
-            } catch (e: Exception) {
-                com.fan.edgex.hook.EdgeXSystemToast.show(
-                    context,
-                    ModuleRes.getString(R.string.toast_launch_error, e.message),
-                )
-            }
-        }
-        task.run()
+        com.fan.edgex.hook.FreezerAppLauncher.launchWithRetry(
+            context = context,
+            pm = pm,
+            packageName = packageName,
+            onLaunched = { dismiss() },
+        )
     }
 
     fun isShowing() = rootView != null

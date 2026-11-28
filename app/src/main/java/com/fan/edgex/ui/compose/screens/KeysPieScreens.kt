@@ -440,6 +440,7 @@ private data class PieSlotUi(
     val action: String,
     val icon: Int?,
     val appIcon: Drawable?,
+    val isFrozen: Boolean = false,
 )
 
 private data class PieGeometry(
@@ -671,6 +672,7 @@ private fun Context.loadPieSlots(edge: PieEdge): List<PieSlotUi> {
                 .takeIf { it.isNotBlank() }
                 ?: none
             val appIcon = loadLaunchAppIcon(action)
+            val isFrozen = isLaunchAppFrozen(action)
             PieSlotUi(
                 sector = PieSector(ring, slot),
                 label = label,
@@ -681,6 +683,7 @@ private fun Context.loadPieSlots(edge: PieEdge): List<PieSlotUi> {
                     null
                 },
                 appIcon = appIcon,
+                isFrozen = isFrozen,
             )
         }
     }
@@ -695,21 +698,59 @@ private fun Context.loadLaunchAppIcon(action: String): Drawable? {
     return runCatching { packageManager.getApplicationIcon(packageName) }.getOrNull()
 }
 
+private fun Context.isLaunchAppFrozen(action: String): Boolean {
+    if (!action.startsWith("launch_app:")) return false
+    val packageName = action.removePrefix("launch_app:").trim()
+    if (packageName.isBlank()) return false
+    return runCatching { !packageManager.getApplicationInfo(packageName, 0).enabled }.getOrDefault(false)
+}
+
+private val piePreviewFrozenColorFilter = android.graphics.ColorMatrixColorFilter(
+    android.graphics.ColorMatrix().apply { setSaturation(0f) },
+)
+
 @Composable
 private fun PieSlotIcon(slot: PieSlotUi, tint: Color, iconSize: Dp) {
     if (slot.appIcon != null) {
-        AndroidView(
-            factory = { context ->
-                ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+        Box(modifier = Modifier.size(iconSize)) {
+            AndroidView(
+                factory = { context ->
+                    ImageView(context).apply {
+                        scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    }
+                },
+                update = { imageView ->
+                    val drawable = slot.appIcon.constantState?.newDrawable()?.mutate() ?: slot.appIcon
+                    imageView.setImageDrawable(drawable)
+                    if (slot.isFrozen) {
+                        imageView.colorFilter = piePreviewFrozenColorFilter
+                        imageView.alpha = 0.55f
+                    } else {
+                        imageView.colorFilter = null
+                        imageView.alpha = 1f
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (slot.isFrozen) {
+                val badgeSize = (iconSize * 0.44f).coerceAtLeast(10.dp)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(badgeSize)
+                        .clip(RoundedCornerShape(badgeSize * 0.38f))
+                        .background(Color(0xD20C1234)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "❄",
+                        color = Color(0xFF90CAF9),
+                        fontSize = (badgeSize.value * 0.62f).sp,
+                        lineHeight = (badgeSize.value * 0.72f).sp,
+                    )
                 }
-            },
-            update = { imageView ->
-                val drawable = slot.appIcon.constantState?.newDrawable()?.mutate() ?: slot.appIcon
-                imageView.setImageDrawable(drawable)
-            },
-            modifier = Modifier.size(iconSize),
-        )
+            }
+        }
     } else {
         slot.icon?.let { icon ->
             EdgeXIcon(

@@ -1,6 +1,9 @@
 package com.fan.edgex.ui.compose.screens
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
@@ -22,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +45,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.FreezerAppPolicy
 import com.fan.edgex.config.FreezerBootstrap
 import com.fan.edgex.config.configPrefs
+import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.ui.compose.components.EdgeXChip
 import com.fan.edgex.ui.compose.components.EdgeXDivider
@@ -84,16 +94,19 @@ fun FreezerScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     var apps by remember { mutableStateOf<List<FreezerApp>>(emptyList()) }
+    var freezerPackages by remember { mutableStateOf<Set<String>>(emptySet()) }
     var loading by remember { mutableStateOf(true) }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(FreezerFilter.All) }
     var busyPackage by remember { mutableStateOf<String?>(null) }
 
-    fun reload() {
+    fun reload(showSpinner: Boolean = true) {
         scope.launch {
-            loading = true
+            if (showSpinner) loading = true
+            freezerPackages = FreezerAppPolicy.parseFreezerPackages(context.getConfigString(AppConfig.FREEZER_APP_LIST))
             apps = context.loadFreezerApps()
             loading = false
         }
@@ -101,8 +114,38 @@ fun FreezerScreen(
 
     LaunchedEffect(Unit) {
         FreezerBootstrap.ensureMigrated(context)
+        freezerPackages = FreezerAppPolicy.parseFreezerPackages(context.getConfigString(AppConfig.FREEZER_APP_LIST))
         apps = context.loadFreezerApps()
         loading = false
+    }
+
+    DisposableEffect(lifecycleOwner, context) {
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                reload(showSpinner = apps.isEmpty())
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(lifecycleObserver)
+
+        val packageReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                reload(showSpinner = false)
+            }
+        }
+        val filterIntent = IntentFilter(Intent.ACTION_PACKAGE_CHANGED).apply {
+            addDataScheme("package")
+        }
+        ContextCompat.registerReceiver(
+            context,
+            packageReceiver,
+            filterIntent,
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(lifecycleObserver)
+            runCatching { context.unregisterReceiver(packageReceiver) }
+        }
     }
 
     val displayed = apps.filter { app ->
@@ -177,14 +220,18 @@ fun FreezerScreen(
             }
         }
 
-        if (frozenCount > 0) {
+        if (freezerPackages.isNotEmpty() || frozenCount > 0) {
             FloatingActionButton(
                 onClick = {
                     scope.launch {
                         showToast(context.getString(R.string.compose_refreezing))
+                        val targets = FreezerAppPolicy.packagesToRefreeze(
+                            freezerPackages = freezerPackages,
+                            enabledStateByPackage = apps.associate { it.packageName to !it.frozen },
+                        )
                         withContext(Dispatchers.IO) {
-                            apps.filter { it.frozen }.forEach {
-                                runRootCommand("pm disable ${it.packageName}")
+                            targets.forEach { pkg ->
+                                runRootCommand("pm disable $pkg")
                             }
                         }
                         reload()

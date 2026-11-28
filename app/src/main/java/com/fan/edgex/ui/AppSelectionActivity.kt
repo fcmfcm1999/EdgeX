@@ -16,6 +16,9 @@ import androidx.core.widget.addTextChangedListener
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.fan.edgex.R
+import com.fan.edgex.config.AppConfig
+import com.fan.edgex.config.FreezerAppPolicy
+import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfigsSync
 import java.util.Locale
 
@@ -104,7 +107,7 @@ class AppSelectionActivity : AppCompatActivity() {
         Thread {
             val pm = packageManager
             val mainIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-            val apps = pm.queryIntentActivities(mainIntent, 0)
+            val enabledApps = pm.queryIntentActivities(mainIntent, 0)
                 .map { ri ->
                     AppItem(
                         packageName = ri.activityInfo.packageName,
@@ -112,7 +115,33 @@ class AppSelectionActivity : AppCompatActivity() {
                         icon = try { ri.loadIcon(pm) } catch (_: Exception) { null },
                     )
                 }
-                .sortedBy { it.label }
+            val freezerPackages = FreezerAppPolicy.parseFreezerPackages(
+                getConfigString(AppConfig.FREEZER_APP_LIST),
+            )
+            val disabledCandidates = if (freezerPackages.isNotEmpty()) {
+                pm.queryIntentActivities(mainIntent, android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS)
+                    .filter { ri ->
+                        val appInfo = ri.activityInfo.applicationInfo
+                        !appInfo.enabled && appInfo.packageName in freezerPackages
+                    }
+                    .map { ri ->
+                        AppItem(
+                            packageName = ri.activityInfo.packageName,
+                            label = ri.loadLabel(pm).toString(),
+                            icon = try { ri.loadIcon(pm) } catch (_: Exception) { null },
+                        )
+                    }
+            } else {
+                emptyList()
+            }
+            val apps = FreezerAppPolicy.mergeLaunchableApps(
+                enabledApps = enabledApps,
+                disabledCandidates = disabledCandidates,
+                freezerPackages = freezerPackages,
+                packageNameOf = { it.packageName },
+                enabledOf = { false },
+                labelOf = { it.label },
+            )
 
             runOnUiThread {
                 allApps.clear()

@@ -4,6 +4,8 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -11,6 +13,7 @@ import android.graphics.drawable.Drawable
 import android.text.TextPaint
 import android.util.TypedValue
 import android.view.View
+import androidx.core.graphics.toColorInt
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -18,7 +21,12 @@ import kotlin.math.sqrt
 
 class PieView(context: Context) : View(context) {
 
-    data class Slot(val label: String, val action: String, val icon: Drawable? = null)
+    data class Slot(
+        val label: String,
+        val action: String,
+        val icon: Drawable? = null,
+        val isFrozen: Boolean = false,
+    )
     data class Ring(val slots: List<Slot>)
 
     private companion object {
@@ -31,6 +39,9 @@ class PieView(context: Context) : View(context) {
         const val ICON_SIZE_DP       = 40f
         const val LABEL_TEXT_SIZE_SP  = 12f
         const val HIT_RADIUS_SLOP_DP  = 8f
+        const val FROZEN_ICON_ALPHA  = 0.55f
+        const val FROZEN_BADGE_RATIO = 0.42f
+        const val FROZEN_BADGE_CORNER_RATIO = 0.38f
 
         const val ANGLE_START_RIGHT  = 100f
         const val ANGLE_START_LEFT   = -80f
@@ -42,6 +53,7 @@ class PieView(context: Context) : View(context) {
         val COLOR_SHADOW           = Color.argb(80, 0, 24, 48)
         val COLOR_DOT              = Color.argb(230, 255, 255, 255)
         val COLOR_DOT_HALO         = Color.argb(70, 255, 255, 255)
+        val COLOR_FROZEN_TEXT      = "#90CAF9".toColorInt()
     }
 
     var accentColor: Int = Color.rgb(2, 134, 180)
@@ -103,6 +115,18 @@ class PieView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
         isFakeBoldText = true
     }
+    private val frozenColorFilter = ColorMatrixColorFilter(
+        ColorMatrix().apply { setSaturation(0f) },
+    )
+    private val frozenBadgeBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = OverlayTheme.FROZEN_BADGE_BG
+    }
+    private val frozenBadgeTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = COLOR_FROZEN_TEXT
+        textAlign = Paint.Align.CENTER
+    }
+    private val frozenBadgeRect = RectF()
     private val path = Path()
     private val outerRect = RectF()
     private val innerRect = RectF()
@@ -252,9 +276,22 @@ class PieView(context: Context) : View(context) {
 
                 val icon = slot.icon
                 if (icon != null) {
-                    icon.alpha = alpha
-                    icon.setBounds(cx - iconHalf, cy - iconHalf, cx + iconHalf, cy + iconHalf)
+                    val iconLeft = cx - iconHalf
+                    val iconTop = cy - iconHalf
+                    val iconRight = cx + iconHalf
+                    val iconBottom = cy + iconHalf
+                    if (slot.isFrozen) {
+                        icon.colorFilter = frozenColorFilter
+                        icon.alpha = (alpha * FROZEN_ICON_ALPHA).toInt().coerceIn(0, 255)
+                    } else {
+                        icon.colorFilter = null
+                        icon.alpha = alpha
+                    }
+                    icon.setBounds(iconLeft, iconTop, iconRight, iconBottom)
                     icon.draw(canvas)
+                    if (slot.isFrozen) {
+                        drawFrozenBadge(canvas, iconLeft, iconTop, iconRight, iconBottom, scale)
+                    }
                 } else if (slot.label.isNotBlank()) {
                     val baseline = cy - (labelPaint.descent() + labelPaint.ascent()) / 2f
                     canvas.drawText(slot.label.take(4), cx.toFloat(), baseline, labelPaint)
@@ -271,5 +308,33 @@ class PieView(context: Context) : View(context) {
         canvas.drawCircle(anchorX, anchorY, scaledDp(15f) * scale, dotHaloPaint)
         dotPaint.alpha = alpha
         canvas.drawCircle(anchorX, anchorY, scaledDp(4.5f) * scale, dotPaint)
+    }
+
+    private fun drawFrozenBadge(
+        canvas: Canvas,
+        iconLeft: Int,
+        iconTop: Int,
+        iconRight: Int,
+        iconBottom: Int,
+        scale: Float,
+    ) {
+        val iconSize = (iconRight - iconLeft).toFloat()
+        if (iconSize <= 0f) return
+        val badgeSize = iconSize * FROZEN_BADGE_RATIO
+        val badgeLeft = iconRight - badgeSize
+        val badgeTop = iconBottom - badgeSize
+        frozenBadgeRect.set(badgeLeft, badgeTop, iconRight.toFloat(), iconBottom.toFloat())
+        val cornerRadius = badgeSize * FROZEN_BADGE_CORNER_RATIO
+
+        val baseBgAlpha = Color.alpha(OverlayTheme.FROZEN_BADGE_BG)
+        frozenBadgeBgPaint.alpha = (baseBgAlpha * scale).toInt().coerceIn(0, 255)
+        canvas.drawRoundRect(frozenBadgeRect, cornerRadius, cornerRadius, frozenBadgeBgPaint)
+
+        frozenBadgeTextPaint.textSize = badgeSize * 0.65f
+        frozenBadgeTextPaint.alpha = (255 * scale).toInt().coerceIn(0, 255)
+        val textCenterX = frozenBadgeRect.centerX()
+        val textBaseline = frozenBadgeRect.centerY() -
+            (frozenBadgeTextPaint.descent() + frozenBadgeTextPaint.ascent()) / 2f
+        canvas.drawText("❄", textCenterX, textBaseline, frozenBadgeTextPaint)
     }
 }
