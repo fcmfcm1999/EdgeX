@@ -418,10 +418,10 @@ class DrawerWindow(
 
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 if (success) launchApp(context, pm, packageName)
-                else android.widget.Toast.makeText(
-                    context, ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
+                else com.fan.edgex.hook.EdgeXSystemToast.show(
+                    context,
+                    ModuleRes.getString(R.string.toast_unfreeze_failed_drawer),
+                )
             }
         }.start()
     }
@@ -440,16 +440,16 @@ class DrawerWindow(
                 } else if (++retries < 10) {
                     handler.postDelayed(task!!, 200)
                 } else {
-                    android.widget.Toast.makeText(
-                        context, ModuleRes.getString(R.string.toast_launch_timeout),
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    com.fan.edgex.hook.EdgeXSystemToast.show(
+                        context,
+                        ModuleRes.getString(R.string.toast_launch_timeout),
+                    )
                 }
             } catch (e: Exception) {
-                android.widget.Toast.makeText(
-                    context, ModuleRes.getString(R.string.toast_launch_error, e.message),
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
+                com.fan.edgex.hook.EdgeXSystemToast.show(
+                    context,
+                    ModuleRes.getString(R.string.toast_launch_error, e.message),
+                )
             }
         }
         task.run()

@@ -19,6 +19,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConditionStore
@@ -56,6 +57,21 @@ class EdgeXComposeSmokeTest {
         composeRule.onNodeWithText(appContext.getString(R.string.compose_home_hero_title)).assertIsDisplayed()
         composeRule.onNodeWithText(appContext.getString(R.string.header_pie_settings)).assertIsDisplayed()
         composeRule.onNodeWithText(appContext.getString(R.string.compose_about_support_author)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag("home_about_guide").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_about_guide)).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_about_detail").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_about_app)).assertIsDisplayed()
+        composeRule.onNodeWithText("v${BuildConfig.VERSION_NAME}").assertIsDisplayed()
+    }
+
+    @Test
+    fun aboutScreenShowsWebsiteAndGithub() {
+        composeRule.onNodeWithTag("home_about_detail").performScrollTo().performClick()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_author)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_website)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.value_website_url)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.label_project_url)).assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.value_project_url)).assertIsDisplayed()
     }
 
     @Test

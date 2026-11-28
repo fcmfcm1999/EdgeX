@@ -79,9 +79,11 @@
     <string name="premium_dex_update_up_to_date">DEX is up to date</string>
     <string name="menu_about">About</string>
     <string name="label_author">Author</string>
-    <string name="label_project_url">Project URL</string>
+    <string name="label_website">Website</string>
+    <string name="label_project_url">GitHub</string>
     <string name="label_version">Version</string>
     <string name="value_author">fantasy1999</string>
+    <string name="value_website_url">edgexy.app</string>
     <string name="value_project_url">github.com/fcmfcm1999/EdgeX</string>
     <string name="value_version">0.1</string>
 
@@ -639,6 +641,8 @@
     <string name="compose_premium_status_reboot">Installed, takes effect after reboot</string>
     <string name="compose_premium_status_installed">Supporter Extras active</string>
     <string name="compose_about_support_author">Support Author</string>
+    <string name="compose_about_guide">User Guide</string>
+    <string name="compose_about_app">About EdgeX</string>
     <string name="compose_about_support_author_crypto">Alipay · WeChat · Crypto</string>
     <string name="compose_about_edgey">EdgeY</string>
     <string name="compose_about_edgey_subtitle">The non-root version of EdgeX</string>

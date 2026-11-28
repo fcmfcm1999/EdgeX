@@ -424,6 +424,7 @@ fun AboutScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val websiteUrl = stringResource(R.string.value_website_url)
     val projectUrl = stringResource(R.string.value_project_url)
     Column(
         modifier = modifier
@@ -438,6 +439,15 @@ fun AboutScreen(
                 subtitle = stringResource(R.string.value_author),
                 icon = EdgeXIcons.Person,
             )
+            EdgeXDivider()
+            EdgeXRow(
+                title = stringResource(R.string.label_website),
+                subtitle = websiteUrl,
+                icon = EdgeXIcons.Website,
+                onClick = { context.openUrl("https://$websiteUrl") },
+            ) {
+                EdgeXIcon(EdgeXIcons.ChevronRight, contentDescription = null, tint = LocalEdgeXColors.current.onSurface)
+            }
             EdgeXDivider()
             EdgeXRow(
                 title = stringResource(R.string.label_project_url),
@@ -756,7 +766,7 @@ private fun deactivateSupporterExtras(context: Context, onComplete: (String) -> 
     }
 }
 
-private fun Context.openUrl(url: String) {
+internal fun Context.openUrl(url: String) {
     runCatching {
         startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
     }

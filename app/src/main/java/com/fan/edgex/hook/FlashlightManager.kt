@@ -73,7 +73,7 @@ object FlashlightManager {
     }
 
     private fun toast(context: Context, text: String) {
-        try { Toast.makeText(context, "EdgeX: $text", Toast.LENGTH_SHORT).show() } catch (_: Throwable) {}
+        EdgeXSystemToast.show(context, text)
     }
 
     private fun showNotification(context: Context) {
