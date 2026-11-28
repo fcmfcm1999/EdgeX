@@ -229,7 +229,7 @@ object TextSelectionOverlay {
                 val text = selected.joinToString("\n") { it.text }
                 copyToClipboard(context, text)
                 val msg = ModuleRes.getString(R.string.copy_copied_count, selected.size)
-                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                EdgeXSystemToast.show(context, msg)
                 dismiss()
             }
         }

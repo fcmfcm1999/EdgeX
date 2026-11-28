@@ -718,12 +718,7 @@ internal class GestureActionDispatcher(
     }
 
     private fun showToast(context: Context, text: String) {
-        handlerProvider().post {
-            try {
-                Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
-            } catch (_: Throwable) {
-            }
-        }
+        EdgeXSystemToast.show(context, text)
     }
 
     private fun launchShortcut(context: Context, action: String) {
@@ -784,7 +779,6 @@ internal class GestureActionDispatcher(
     }
 
     private fun performRefreeze(context: Context) {
-        val handler = Handler(Looper.getMainLooper())
         Thread {
             try {
                 val pm = context.packageManager
@@ -799,13 +793,7 @@ internal class GestureActionDispatcher(
                 }
 
                 if (packageSet.isEmpty()) {
-                    handler.post {
-                        Toast.makeText(
-                            context,
-                            ModuleRes.getString(R.string.toast_freezer_list_empty),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                    showToast(context, ModuleRes.getString(R.string.toast_freezer_list_empty))
                     return@Thread
                 }
 
@@ -834,31 +822,13 @@ internal class GestureActionDispatcher(
                 }
 
                 if (count > 0) {
-                    handler.post {
-                        Toast.makeText(
-                            context,
-                            ModuleRes.getString(R.string.toast_refrozen_apps, count),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                    showToast(context, ModuleRes.getString(R.string.toast_refrozen_apps, count))
                 } else {
-                    handler.post {
-                        Toast.makeText(
-                            context,
-                            ModuleRes.getString(R.string.toast_no_apps_to_freeze),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                    showToast(context, ModuleRes.getString(R.string.toast_no_apps_to_freeze))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                handler.post {
-                    Toast.makeText(
-                        context,
-                        ModuleRes.getString(R.string.toast_freeze_error, e.message),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
+                showToast(context, ModuleRes.getString(R.string.toast_freeze_error, e.message))
             }
         }.start()
     }

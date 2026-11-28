@@ -145,7 +145,6 @@ fun EdgeLightingScreen(
             onSelected = {
                 selectedEffect = it.code
                 context.putConfig(AppConfig.EDGE_LIGHTING_EFFECT, it.code)
-                showToast(context.getString(R.string.compose_selected_toast, context.getString(it.labelRes)))
             },
         )
         EdgeLightingSectionLabel(stringResource(R.string.edge_lighting_section_general))

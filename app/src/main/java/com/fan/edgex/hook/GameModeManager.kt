@@ -26,22 +26,14 @@ object GameModeManager {
     fun enable(context: Context, handler: Handler) {
         if (isActive) return
         isActive = true
-        handler.post {
-            try {
-                Toast.makeText(context, "EdgeX: ${ModuleRes.getString(R.string.game_mode_toast_on)}", Toast.LENGTH_SHORT).show()
-            } catch (_: Throwable) {}
-        }
+        EdgeXSystemToast.show(context, ModuleRes.getString(R.string.game_mode_toast_on))
         showNotification(context)
     }
 
     fun disable(context: Context, handler: Handler) {
         if (!isActive) return
         isActive = false
-        handler.post {
-            try {
-                Toast.makeText(context, "EdgeX: ${ModuleRes.getString(R.string.game_mode_toast_off)}", Toast.LENGTH_SHORT).show()
-            } catch (_: Throwable) {}
-        }
+        EdgeXSystemToast.show(context, ModuleRes.getString(R.string.game_mode_toast_off))
         cancelNotification(context)
     }
 

@@ -59,6 +59,8 @@ object EdgeXIcons {
     @DrawableRes val Info = R.drawable.ic_info
     @DrawableRes val Donate = R.drawable.ic_donate
     @DrawableRes val Link = R.drawable.ic_link
+    @DrawableRes val Guide = R.drawable.ic_menu_book
+    @DrawableRes val Website = R.drawable.ic_language
     @DrawableRes val Terminal = R.drawable.ic_terminal
     @DrawableRes val Vibration = R.drawable.ic_vibration
     @DrawableRes val SubGesture = R.drawable.ic_sub_gesture
