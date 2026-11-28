@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
@@ -30,8 +31,7 @@ fun ConditionSheet(
     open: Boolean,
     prefKey: String,
     title: String,
-    excludedCodes: Set<String> = emptySet(),
-    includeMultiActionFlowControls: Boolean = false,
+    scope: ActionPickerScope,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -153,12 +153,11 @@ fun ConditionSheet(
         ActionSelectionSheet(
             open = true,
             title = branchTitle,
+            scope = scope,
             onDismiss = {
                 pickingBranch = null
                 secondarySheet = null
             },
-            excludedCodes = excludedCodes,
-            includeMultiActionFlowControls = includeMultiActionFlowControls,
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
@@ -189,8 +188,7 @@ fun ConditionSheet(
             type = activeSecondary,
             prefKey = branchPrefKey,
             title = branchTitle,
-            excludedCodes = excludedCodes,
-            includeMultiActionFlowControls = includeMultiActionFlowControls,
+            scope = scope,
             onDismiss = {
                 secondarySheet = null
                 pickingBranch = null

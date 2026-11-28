@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
 import com.fan.edgex.config.ActionFlowStore
+import com.fan.edgex.config.ActionPickerScope
+import com.fan.edgex.config.ActionVisibilityPolicy
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.ui.compose.theme.EdgeXRadius
 import com.fan.edgex.ui.compose.theme.LocalEdgeXColors
@@ -82,21 +84,15 @@ val allActionSelectionItems = listOf(
 fun ActionSelectionSheet(
     open: Boolean,
     title: String,
+    scope: ActionPickerScope,
     onDismiss: () -> Unit,
-    excludedCodes: Set<String>,
-    includeMultiActionFlowControls: Boolean = false,
     onSelect: (ActionSelectionItem) -> Unit,
 ) {
     val colors = LocalEdgeXColors.current
     var searchQuery by remember { mutableStateOf("") }
 
-    val effectiveExcluded = remember(excludedCodes, includeMultiActionFlowControls) {
-        if (includeMultiActionFlowControls) excludedCodes
-        else excludedCodes + ActionFlowStore.MULTI_ACTION_ONLY_FLOW_CODES
-    }
-
-    val items = remember(effectiveExcluded) {
-        allActionSelectionItems.filter { it.code !in effectiveExcluded }
+    val items = remember(scope) {
+        allActionSelectionItems.filter { ActionVisibilityPolicy.isVisible(it.code, scope) }
     }
 
     val query = searchQuery.trim()

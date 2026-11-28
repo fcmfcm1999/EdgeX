@@ -43,17 +43,4 @@ class ActionFlowStoreTest {
         assertEquals(0, ActionFlowStore.parseRepeatCount("bad"))
         assertEquals(ActionFlowStore.MAX_REPEAT_COUNT, ActionFlowStore.parseRepeatCount("99999999"))
     }
-
-    @Test
-    fun `all flow control actions are restricted to multi-action picker`() {
-        assertEquals(
-            setOf(
-                ActionFlowStore.ACTION_DELAY_MENU,
-                ActionFlowStore.ACTION_REPEAT_MENU,
-                ActionFlowStore.ACTION_ABORT,
-                ActionFlowStore.ACTION_STOP_ALL,
-            ),
-            ActionFlowStore.MULTI_ACTION_ONLY_FLOW_CODES,
-        )
-    }
 }

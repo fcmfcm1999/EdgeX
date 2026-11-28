@@ -60,6 +60,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionEntryPoint
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigBool
 import com.fan.edgex.config.getConfigString
@@ -251,8 +253,8 @@ fun KeysScreen(
         ActionSelectionSheet(
             open = true,
             title = triggerTitle,
+            scope = ActionPickerScope(ActionEntryPoint.KEY),
             onDismiss = { pickingTrigger = null },
-            excludedCodes = emptySet(),
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
@@ -280,6 +282,7 @@ fun KeysScreen(
             type = secondarySheet,
             prefKey = prefKey,
             title = triggerTitle,
+            scope = ActionPickerScope(ActionEntryPoint.KEY),
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null
@@ -546,8 +549,8 @@ fun PieScreen(
     ActionSelectionSheet(
         open = sheetSector != null && secondarySheet == null,
         title = sheetTitle,
+        scope = ActionPickerScope(ActionEntryPoint.PIE_SLOT),
         onDismiss = { pickingSector = null },
-        excludedCodes = setOf("pie"),
         onSelect = { action ->
             val sector = sheetSector ?: return@ActionSelectionSheet
             val prefKey = AppConfig.pieSlot(edge.id, sector.ring, sector.slot)
@@ -573,7 +576,7 @@ fun PieScreen(
             type = activeSecondary,
             prefKey = prefKey,
             title = sheetTitle,
-            excludedCodes = setOf("pie"),
+            scope = ActionPickerScope(ActionEntryPoint.PIE_SLOT),
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null

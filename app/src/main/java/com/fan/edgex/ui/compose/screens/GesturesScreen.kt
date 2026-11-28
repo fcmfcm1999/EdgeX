@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionEntryPoint
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.GestureZoneGeometryCalculator
 import com.fan.edgex.config.getConfigBool
@@ -303,10 +305,10 @@ fun GesturesScreen(
         ActionSelectionSheet(
             open = true,
             title = gestureTitle,
+            scope = ActionPickerScope(ActionEntryPoint.GESTURE),
             onDismiss = {
                 pickingActionForId = null
             },
-            excludedCodes = emptySet(),
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondaryTypeName = SecondaryType.fromCode(action.code)?.name
@@ -335,6 +337,7 @@ fun GesturesScreen(
             type = secondarySheet,
             prefKey = prefKey,
             title = gestureTitle,
+            scope = ActionPickerScope(ActionEntryPoint.GESTURE),
             onCreateMultiAction = onOpenMultiActions,
             onDismiss = { secondaryTypeName = null },
             onSaved = {

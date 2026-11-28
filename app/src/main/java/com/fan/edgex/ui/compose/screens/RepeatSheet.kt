@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fan.edgex.R
 import com.fan.edgex.config.ActionFlowStore
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfig
 import com.fan.edgex.config.putConfigsSync
@@ -47,8 +48,7 @@ fun RepeatSheet(
     open: Boolean,
     prefKey: String,
     title: String,
-    excludedCodes: Set<String> = emptySet(),
-    includeMultiActionFlowControls: Boolean = false,
+    scope: ActionPickerScope,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -195,12 +195,11 @@ fun RepeatSheet(
         ActionSelectionSheet(
             open = true,
             title = stringResource(R.string.repeat_action_label),
+            scope = scope,
             onDismiss = {
                 pickingAction = false
                 secondarySheet = null
             },
-            excludedCodes = excludedCodes,
-            includeMultiActionFlowControls = false,
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
@@ -222,8 +221,7 @@ fun RepeatSheet(
             type = activeSecondary,
             prefKey = childPrefKey,
             title = stringResource(R.string.repeat_action_label),
-            excludedCodes = excludedCodes,
-            includeMultiActionFlowControls = includeMultiActionFlowControls,
+            scope = scope,
             onDismiss = {
                 secondarySheet = null
                 pickingAction = false

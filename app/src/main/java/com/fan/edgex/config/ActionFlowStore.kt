@@ -13,14 +13,6 @@ object ActionFlowStore {
     const val DEFAULT_REPEAT_COUNT = 2
     const val MAX_REPEAT_COUNT = 999_999
 
-    /** Actions that are only shown when configuring a multi-action. */
-    val MULTI_ACTION_ONLY_FLOW_CODES: Set<String> = setOf(
-        ACTION_DELAY_MENU,
-        ACTION_REPEAT_MENU,
-        ACTION_ABORT,
-        ACTION_STOP_ALL,
-    )
-
     fun buildDelayCode(durationMs: Long): String =
         "$ACTION_DELAY_PREFIX${durationMs.coerceIn(0L, MAX_DELAY_MS)}"
 

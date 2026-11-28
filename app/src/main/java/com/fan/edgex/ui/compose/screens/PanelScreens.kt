@@ -46,6 +46,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionEntryPoint
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ThemeColorResolver
 import com.fan.edgex.config.getConfigString
@@ -159,14 +161,12 @@ fun CustomPanelScreen(
         Spacer(modifier = Modifier.height(28.dp))
     }
 
-    val panelExcluded = remember {
-        setOf(AppConfig.CUSTOM_PANEL_ACTION, AppConfig.PIE_ACTION, AppConfig.SUB_GESTURE_ACTION)
-    }
+    val panelScope = remember { ActionPickerScope(ActionEntryPoint.CUSTOM_PANEL_SLOT) }
     ActionSelectionSheet(
         open = selectedSlot != null && secondarySheet == null,
         title = selectedSlot?.title.orEmpty(),
+        scope = panelScope,
         onDismiss = { selectedSlot = null },
-        excludedCodes = panelExcluded,
         onSelect = { action ->
             val slot = selectedSlot ?: return@ActionSelectionSheet
             if (action.needsSecondary) {
@@ -186,7 +186,7 @@ fun CustomPanelScreen(
             type = activeSecondary,
             prefKey = activeSlot.key,
             title = activeSlot.title,
-            excludedCodes = panelExcluded,
+            scope = panelScope,
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null
@@ -226,14 +226,7 @@ fun SideBarScreen(
         SideBarSide.Left to stringResource(SideBarSide.Left.labelRes),
         SideBarSide.Right to stringResource(SideBarSide.Right.labelRes),
     )
-    val excluded = remember {
-        setOf(
-            AppConfig.SIDE_BAR_LEFT_ACTION,
-            AppConfig.SIDE_BAR_RIGHT_ACTION,
-            AppConfig.PIE_ACTION,
-            AppConfig.SUB_GESTURE_ACTION,
-        )
-    }
+    val sideBarScope = remember { ActionPickerScope(ActionEntryPoint.SIDE_BAR_SLOT) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -297,8 +290,8 @@ fun SideBarScreen(
     ActionSelectionSheet(
         open = selectedSlot != null && secondarySheet == null,
         title = selectedSlot?.title.orEmpty(),
+        scope = sideBarScope,
         onDismiss = { selectedSlot = null },
-        excludedCodes = excluded,
         onSelect = { action ->
             val slot = selectedSlot ?: return@ActionSelectionSheet
             if (action.needsSecondary) {
@@ -318,7 +311,7 @@ fun SideBarScreen(
             type = activeSecondary,
             prefKey = activeSlot.key,
             title = activeSlot.title,
-            excludedCodes = excluded,
+            scope = sideBarScope,
             onDismiss = { secondarySheet = null },
             onSaved = {
                 secondarySheet = null

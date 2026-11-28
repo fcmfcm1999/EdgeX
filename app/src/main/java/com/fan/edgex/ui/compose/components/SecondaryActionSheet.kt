@@ -3,6 +3,7 @@ package com.fan.edgex.ui.compose.components
 import androidx.compose.runtime.Composable
 import com.fan.edgex.R
 import com.fan.edgex.config.ActionFlowStore
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.MultiActionStore
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfigsSync
@@ -46,8 +47,7 @@ fun SecondaryActionDispatcher(
     type: SecondaryType?,
     prefKey: String,
     title: String,
-    excludedCodes: Set<String> = emptySet(),
-    includeMultiActionFlowControls: Boolean = false,
+    scope: ActionPickerScope,
     onCreateMultiAction: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
@@ -129,7 +129,7 @@ fun SecondaryActionDispatcher(
                 open = true,
                 prefKey = prefKey,
                 title = title,
-                excludedCodes = excludedCodes,
+                scope = scope.enterSubGesture(),
                 onDismiss = onDismiss,
                 onSaved = onSaved,
             )
@@ -140,8 +140,7 @@ fun SecondaryActionDispatcher(
                 open = true,
                 prefKey = prefKey,
                 title = title,
-                excludedCodes = excludedCodes,
-                includeMultiActionFlowControls = includeMultiActionFlowControls,
+                scope = scope.enterConditionBranch(),
                 onDismiss = onDismiss,
                 onSaved = onSaved,
             )
@@ -192,8 +191,7 @@ fun SecondaryActionDispatcher(
                 open = true,
                 prefKey = prefKey,
                 title = title,
-                excludedCodes = excludedCodes,
-                includeMultiActionFlowControls = includeMultiActionFlowControls,
+                scope = scope.enterRepeatChild(),
                 onDismiss = onDismiss,
                 onSaved = onSaved,
             )

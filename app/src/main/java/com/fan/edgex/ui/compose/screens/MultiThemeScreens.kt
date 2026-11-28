@@ -59,7 +59,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionEntryPoint
 import com.fan.edgex.config.ActionFlowStore
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConditionStore
 import com.fan.edgex.config.MultiAction
@@ -490,15 +492,15 @@ private fun MultiActionEditorScreen(
         },
     )
 
+    val multiActionScope = remember { ActionPickerScope(ActionEntryPoint.MULTI_ACTION_EDITOR) }
     ActionSelectionSheet(
         open = choosingAction,
         title = stringResource(R.string.header_action_selection),
+        scope = multiActionScope,
         onDismiss = {
             choosingAction = false
             editingStepIndex = null
         },
-        excludedCodes = setOf("none", "multi_action"),
-        includeMultiActionFlowControls = true,
         onSelect = { action ->
             val targetIndex = editingStepIndex
             when (action.code) {
@@ -543,8 +545,7 @@ private fun MultiActionEditorScreen(
         open = showConditionSheet,
         prefKey = MultiActionStore.tempStepKey(),
         title = stringResource(R.string.action_condition),
-        excludedCodes = setOf("multi_action"),
-        includeMultiActionFlowControls = true,
+        scope = multiActionScope.enterConditionBranch(),
         onDismiss = { showConditionSheet = false; conditionTargetIndex = null },
         onSaved = {
             val tempKey = MultiActionStore.tempStepKey()
@@ -569,8 +570,7 @@ private fun MultiActionEditorScreen(
             type = activeSecondaryType,
             prefKey = MultiActionStore.tempStepKey(),
             title = stringResource(R.string.header_action_selection),
-            excludedCodes = setOf("multi_action"),
-            includeMultiActionFlowControls = true,
+            scope = multiActionScope,
             onDismiss = {
                 secondaryType = null
                 secondaryTargetIndex = null

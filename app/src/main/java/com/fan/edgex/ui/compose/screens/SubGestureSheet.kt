@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.fan.edgex.R
+import com.fan.edgex.config.ActionPickerScope
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.getConfigString
 import com.fan.edgex.config.putConfigsSync
@@ -66,7 +67,7 @@ fun SubGestureSheet(
     open: Boolean,
     prefKey: String,
     title: String,
-    excludedCodes: Set<String> = emptySet(),
+    scope: ActionPickerScope,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
 ) {
@@ -125,11 +126,11 @@ fun SubGestureSheet(
         ActionSelectionSheet(
             open = true,
             title = childTitle,
+            scope = scope,
             onDismiss = {
                 pickingDirection = null
                 secondarySheet = null
             },
-            excludedCodes = excludedCodes,
             onSelect = { action ->
                 if (action.needsSecondary) {
                     secondarySheet = SecondaryType.fromCode(action.code)
@@ -154,7 +155,7 @@ fun SubGestureSheet(
             type = activeSecondary,
             prefKey = childKey,
             title = childTitle,
-            excludedCodes = excludedCodes,
+            scope = scope,
             onDismiss = {
                 secondarySheet = null
                 pickingDirection = null
