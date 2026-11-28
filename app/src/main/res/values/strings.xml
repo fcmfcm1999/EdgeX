@@ -411,7 +411,7 @@
     <string name="action_delay">Delay</string>
     <string name="action_repeat">Repeat</string>
     <string name="action_abort">Abort</string>
-    <string name="action_stop_all">Stop All</string>
+    <string name="action_stop_all">Stop Running Actions</string>
     <string name="delay_duration_label">Duration (ms)</string>
     <string name="delay_duration_hint">e.g. 1000</string>
     <string name="delay_summary">%1$s: %2$s</string>

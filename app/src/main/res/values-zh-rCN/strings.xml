@@ -431,7 +431,7 @@
     <string name="action_delay">延时</string>
     <string name="action_repeat">重复</string>
     <string name="action_abort">终止</string>
-    <string name="action_stop_all">全部停止</string>
+    <string name="action_stop_all">停止运行中的动作</string>
     <string name="delay_duration_label">等待时长（毫秒）</string>
     <string name="delay_duration_hint">例如 1000</string>
     <string name="delay_summary">%1$s: %2$s</string>

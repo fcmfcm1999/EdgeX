@@ -402,7 +402,7 @@ private class PanelOverlayWindow(
         ActionFlowStore.isDelay(action) -> "Delay"
         action.startsWith(ActionFlowStore.ACTION_REPEAT_PREFIX) -> "Repeat"
         action == ActionFlowStore.ACTION_ABORT -> "Abort"
-        action == ActionFlowStore.ACTION_STOP_ALL -> "Stop All"
+        action == ActionFlowStore.ACTION_STOP_ALL -> "Stop Actions"
         else -> action
     }
 
