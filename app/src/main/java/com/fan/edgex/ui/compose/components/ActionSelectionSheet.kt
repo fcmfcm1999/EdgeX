@@ -165,7 +165,9 @@ fun ActionSelectionSheet(
 
             finalRows.forEach { rowItems ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ActionGridItem(
@@ -174,7 +176,9 @@ fun ActionSelectionSheet(
                             searchQuery = ""
                             onSelect(rowItems[0])
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
                     if (rowItems.size > 1) {
                         ActionGridItem(
@@ -183,7 +187,9 @@ fun ActionSelectionSheet(
                                 searchQuery = ""
                                 onSelect(rowItems[1])
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
@@ -234,7 +240,8 @@ fun ActionGridItem(
                 color = colors.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
-                maxLines = 1,
+                lineHeight = 16.sp,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
