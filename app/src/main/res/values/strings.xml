@@ -631,6 +631,7 @@
     <string name="compose_premium_status_installed">Supporter Extras active</string>
     <string name="compose_about_support_author">Support Author</string>
     <string name="compose_about_guide">User Guide</string>
+    <string name="compose_about_app">About EdgeX</string>
     <string name="compose_about_support_author_crypto">Alipay · WeChat · Crypto</string>
     <string name="compose_about_edgey">EdgeY</string>
     <string name="compose_about_edgey_subtitle">The non-root version of EdgeX</string>

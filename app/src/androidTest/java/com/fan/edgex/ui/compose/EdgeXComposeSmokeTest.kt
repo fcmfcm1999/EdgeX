@@ -19,6 +19,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.ViewMatchers.withText
+import com.fan.edgex.BuildConfig
 import com.fan.edgex.R
 import com.fan.edgex.config.AppConfig
 import com.fan.edgex.config.ConditionStore
@@ -58,6 +59,9 @@ class EdgeXComposeSmokeTest {
         composeRule.onNodeWithText(appContext.getString(R.string.compose_about_support_author)).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("home_about_guide").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(appContext.getString(R.string.compose_about_guide)).assertIsDisplayed()
+        composeRule.onNodeWithTag("home_about_detail").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(appContext.getString(R.string.compose_about_app)).assertIsDisplayed()
+        composeRule.onNodeWithText("v${BuildConfig.VERSION_NAME}").assertIsDisplayed()
     }
 
     @Test

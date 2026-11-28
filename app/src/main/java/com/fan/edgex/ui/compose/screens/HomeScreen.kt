@@ -478,8 +478,8 @@ private fun AboutSettings(callbacks: HomeCallbacks, premiumStatus: PremiumActiva
         }
         EdgeXDivider()
         EdgeXRow(
-            title = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
-            subtitle = stringResource(R.string.value_project_url),
+            title = stringResource(R.string.compose_about_app),
+            subtitle = "v${BuildConfig.VERSION_NAME}",
             icon = EdgeXIcons.About,
             onClick = { callbacks.openRoute(EdgeXRoute.About) },
             modifier = Modifier.testTag("home_about_detail"),
